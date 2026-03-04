@@ -7,7 +7,7 @@ import {
   logger,
   OpenAIEmbeddingProvider,
   type OpenAIProviderConfig
-} from '@nexo-labs/payload-indexer'
+} from '@zetesis/payload-indexer'
 import type { SpendingEntry } from '../../../../../shared/index'
 import type { ChatEndpointConfig } from '../route'
 

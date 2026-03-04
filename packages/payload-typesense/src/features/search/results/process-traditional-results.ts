@@ -1,4 +1,4 @@
-import type { TableConfig } from '@nexo-labs/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { SearchResponse } from 'typesense/lib/Typesense/Documents'
 import type { CollectionSearchResult, CombinedSearchResult, SearchHit } from '../types'
 

@@ -288,7 +288,7 @@ export interface RAGFeatureConfig extends RAGConfig {
 }
 
 // Re-export embedding types from payload-indexer (single source of truth)
-export type { EmbeddingProviderConfig } from '@nexo-labs/payload-indexer'
+export type { EmbeddingProviderConfig } from '@zetesis/payload-indexer'
 
 type TypesenseProtocol = 'http' | 'https'
 

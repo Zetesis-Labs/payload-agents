@@ -1,4 +1,4 @@
-# @nexo-labs/payload-typesense
+# @zetesis/payload-typesense
 
 A powerful, production-ready search plugin that integrates [Typesense](https://typesense.org/) with [Payload CMS](https://payloadcms.com/). This plugin provides lightning-fast, typo-tolerant search capabilities with real-time synchronization, and a comprehensive RAG (Retrieval Augmented Generation) system for building AI-powered conversational agents.
 
@@ -20,7 +20,7 @@ A powerful, production-ready search plugin that integrates [Typesense](https://t
 ## Installation
 
 ```bash
-pnpm add @nexo-labs/payload-typesense
+pnpm add @zetesis/payload-typesense
 ```
 
 ## Configuration
@@ -31,7 +31,7 @@ The plugin is configured in your `payload.config.ts`.
 
 ```typescript
 import { buildConfig } from 'payload/config';
-import { typesenseSearch } from '@nexo-labs/payload-typesense';
+import { typesenseSearch } from '@zetesis/payload-typesense';
 
 export default buildConfig({
   // ...

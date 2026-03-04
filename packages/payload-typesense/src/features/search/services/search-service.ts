@@ -1,4 +1,4 @@
-import type { TableConfig } from '@nexo-labs/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { Client } from 'typesense'
 import type { ModularPluginConfig } from '../../../core/config/types'
 import { logger } from '../../../core/logging/logger'

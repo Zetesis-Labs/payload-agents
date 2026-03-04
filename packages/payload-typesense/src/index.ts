@@ -1,5 +1,5 @@
 /**
- * @nexo-labs/payload-typesense
+ * @zetesis/payload-typesense
  *
  * Full-text and vector search plugin for Payload CMS using Typesense
  * with optional RAG (Retrieval Augmented Generation) support

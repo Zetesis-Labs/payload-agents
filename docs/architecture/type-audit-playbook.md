@@ -48,13 +48,13 @@ Metodologia reproducible para auditar la calidad de tipos de un paquete TypeScri
 
 ```bash
 # 1. Build del paquete
-pnpm --filter @nexo-labs/{paquete} build
+pnpm --filter @zetesis/{paquete} build
 
 # 2. Type-check global (detecta breaking changes en la app)
 pnpm tsc --noEmit
 
 # 3. Si hay tests
-pnpm --filter @nexo-labs/{paquete} test
+pnpm --filter @zetesis/{paquete} test
 ```
 
 Los 3 deben pasar con **0 errores** antes de documentar resultados.
@@ -137,7 +137,7 @@ Incluir:
 
 ### Verificacion
 
-- [ ] `pnpm --filter @nexo-labs/{paquete} build` — 0 errores
+- [ ] `pnpm --filter @zetesis/{paquete} build` — 0 errores
 - [ ] `pnpm tsc --noEmit` — 0 errores
 - [ ] Tests pasan (si existen)
 
@@ -149,7 +149,7 @@ Incluir:
 # Type Audit: {nombre-paquete}
 
 > **Fecha**: YYYY-MM-DD
-> **Paquete**: `@nexo-labs/{paquete}`
+> **Paquete**: `@zetesis/{paquete}`
 > **Referencia**: [`payload-cast-patterns.md`](../architecture/payload-cast-patterns.md)
 
 ## Contexto

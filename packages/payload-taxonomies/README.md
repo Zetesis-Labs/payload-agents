@@ -1,18 +1,18 @@
-# @nexo-labs/payload-taxonomies
+# @zetesis/payload-taxonomies
 
 Hierarchical taxonomy collection and relationship utilities for Payload CMS.
 
 ## Installation
 
 ```bash
-pnpm add @nexo-labs/payload-taxonomies
+pnpm add @zetesis/payload-taxonomies
 ```
 
 ## Usage
 
 ```ts
 // payload.config.ts
-import { taxonomiesCollection } from '@nexo-labs/payload-taxonomies'
+import { taxonomiesCollection } from '@zetesis/payload-taxonomies'
 
 export default buildConfig({
   collections: [
@@ -24,7 +24,7 @@ export default buildConfig({
 
 ```ts
 // In another collection
-import { buildTaxonomyRelationship } from '@nexo-labs/payload-taxonomies'
+import { buildTaxonomyRelationship } from '@zetesis/payload-taxonomies'
 
 const PostsCollection = {
   slug: 'posts',

@@ -1,5 +1,5 @@
 /**
- * Re-export logger from @nexo-labs/payload-indexer
+ * Re-export logger from @zetesis/payload-indexer
  */
 
-export { logger } from '@nexo-labs/payload-indexer'
+export { logger } from '@zetesis/payload-indexer'

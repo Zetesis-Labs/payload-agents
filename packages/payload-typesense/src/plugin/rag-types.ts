@@ -2,7 +2,7 @@
  * Types for the composable Typesense RAG plugin
  */
 
-import type { EmbeddingProviderConfig, TableConfig } from '@nexo-labs/payload-indexer'
+import type { EmbeddingProviderConfig, TableConfig } from '@zetesis/payload-indexer'
 import type { CollectionSlug } from 'payload'
 import type { TypesenseFieldMapping } from '../adapter/types'
 import type {

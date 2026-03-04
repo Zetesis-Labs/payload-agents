@@ -26,7 +26,7 @@ export interface TypesenseAdapterOptions {
  *
  * @example
  * ```typescript
- * import { createTypesenseAdapter } from '@nexo-labs/payload-typesense';
+ * import { createTypesenseAdapter } from '@zetesis/payload-typesense';
  *
  * const adapter = createTypesenseAdapter({
  *   apiKey: process.env.TYPESENSE_API_KEY!,

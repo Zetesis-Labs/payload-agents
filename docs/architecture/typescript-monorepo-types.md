@@ -126,7 +126,7 @@ Con `moduleResolution: "bundler"`, TypeScript lee la condicion `types` primero (
 
 #### Capa 3: Sin paths a source
 
-Se eliminaron los `paths` de `tsconfig.base.json` que apuntaban `@nexo-labs/*` al source de los paquetes. Sin estos paths, TypeScript resuelve los imports a traves de los symlinks de pnpm workspace + `package.json` exports, que redirigen tipos a `dist/`.
+Se eliminaron los `paths` de `tsconfig.base.json` que apuntaban `@zetesis/*` al source de los paquetes. Sin estos paths, TypeScript resuelve los imports a traves de los symlinks de pnpm workspace + `package.json` exports, que redirigen tipos a `dist/`.
 
 ### Casts en paquetes
 
@@ -164,7 +164,7 @@ apps/server -> chat-agent, payload-betterauth-stripe,
 
 ```bash
 # 1. Build paquetes (genera .d.mts en dist/)
-pnpm --filter "@nexo-labs/*" build
+pnpm --filter "@zetesis/*" build
 
 # 2. Type-check la app (usa .d.mts compilados, sin leak)
 cd apps/server && pnpm tsc --noEmit
@@ -214,14 +214,14 @@ La separacion `types -> dist` / `import -> src` es nuestra solucion principal. L
 Cuando TypeScript en `apps/server` encuentra:
 
 ```typescript
-import { cleanupStaleCustomer } from '@nexo-labs/payload-betterauth-stripe/server'
+import { cleanupStaleCustomer } from '@zetesis/payload-betterauth-stripe/server'
 ```
 
 La resolucion sigue esta cadena:
 
 1. **TypeScript busca en `paths` de tsconfig** → No hay match. Los `paths` que apuntaban a source fueron eliminados intencionalmente (ver Decision 2).
 
-2. **Busca en `node_modules`** → Encuentra el symlink de pnpm workspace: `node_modules/@nexo-labs/payload-betterauth-stripe` → `packages/payload-betterauth-stripe/`.
+2. **Busca en `node_modules`** → Encuentra el symlink de pnpm workspace: `node_modules/@zetesis/payload-betterauth-stripe` → `packages/payload-betterauth-stripe/`.
 
 3. **Lee `package.json` exports** para el subpath `./server`:
    ```json
@@ -246,7 +246,7 @@ La resolucion sigue esta cadena:
 
 ```
 tsconfig.base.json:
-  "paths": { "@nexo-labs/payload-betterauth-stripe/*": ["packages/payload-betterauth-stripe/src/*"] }
+  "paths": { "@zetesis/payload-betterauth-stripe/*": ["packages/payload-betterauth-stripe/src/*"] }
 ```
 
 Con paths activos:
@@ -281,7 +281,7 @@ Con paths activos:
 
 **Problema**: Los paths cortocircuitan la resolucion de exports en `package.json`. Con paths a source, TypeScript incluye el source del paquete en el mismo programa que `payload-types.ts`, causando el augmentation leak.
 
-**Decision**: Eliminar todos los `paths` de `@nexo-labs/*` de `tsconfig.base.json`.
+**Decision**: Eliminar todos los `paths` de `@zetesis/*` de `tsconfig.base.json`.
 
 **Justificacion**:
 - Sin paths, TypeScript sigue la cadena: `node_modules` → symlink pnpm → `package.json` exports → `dist/` (aislado)
@@ -409,7 +409,7 @@ Cada paquete hereda `outDir: "${configDir}/dist"` y `${configDir}` se resuelve a
 
 **Solucion**: Rebuild el paquete:
 ```bash
-pnpm --filter @nexo-labs/paquete build
+pnpm --filter @zetesis/paquete build
 ```
 
 ### "Errores de tipo union despues de payload generate:types"
@@ -419,7 +419,7 @@ pnpm --filter @nexo-labs/paquete build
 **Verificar**:
 1. El paquete **NO** tiene paths en `tsconfig.base.json` apuntando a su source
 2. El `exports` del `package.json` tiene `"types"` apuntando a `dist/` (no a `src/`)
-3. El `dist/` esta actualizado: `pnpm --filter @nexo-labs/paquete build`
+3. El `dist/` esta actualizado: `pnpm --filter @zetesis/paquete build`
 
 ### "Go to Definition me lleva a un .d.mts"
 
@@ -432,15 +432,15 @@ ls packages/payload-betterauth-stripe/dist/**/*.d.mts.map
 
 Si no existen, rebuild el paquete para que tsdown los genere.
 
-### "Cannot find module '@nexo-labs/...' or its type declarations"
+### "Cannot find module '@zetesis/...' or its type declarations"
 
 **Causa**: El paquete no esta buildeado (no existe `dist/`).
 
 **Solucion**:
 ```bash
-pnpm --filter @nexo-labs/paquete build
+pnpm --filter @zetesis/paquete build
 # O para todos:
-pnpm --filter "@nexo-labs/*" build
+pnpm --filter "@zetesis/*" build
 ```
 
 ### "Property X does not exist on type union"

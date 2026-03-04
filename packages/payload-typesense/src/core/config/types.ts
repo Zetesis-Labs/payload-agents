@@ -1,4 +1,4 @@
-import type { TableConfig } from '@nexo-labs/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { CollectionSlug } from 'payload'
 import type { TypesenseFieldMapping } from '../../adapter/types'
 import type {

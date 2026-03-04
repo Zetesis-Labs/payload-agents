@@ -1,4 +1,4 @@
-import type { TableConfig } from '@nexo-labs/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { Client } from 'typesense'
 import type { CollectionCreateSchema } from 'typesense/lib/Typesense/Collections'
 import { isTypesense404, type TypesenseFieldMapping } from '../../../adapter/types'

@@ -1,18 +1,18 @@
-# @nexo-labs/chat-agent
+# @zetesis/chat-agent
 
 Floating chat agent component for React applications with AI integration. Built on [`@assistant-ui/react`](https://github.com/assistant-ui/assistant-ui).
 
 ## Installation
 
 ```bash
-pnpm add @nexo-labs/chat-agent
+pnpm add @zetesis/chat-agent
 ```
 
 ## Usage
 
 ```tsx
-import { FloatingChatManager, ChatProvider, NexoPayloadChatAdapter } from '@nexo-labs/chat-agent'
-import '@nexo-labs/chat-agent/styles.css'
+import { FloatingChatManager, ChatProvider, NexoPayloadChatAdapter } from '@zetesis/chat-agent'
+import '@zetesis/chat-agent/styles.css'
 
 const adapter = new NexoPayloadChatAdapter({ baseUrl: '/api/chat' })
 

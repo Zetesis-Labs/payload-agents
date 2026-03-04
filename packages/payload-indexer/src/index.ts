@@ -1,5 +1,5 @@
 /**
- * @nexo-labs/payload-indexer
+ * @zetesis/payload-indexer
  *
  * Generic document indexing library for Payload CMS
  * with support for multiple search backends, embedding providers, and chunking strategies.

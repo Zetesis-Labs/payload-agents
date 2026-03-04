@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, TaskType } from '@google/generative-ai'
-import { logger, MIN_EMBEDDING_TEXT_LENGTH } from '@nexo-labs/payload-indexer'
+import { logger, MIN_EMBEDDING_TEXT_LENGTH } from '@zetesis/payload-indexer'
 import OpenAI from 'openai'
 import type {
   BatchEmbeddingWithUsage,

@@ -1,17 +1,17 @@
-# @nexo-labs/payload-lexical-blocks-builder
+# @zetesis/payload-lexical-blocks-builder
 
 Builder and renderer utilities for Payload CMS Lexical editor blocks.
 
 ## Installation
 
 ```bash
-pnpm add @nexo-labs/payload-lexical-blocks-builder
+pnpm add @zetesis/payload-lexical-blocks-builder
 ```
 
 ## Usage
 
 ```ts
-import { buildLexicalByFeatures } from '@nexo-labs/payload-lexical-blocks-builder/builder'
+import { buildLexicalByFeatures } from '@zetesis/payload-lexical-blocks-builder/builder'
 
 const lexicalConfig = buildLexicalByFeatures({
   features: [HeadingFeature, BoldFeature],

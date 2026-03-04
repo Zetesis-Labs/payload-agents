@@ -45,8 +45,8 @@ export interface IndexerPluginResult {
  *
  * @example
  * ```typescript
- * import { createIndexerPlugin } from '@nexo-labs/payload-indexer';
- * import { createTypesenseAdapter } from '@nexo-labs/payload-typesense';
+ * import { createIndexerPlugin } from '@zetesis/payload-indexer';
+ * import { createTypesenseAdapter } from '@zetesis/payload-typesense';
  *
  * const adapter = createTypesenseAdapter({ apiKey: '...', nodes: [...] });
  *
@@ -200,8 +200,8 @@ function injectSyncStatusField(
           admin: {
             position: 'sidebar',
             components: {
-              Field: '@nexo-labs/payload-indexer/client#SyncStatusField',
-              Cell: '@nexo-labs/payload-indexer/client#SyncStatusCell'
+              Field: '@zetesis/payload-indexer/client#SyncStatusField',
+              Cell: '@zetesis/payload-indexer/client#SyncStatusCell'
             }
           }
         }

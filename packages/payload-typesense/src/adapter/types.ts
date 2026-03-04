@@ -3,7 +3,7 @@
  * These are the data types and field configurations supported by Typesense
  */
 
-import type { BaseCollectionSchema, FieldMapping } from '@nexo-labs/payload-indexer'
+import type { BaseCollectionSchema, FieldMapping } from '@zetesis/payload-indexer'
 
 /**
  * All valid Typesense field types

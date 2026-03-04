@@ -2,7 +2,7 @@
 
 /**
  * Client-side exports for payload-indexer admin components
- * Import via: @nexo-labs/payload-indexer/client
+ * Import via: @zetesis/payload-indexer/client
  */
 
 export { SyncStatusCell } from './components/SyncStatusCell'

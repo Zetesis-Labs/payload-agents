@@ -9,7 +9,7 @@
 
 Publicar paquetes de un monorepo Payload a npm presenta tres desafios:
 
-1. **Type isolation**: Los tipos generados por `payload generate:types` (`declare module 'payload'`) no deben filtrarse al paquete publicado. Un consumidor que instala `@nexo-labs/payload-indexer` no debe recibir los tipos de coleccion de nuestra app.
+1. **Type isolation**: Los tipos generados por `payload generate:types` (`declare module 'payload'`) no deben filtrarse al paquete publicado. Un consumidor que instala `@zetesis/payload-indexer` no debe recibir los tipos de coleccion de nuestra app.
 
 2. **Dual-mode resolution**: Durante desarrollo, queremos que el IDE y Next.js lean el **source** (para HMR y Go to Definition). Pero el paquete publicado debe contener solo **artefactos compilados** (`dist/`).
 
@@ -325,7 +325,7 @@ Para features que solo se activan si el consumidor tiene la dependencia instalad
 ```json
 // payload-typesense/package.json
 "dependencies": {
-  "@nexo-labs/payload-indexer": "workspace:*"
+  "@zetesis/payload-indexer": "workspace:*"
 }
 ```
 
@@ -334,7 +334,7 @@ Para features que solo se activan si el consumidor tiene la dependencia instalad
 ```json
 // En el tarball publicado
 "dependencies": {
-  "@nexo-labs/payload-indexer": "^0.5.0"
+  "@zetesis/payload-indexer": "^0.5.0"
 }
 ```
 
@@ -351,13 +351,13 @@ Cuando `payload-typesense` depende de `payload-indexer`, sus declarations import
 import {
   BaseCollectionSchema, FieldMapping, IndexerAdapter,
   TableConfig, VectorSearchOptions
-} from "@nexo-labs/payload-indexer";
+} from "@zetesis/payload-indexer";
 ```
 
 Esto funciona porque:
-1. `@nexo-labs/payload-indexer` esta en `dependencies` (no `external` — se resuelve como dependencia normal)
+1. `@zetesis/payload-indexer` esta en `dependencies` (no `external` — se resuelve como dependencia normal)
 2. Pero sus **tipos** no se inlinean — `dts: { resolve: true }` solo inlinea tipos de archivos internos del paquete
-3. tsdown marca `@nexo-labs/payload-indexer` como external automaticamente porque esta en `dependencies`
+3. tsdown marca `@zetesis/payload-indexer` como external automaticamente porque esta en `dependencies`
 4. El consumidor instala ambos paquetes y TypeScript resuelve los tipos transitivamente
 
 ---
@@ -377,11 +377,11 @@ Usamos [Changesets](https://github.com/changesets/changesets) para gestionar ver
   "baseBranch": "main",
   "linked": [
     [
-      "@nexo-labs/payload-typesense",
-      "@nexo-labs/payload-indexer",
-      "@nexo-labs/payload-stripe-inventory",
-      "@nexo-labs/payload-taxonomies",
-      "@nexo-labs/payload-lexical-blocks-builder"
+      "@zetesis/payload-typesense",
+      "@zetesis/payload-indexer",
+      "@zetesis/payload-stripe-inventory",
+      "@zetesis/payload-taxonomies",
+      "@zetesis/payload-lexical-blocks-builder"
     ]
   ],
   "updateInternalDependencies": "minor"
@@ -422,7 +422,7 @@ npm provenance vincula el paquete publicado con el commit y workflow de GitHub q
 ### 1. Desarrollo (monorepo)
 
 ```
-apps/server importa @nexo-labs/payload-indexer
+apps/server importa @zetesis/payload-indexer
   ↓
 TypeScript (tsc --noEmit):
   → Lee exports.types → dist/index.d.mts (tipos aislados, CollectionSlug = string)
@@ -459,11 +459,11 @@ Por cada paquete con changeset:
 ### 4. Consumidor instala
 
 ```bash
-npm install @nexo-labs/payload-indexer
+npm install @zetesis/payload-indexer
 ```
 
 ```
-node_modules/@nexo-labs/payload-indexer/
+node_modules/@zetesis/payload-indexer/
 ├── dist/
 │   ├── index.mjs         ← JavaScript
 │   ├── index.d.mts       ← Tipos (autocontenidos)
@@ -476,7 +476,7 @@ node_modules/@nexo-labs/payload-indexer/
 El consumidor importa:
 
 ```typescript
-import { createIndexerPlugin } from '@nexo-labs/payload-indexer'
+import { createIndexerPlugin } from '@zetesis/payload-indexer'
 ```
 
 TypeScript resuelve tipos desde `dist/index.d.mts`. JavaScript se resuelve desde `dist/index.mjs`. Ambos son artefactos compilados, aislados, sin leak de tipos.
@@ -491,7 +491,7 @@ declare module 'payload' {
 // CollectionSlug = 'posts' | 'users' | 'media'
 ```
 
-Pero los tipos de `@nexo-labs/payload-indexer` ya estan compilados. Sus `.d.mts` dicen `CollectionSlug` (que es `string` en el .d.mts), no la union del consumidor. **No hay leak bidireccional**.
+Pero los tipos de `@zetesis/payload-indexer` ya estan compilados. Sus `.d.mts` dicen `CollectionSlug` (que es `string` en el .d.mts), no la union del consumidor. **No hay leak bidireccional**.
 
 ---
 
@@ -532,7 +532,7 @@ Pero los tipos de `@nexo-labs/payload-indexer` ya estan compilados. Sus `.d.mts`
 
 ```bash
 # 1. Build limpio
-pnpm --filter @nexo-labs/{paquete} clean && pnpm --filter @nexo-labs/{paquete} build
+pnpm --filter @zetesis/{paquete} clean && pnpm --filter @zetesis/{paquete} build
 
 # 2. Type-check global
 pnpm tsc --noEmit
@@ -590,10 +590,10 @@ grep -r "from '\.\." dist/*.d.mts  # No debe haber imports relativos que salgan 
 
 **Solucion**: Siempre publicar via `pnpm release` o `changeset publish`, nunca via `npm publish` directo.
 
-### "Import de @nexo-labs/payload-indexer no resuelve en el consumidor"
+### "Import de @zetesis/payload-indexer no resuelve en el consumidor"
 
-**Causa**: `payload-typesense` declara `@nexo-labs/payload-indexer` como `dependencies`, pero el consumidor no lo instalo.
+**Causa**: `payload-typesense` declara `@zetesis/payload-indexer` como `dependencies`, pero el consumidor no lo instalo.
 
-**Verificar**: `npm ls @nexo-labs/payload-indexer` en el proyecto del consumidor. Deberia instalarse transitivamente.
+**Verificar**: `npm ls @zetesis/payload-indexer` en el proyecto del consumidor. Deberia instalarse transitivamente.
 
 **Solucion**: Verificar que esta en `dependencies` (no `devDependencies` ni `peerDependencies`) en `payload-typesense/package.json`.

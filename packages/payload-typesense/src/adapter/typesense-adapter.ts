@@ -3,7 +3,7 @@ import type {
   IndexDocument,
   IndexerAdapter,
   VectorSearchOptions
-} from '@nexo-labs/payload-indexer'
+} from '@zetesis/payload-indexer'
 import type { Client } from 'typesense'
 import type { CollectionFieldSchema } from 'typesense/lib/Typesense/Collection'
 import type { CollectionCreateSchema } from 'typesense/lib/Typesense/Collections'

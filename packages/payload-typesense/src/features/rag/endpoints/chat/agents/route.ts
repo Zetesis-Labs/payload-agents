@@ -1,4 +1,4 @@
-import type { AgentConfig } from '@nexo-labs/payload-typesense'
+import type { AgentConfig } from '@zetesis/payload-typesense'
 import type { PayloadRequest } from 'payload'
 import type { RAGFeatureConfig } from '../../../../../shared/types/plugin-types'
 import { jsonResponse } from '../validators/index'

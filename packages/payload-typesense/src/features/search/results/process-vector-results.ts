@@ -1,4 +1,4 @@
-import type { TableConfig } from '@nexo-labs/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import { DEFAULT_PAGE, DEFAULT_PER_PAGE } from '../constants'
 import type { CombinedSearchResult, ProcessVectorSearchResultsOptions, SearchHit } from '../types'
 

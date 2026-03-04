@@ -2,7 +2,7 @@
 
 ## Project
 
-TypeScript monorepo (pnpm workspaces + Turborepo) with 5 publishable npm packages under `@nexo-labs/`.
+TypeScript monorepo (pnpm workspaces + Turborepo) with 5 publishable npm packages under `@zetesis/`.
 
 Open-source Payload CMS plugins extracted from ZetesisPortal.
 
@@ -60,7 +60,7 @@ To audit types of a package, follow the playbook manually.
 
 ```bash
 # Build a package
-pnpm --filter @nexo-labs/{pkg} build
+pnpm --filter @zetesis/{pkg} build
 
 # Type-check global (solution-style)
 pnpm tsc --noEmit

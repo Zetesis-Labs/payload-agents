@@ -12,7 +12,7 @@ export default defineConfig({
   outDir: 'dist',
   tsconfig: './tsconfig.json',
   external: [
-    '@nexo-labs/payload-indexer',
+    '@zetesis/payload-indexer',
     'payload',
     '@payloadcms/richtext-lexical',
     'next',

@@ -219,12 +219,12 @@ importers:
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
-      '@nexo-labs/payload-indexer':
-        specifier: workspace:*
-        version: link:../payload-indexer
       '@payloadcms/richtext-lexical':
         specifier: ^3.75.0
         version: 3.79.0(@faceless-ui/modal@3.0.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@faceless-ui/scroll-info@2.0.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@payloadcms/next@3.79.0(@types/react@19.1.8)(graphql@16.13.1)(monaco-editor@0.55.1)(next@16.1.6(@playwright/test@1.58.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.77.4))(payload@3.79.0(graphql@16.13.1)(typescript@5.7.3))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.7.3))(@types/react@19.1.8)(monaco-editor@0.55.1)(next@16.1.6(@playwright/test@1.58.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.77.4))(payload@3.79.0(graphql@16.13.1)(typescript@5.7.3))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.7.3)(yjs@13.6.29)
+      '@zetesis/payload-indexer':
+        specifier: workspace:*
+        version: link:../payload-indexer
       openai:
         specifier: ^4.104.0
         version: 4.104.0(ws@8.19.0)(zod@4.3.6)

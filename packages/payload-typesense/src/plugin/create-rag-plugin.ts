@@ -7,12 +7,12 @@
  * - Schema synchronization
  * - Agent synchronization
  *
- * It's designed to be used together with createIndexerPlugin from @nexo-labs/payload-indexer.
+ * It's designed to be used together with createIndexerPlugin from @zetesis/payload-indexer.
  *
  * @example
  * ```typescript
- * import { createIndexerPlugin } from '@nexo-labs/payload-indexer'
- * import { createTypesenseAdapter, createTypesenseRAGPlugin } from '@nexo-labs/payload-typesense'
+ * import { createIndexerPlugin } from '@zetesis/payload-indexer'
+ * import { createTypesenseAdapter, createTypesenseRAGPlugin } from '@zetesis/payload-typesense'
  *
  * // 1. Create adapter
  * const adapter = createTypesenseAdapter(typesenseConnection)
@@ -39,7 +39,7 @@
  * ```
  */
 
-import { Logger } from '@nexo-labs/payload-indexer'
+import { Logger } from '@zetesis/payload-indexer'
 import type { Config } from 'payload'
 import { createTypesenseClient } from '../core/client/typesense-client'
 import { createRAGPayloadHandlers } from '../features/rag/endpoints'

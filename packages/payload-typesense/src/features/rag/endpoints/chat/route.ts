@@ -1,4 +1,4 @@
-import type { AgentConfig } from '@nexo-labs/payload-typesense'
+import type { AgentConfig } from '@zetesis/payload-typesense'
 import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
 import { logger } from '../../../../core/logging/logger'
 import type {

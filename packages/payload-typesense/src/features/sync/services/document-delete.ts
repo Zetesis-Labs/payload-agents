@@ -1,4 +1,4 @@
-import type { TableConfig } from '@nexo-labs/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { Client } from 'typesense'
 import { isTypesense404 } from '../../../adapter/types'
 import { logger } from '../../../core/logging/logger'

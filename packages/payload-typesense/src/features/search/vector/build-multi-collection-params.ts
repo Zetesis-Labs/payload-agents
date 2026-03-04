@@ -1,4 +1,4 @@
-import type { TableConfig } from '@nexo-labs/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { BuildMultiCollectionVectorSearchParamsOptions } from '../types'
 import { buildVectorSearchParams } from './build-params'
 

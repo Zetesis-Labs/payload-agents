@@ -3,18 +3,18 @@
   "changelog": [
     "@changesets/changelog-github",
     {
-      "repo": "Zetesis-Labs/payload-agents"
+      "repo": "Zetesis-Labs/PayloadAgents"
     }
   ],
   "commit": false,
   "fixed": [],
   "linked": [
     [
-      "@nexo-labs/payload-typesense",
-      "@nexo-labs/payload-indexer",
-      "@nexo-labs/payload-taxonomies",
-      "@nexo-labs/payload-lexical-blocks-builder",
-      "@nexo-labs/chat-agent"
+      "@zetesis/payload-typesense",
+      "@zetesis/payload-indexer",
+      "@zetesis/payload-taxonomies",
+      "@zetesis/payload-lexical-blocks-builder",
+      "@zetesis/chat-agent"
     ]
   ],
   "access": "public",

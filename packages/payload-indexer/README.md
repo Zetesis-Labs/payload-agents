@@ -1,17 +1,17 @@
-# @nexo-labs/payload-indexer
+# @zetesis/payload-indexer
 
 Generic document indexing library for Payload CMS with support for multiple search backends, embedding providers, and chunking strategies.
 
 ## Installation
 
 ```bash
-pnpm add @nexo-labs/payload-indexer
+pnpm add @zetesis/payload-indexer
 ```
 
 ## Usage
 
 ```ts
-import { createIndexerPlugin, OpenAIEmbeddingProvider } from '@nexo-labs/payload-indexer'
+import { createIndexerPlugin, OpenAIEmbeddingProvider } from '@zetesis/payload-indexer'
 
 const indexerPlugin = createIndexerPlugin({
   collections: ['posts', 'pages'],
@@ -31,7 +31,7 @@ const indexerPlugin = createIndexerPlugin({
 
 ## Exports
 
-### Main (`@nexo-labs/payload-indexer`)
+### Main (`@zetesis/payload-indexer`)
 
 - **`createIndexerPlugin`** - Main plugin factory for Payload CMS
 - **`IndexerAdapter`** - Abstract adapter interface for search backends
@@ -44,7 +44,7 @@ const indexerPlugin = createIndexerPlugin({
 - **`createSyncStatusEndpoints`** - REST endpoints for sync status checks
 - **`checkSyncStatus`** / **`checkBatchSyncStatus`** - Sync status comparison services
 
-### Client (`@nexo-labs/payload-indexer/client`)
+### Client (`@zetesis/payload-indexer/client`)
 
 - **`SyncStatusCell`** - List view cell component showing sync status as a colored Pill
 - **`SyncStatusField`** - Sidebar field component with status display and manual "Sync Now" button
