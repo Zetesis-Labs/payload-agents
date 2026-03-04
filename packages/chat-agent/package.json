@@ -19,12 +19,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Zetesis-Labs/payload-agents.git",
+    "url": "git+https://github.com/Zetesis-Labs/PayloadAgents.git",
     "directory": "packages/chat-agent"
   },
-  "homepage": "https://github.com/Zetesis-Labs/payload-agents/tree/main/packages/chat-agent#readme",
+  "homepage": "https://github.com/Zetesis-Labs/PayloadAgents/tree/main/packages/chat-agent#readme",
   "bugs": {
-    "url": "https://github.com/Zetesis-Labs/payload-agents/issues"
+    "url": "https://github.com/Zetesis-Labs/PayloadAgents/issues"
   },
   "sideEffects": [
     "*.css"

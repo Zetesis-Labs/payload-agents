@@ -72,12 +72,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Zetesis-Labs/payload-agents.git",
+    "url": "git+https://github.com/Zetesis-Labs/PayloadAgents.git",
     "directory": "packages/payload-indexer"
   },
-  "homepage": "https://github.com/Zetesis-Labs/payload-agents/tree/main/packages/payload-indexer#readme",
+  "homepage": "https://github.com/Zetesis-Labs/PayloadAgents/tree/main/packages/payload-indexer#readme",
   "bugs": {
-    "url": "https://github.com/Zetesis-Labs/payload-agents/issues"
+    "url": "https://github.com/Zetesis-Labs/PayloadAgents/issues"
   },
   "author": {
     "name": "Zetesis - Rubén Garcia",
