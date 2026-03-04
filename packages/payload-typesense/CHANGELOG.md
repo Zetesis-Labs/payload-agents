@@ -1,5 +1,14 @@
 # @nexo-labs/payload-typesense
 
+## 1.15.1
+
+### Patch Changes
+
+- [`fba30d5`](https://github.com/Zetesis-Labs/PayloadAgents/commit/fba30d59094ba3199ddcf4a748ced764832915f9) - Extract OSS packages to standalone repo
+
+- Updated dependencies [[`fba30d5`](https://github.com/Zetesis-Labs/PayloadAgents/commit/fba30d59094ba3199ddcf4a748ced764832915f9)]:
+  - @nexo-labs/payload-indexer@1.15.1
+
 ## 1.15.0
 
 ### Minor Changes
