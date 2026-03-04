@@ -1,5 +1,11 @@
 # @nexo-labs/payload-lexical-blocks-builder
 
+## 1.15.1
+
+### Patch Changes
+
+- [`b15adc5`](https://github.com/Zetesis-Labs/payload-agents/commit/b15adc5c36997cf9e83b6acdb7a4dfc8accd4681) - Extract OSS packages to standalone repo
+
 ## 1.15.0
 
 ### Minor Changes

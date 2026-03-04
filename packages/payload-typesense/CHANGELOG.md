@@ -1,5 +1,14 @@
 # @nexo-labs/payload-typesense
 
+## 1.15.1
+
+### Patch Changes
+
+- [`b15adc5`](https://github.com/Zetesis-Labs/payload-agents/commit/b15adc5c36997cf9e83b6acdb7a4dfc8accd4681) - Extract OSS packages to standalone repo
+
+- Updated dependencies [[`b15adc5`](https://github.com/Zetesis-Labs/payload-agents/commit/b15adc5c36997cf9e83b6acdb7a4dfc8accd4681)]:
+  - @nexo-labs/payload-indexer@1.15.1
+
 ## 1.15.0
 
 ### Minor Changes
