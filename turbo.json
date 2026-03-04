@@ -1,0 +1,32 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT",
+        ".env*"
+      ],
+      "outputs": [
+        ".turbo/**",
+        ".next/**",
+        ".vercel/**",
+        "build/**",
+        "dist/**"
+      ]
+    },
+    "test": {
+      "inputs": [
+        "src/**/*.ts",
+        "vitest.config.ts"
+      ]
+    },
+    "lint": {},
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

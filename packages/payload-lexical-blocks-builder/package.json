@@ -1,0 +1,94 @@
+{
+  "name": "@nexo-labs/payload-lexical-blocks-builder",
+  "version": "1.15.0",
+  "description": "Builder y renderer de bloques para Payload CMS Lexical",
+  "keywords": [
+    "payload-cms",
+    "lexical",
+    "blocks",
+    "builder",
+    "renderer"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Zetesis - Rubén Garcia",
+    "email": "ruben@zetesis.xyz",
+    "url": "https://zetesis.xyz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Zetesis-Labs/payload-agents",
+    "directory": "packages/payload-lexical-blocks-builder"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./builder": {
+      "types": "./dist/builder.d.mts",
+      "import": "./src/builder.ts",
+      "default": "./src/builder.ts"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.mts",
+      "import": "./src/renderer.ts",
+      "default": "./src/renderer.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "pnpm copyfiles && tsdown",
+    "dev": "tsdown --watch",
+    "clean": "rimraf -g {dist,*.tsbuildinfo}",
+    "copyfiles": "copyfiles -u 1 \"src/**/*.{html,css,scss,ttf,woff,woff2,eot,svg,jpg,png,json}\" dist/ || true",
+    "prepublishOnly": "pnpm clean && pnpm build"
+  },
+  "peerDependencies": {
+    "@payloadcms/richtext-lexical": "^3.75.0",
+    "@payloadcms/ui": "^3.75.0",
+    "payload": "^3.75.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@payloadcms/richtext-lexical": "^3.75.0",
+    "@storybook/react": "^8.6.11",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19",
+    "copyfiles": "^2.4.1",
+    "rimraf": "^5.0.10",
+    "tsdown": "^0.16.5",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./builder": {
+        "types": "./dist/builder.d.mts",
+        "import": "./dist/builder.mjs",
+        "default": "./dist/builder.mjs"
+      },
+      "./renderer": {
+        "types": "./dist/renderer.d.mts",
+        "import": "./dist/renderer.mjs",
+        "default": "./dist/renderer.mjs"
+      }
+    },
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

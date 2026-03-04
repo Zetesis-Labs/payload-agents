@@ -1,0 +1,35 @@
+{
+  "name": "payload-agents",
+  "private": true,
+  "license": "MIT",
+  "author": {
+    "name": "Zetesis - Ruben Garcia",
+    "email": "ruben@zetesis.xyz",
+    "url": "https://zetesis.xyz"
+  },
+  "scripts": {
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "turbo run build --filter=\"./packages/*\" && changeset publish",
+    "build": "turbo run build --continue",
+    "lint": "biome check packages/*/src --no-errors-on-unmatched",
+    "lint:fix": "biome check --write packages/*/src --no-errors-on-unmatched",
+    "format": "biome format --write packages/*/src --no-errors-on-unmatched",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.14",
+    "@changesets/changelog-github": "^0.5.0",
+    "@changesets/cli": "^2.27.1",
+    "@types/react": "^19.0.12",
+    "tsdown": "^0.16.5",
+    "turbo": "^2.4.0",
+    "typescript": "5.7.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": "25.x || 22.x || 23.x || 24.x"
+  },
+  "type": "module",
+  "packageManager": "pnpm@10.14.0"
+}

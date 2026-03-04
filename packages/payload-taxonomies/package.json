@@ -1,0 +1,87 @@
+{
+  "name": "@nexo-labs/payload-taxonomies",
+  "version": "1.15.0",
+  "description": "Taxonomies for Payload CMS",
+  "keywords": [
+    "payload-cms",
+    "taxonomies"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Zetesis - Rubén Garcia",
+    "email": "ruben@zetesis.xyz",
+    "url": "https://zetesis.xyz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Zetesis-Labs/payload-agents",
+    "directory": "packages/payload-taxonomies"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.mts",
+      "import": "./src/constants.ts",
+      "default": "./src/constants.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "pnpm copyfiles && tsdown",
+    "dev": "tsdown --watch",
+    "clean": "rimraf -g {dist,*.tsbuildinfo}",
+    "copyfiles": "copyfiles -u 1 \"src/**/*.{html,css,scss,ttf,woff,woff2,eot,svg,jpg,png,json,mjs}\" dist/ || true",
+    "prepublishOnly": "pnpm clean && pnpm build",
+    "taxonomize": "node src/processor/runners/run-taxonomizer.mjs",
+    "process": "node src/processor/runners/run-processor.mjs",
+    "diagram": "node src/processor/runners/run-diagram-generator.mjs",
+    "all": "pnpm run taxonomize && pnpm run process && pnpm run diagram"
+  },
+  "peerDependencies": {
+    "@payloadcms/ui": "^3.75.0",
+    "payload": "^3.75.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/json-schema": "^7.0.11",
+    "@types/node": "^22.0.0",
+    "dotenv": "16.4.7",
+    "copyfiles": "^2.4.1",
+    "payload": "^3.75.0",
+    "rimraf": "^5.0.10",
+    "tsdown": "^0.16.5",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./constants": {
+        "types": "./dist/constants.d.mts",
+        "import": "./dist/constants.mjs",
+        "default": "./dist/constants.mjs"
+      }
+    },
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1"
+  }
+}

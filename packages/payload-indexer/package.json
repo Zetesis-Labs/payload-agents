@@ -1,0 +1,105 @@
+{
+  "name": "@nexo-labs/payload-indexer",
+  "version": "1.15.0",
+  "description": "Generic document indexing library for Payload CMS with support for multiple search backends, embedding providers, and chunking strategies.",
+  "license": "MIT",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.mts",
+      "import": "./src/client/index.ts",
+      "default": "./src/client/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "clean": "rimraf -g {dist,*.tsbuildinfo}",
+    "prepublishOnly": "pnpm clean && pnpm build"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@langchain/textsplitters": "^1.0.0",
+    "openai": "^4.68.0"
+  },
+  "peerDependencies": {
+    "@payloadcms/richtext-lexical": "^3.75.0",
+    "@payloadcms/ui": "^3.75.0",
+    "payload": "^3.75.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@payloadcms/richtext-lexical": {
+      "optional": true
+    },
+    "@payloadcms/ui": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.7",
+    "@types/react": "^19",
+    "rimraf": "3.0.2",
+    "tsdown": "^0.16.5",
+    "typescript": "5.7.3"
+  },
+  "engines": {
+    "pnpm": "^9 || ^10"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "indexer",
+    "search",
+    "embeddings",
+    "chunking",
+    "rag",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zetesis-Labs/payload-agents.git",
+    "directory": "packages/payload-indexer"
+  },
+  "homepage": "https://github.com/Zetesis-Labs/payload-agents/tree/main/packages/payload-indexer#readme",
+  "bugs": {
+    "url": "https://github.com/Zetesis-Labs/payload-agents/issues"
+  },
+  "author": {
+    "name": "Zetesis - Rubén Garcia",
+    "email": "ruben@zetesis.xyz",
+    "url": "https://zetesis.xyz"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./client": {
+        "types": "./dist/client/index.d.mts",
+        "import": "./dist/client/index.mjs",
+        "default": "./dist/client/index.mjs"
+      }
+    },
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}
