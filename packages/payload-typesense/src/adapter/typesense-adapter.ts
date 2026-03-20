@@ -1,9 +1,4 @@
-import type {
-  AdapterSearchResult,
-  IndexDocument,
-  IndexerAdapter,
-  VectorSearchOptions
-} from '@zetesis/payload-indexer'
+import type { AdapterSearchResult, IndexDocument, IndexerAdapter, VectorSearchOptions } from '@zetesis/payload-indexer'
 import type { Client } from 'typesense'
 import type { CollectionFieldSchema } from 'typesense/lib/Typesense/Collection'
 import type { CollectionCreateSchema } from 'typesense/lib/Typesense/Collections'

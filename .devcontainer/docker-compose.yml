@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    env_file:
+      - devcontainer.env
+      - path: devcontainer.env.local
+        required: false
+    networks:
+      - default_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  typesense:
+    image: typesense/typesense:30.0.rc29
+    restart: unless-stopped
+    ports:
+      - "8108:8108"
+    volumes:
+      - typesense_data:/data
+    command: ["--data-dir", "/data", "--api-key=xyz", "--enable-cors"]
+    networks:
+      - default_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      - node_modules:/workspace/node_modules:delegated
+      - claude_memory:/root/.claude
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sleep infinity
+    env_file:
+      - devcontainer.env
+      - path: devcontainer.env.local
+        required: false
+    depends_on:
+      db:
+        condition: service_healthy
+      typesense:
+        condition: service_started
+    networks:
+      - default_network
+
+volumes:
+  node_modules:
+  claude_memory:
+  postgres_data:
+  typesense_data:
+
+networks:
+  default_network:
+    driver: bridge

@@ -186,6 +186,8 @@ export interface TypesenseQueryConfig {
   advancedConfig?: AdvancedSearchConfig
   /** Taxonomy slugs to filter RAG content */
   taxonomySlugs?: string[]
+  /** When true, block search if no taxonomySlugs are assigned (prevents global searches in multi-tenant setups) */
+  requireTaxonomies?: boolean
 }
 
 /**
@@ -390,6 +392,12 @@ export interface AgentConfig<SearchCollections extends readonly string[] = strin
    * If empty/undefined, searches all content.
    */
   taxonomySlugs?: string[]
+  /**
+   * When true, block search if no taxonomySlugs are assigned.
+   * Useful in multi-tenant setups to prevent global searches.
+   * Default: false (no taxonomies = search all content)
+   */
+  requireTaxonomies?: boolean
   /**
    * Maximum number of tokens the LLM can generate in responses.
    * Default: 16000 (suitable for most use cases)

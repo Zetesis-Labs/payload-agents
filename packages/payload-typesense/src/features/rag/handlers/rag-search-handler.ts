@@ -27,6 +27,8 @@ export type RAGSearchConfig = {
   }
   /** Taxonomy slugs to filter RAG content */
   taxonomySlugs?: string[]
+  /** When true, block search if no taxonomySlugs are assigned */
+  requireTaxonomies?: boolean
 }
 
 /**
@@ -90,7 +92,8 @@ export async function executeRAGSearch(
     searchCollections: searchConfig.searchCollections,
     kResults: searchConfig.kResults || 10,
     advancedConfig: searchConfig.advancedConfig,
-    taxonomySlugs: searchConfig.taxonomySlugs
+    taxonomySlugs: searchConfig.taxonomySlugs,
+    requireTaxonomies: searchConfig.requireTaxonomies
   })
 
   // Execute the search

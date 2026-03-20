@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Server",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm run dev",
+      "cwd": "${workspaceFolder}/apps/server"
+    },
+    {
+      "name": "Lint fix",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm lint:fix",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Type check",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm tsc --noEmit",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Test",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm test",
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch",
+      "configurations": ["Server"],
+      "stopAll": true
+    },
+    {
+      "name": "Eval",
+      "configurations": ["Type check", "Lint fix"],
+      "stopAll": true
+    }
+  ]
+}
