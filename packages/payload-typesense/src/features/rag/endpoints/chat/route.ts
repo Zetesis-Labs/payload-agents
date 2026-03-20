@@ -134,6 +134,7 @@ function buildSearchConfigFromAgent(
     searchCollections: agent.searchCollections,
     kResults: agent.kResults,
     taxonomySlugs: agent.taxonomySlugs,
+    requireTaxonomies: agent.requireTaxonomies,
     advancedConfig
   }
 }

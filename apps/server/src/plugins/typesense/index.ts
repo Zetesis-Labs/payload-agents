@@ -1,6 +1,8 @@
 import { createIndexerPlugin } from '@zetesis/payload-indexer'
 import { createTypesenseAdapter, createTypesenseRAGPlugin } from '@zetesis/payload-typesense'
 import type { Config } from 'payload'
+import { agents } from './agents'
+import { callbacks } from './callbacks'
 import { collections } from './collections'
 import { embeddingConfig, typesenseConnection } from './config'
 
@@ -37,6 +39,8 @@ const typesenseRAGPlugin = createTypesenseRAGPlugin({
       tables: SEARCH_COLLECTIONS
     }
   },
+  agents,
+  callbacks,
   hybrid: {
     alpha: 0.9,
     rerankMatches: true,

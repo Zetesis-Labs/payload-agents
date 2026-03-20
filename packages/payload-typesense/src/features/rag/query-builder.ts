@@ -79,7 +79,8 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
     selectedDocuments,
     kResults = 10,
     advancedConfig = {},
-    taxonomySlugs
+    taxonomySlugs,
+    requireTaxonomies = false
   } = config
 
   return searchCollections.map((collection: string) => {
@@ -100,13 +101,13 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
       filters.push(`parent_doc_id:[${documentIds}]`)
     }
 
-    // Add taxonomy filter - REQUIRED to prevent global searches
+    // Add taxonomy filter if the agent has taxonomies assigned
     if (taxonomySlugs && taxonomySlugs.length > 0) {
       const taxFilter = taxonomySlugs.map((s: string) => `"${s}"`).join(',')
       filters.push(`taxonomy_slugs:[${taxFilter}]`)
-    } else {
-      // No taxonomies assigned = no search results allowed (prevent global search)
-      filters.push(`id:=__BLOCKED_NO_TAXONOMIES__`)
+    } else if (requireTaxonomies) {
+      // Block global searches when taxonomies are required but none assigned
+      filters.push('id:=__BLOCKED_NO_TAXONOMIES__')
     }
 
     // Apply combined filters
