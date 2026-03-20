@@ -69,6 +69,8 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    posts: Post;
+    taxonomy: Taxonomy;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,6 +80,8 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    posts: PostsSelect<false> | PostsSelect<true>;
+    taxonomy: TaxonomySelect<false> | TaxonomySelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -86,10 +90,10 @@ export interface Config {
   db: {
     defaultIDType: number;
   };
-  fallbackLocale: null;
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('es' | 'en') | ('es' | 'en')[];
   globals: {};
   globalsSelect: {};
-  locale: null;
+  locale: 'es' | 'en';
   widgets: {
     collections: CollectionsWidget;
   };
@@ -163,6 +167,70 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: number;
+  title?: string | null;
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  publishedAt?: string | null;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Transforms to apply to the content text before indexing. Order matters.
+   */
+  text_transforms?: ('strip-urls' | 'strip-mentions' | 'normalize-whitespace')[] | null;
+  categories?: (number | Taxonomy)[] | null;
+  _syncStatus?: ('synced' | 'outdated' | 'not-indexed' | 'error') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "taxonomy".
+ */
+export interface Taxonomy {
+  id: number;
+  name: string;
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  /**
+   * Metadata: types, permissions, selectable, etc.
+   */
+  payload?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -192,6 +260,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'posts';
+        value: number | Post;
+      } | null)
+    | ({
+        relationTo: 'taxonomy';
+        value: number | Taxonomy;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -274,6 +350,34 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts_select".
+ */
+export interface PostsSelect<T extends boolean = true> {
+  title?: T;
+  generateSlug?: T;
+  slug?: T;
+  publishedAt?: T;
+  content?: T;
+  text_transforms?: T;
+  categories?: T;
+  _syncStatus?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "taxonomy_select".
+ */
+export interface TaxonomySelect<T extends boolean = true> {
+  name?: T;
+  generateSlug?: T;
+  slug?: T;
+  payload?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
