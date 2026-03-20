@@ -1,6 +1,6 @@
 {
   "name": "@zetesis/chat-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Floating chat agent component for React applications with AI integration",
   "keywords": [
     "react",
