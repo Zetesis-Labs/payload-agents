@@ -1,5 +1,12 @@
 # @zetesis/payload-typesense
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`c73a899`](https://github.com/Zetesis-Labs/PayloadAgents/commit/c73a89959dba50c31f5563bf21978952f7a8e3ce)]:
+  - @zetesis/payload-indexer@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes

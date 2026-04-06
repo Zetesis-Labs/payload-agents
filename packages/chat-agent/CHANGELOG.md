@@ -1,5 +1,11 @@
 # @zetesis/chat-agent
 
+## 0.1.3
+
+### Patch Changes
+
+- [`c73a899`](https://github.com/Zetesis-Labs/PayloadAgents/commit/c73a89959dba50c31f5563bf21978952f7a8e3ce) - fix: issue regarding jsx tsdown build compilation
+
 ## 0.1.1
 
 ### Patch Changes
