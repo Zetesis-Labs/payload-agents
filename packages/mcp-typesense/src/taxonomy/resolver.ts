@@ -44,6 +44,10 @@ export function createTaxonomyResolver(config: TaxonomyConfig): TaxonomyResolver
         cache = buildCache(docs)
         cacheTimestamp = Date.now()
         return cache
+      } catch (err) {
+        console.error('[mcp-typesense] taxonomy reload failed:', err)
+        if (cache) return cache
+        throw err
       } finally {
         inflight = null
       }

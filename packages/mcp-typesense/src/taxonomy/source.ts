@@ -30,8 +30,7 @@ async function fetchFromPayload(baseUrl: string, collectionSlug: string): Promis
     })
 
     if (!res.ok) {
-      console.error(`[mcp-typesense] taxonomy source error: ${res.status} ${res.statusText}`)
-      return allDocs
+      throw new Error(`[mcp-typesense] taxonomy source error: ${res.status} ${res.statusText} (page ${page})`)
     }
 
     const data = (await res.json()) as { docs: PayloadTaxonomyDoc[]; totalPages: number }

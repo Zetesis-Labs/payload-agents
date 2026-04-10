@@ -34,7 +34,8 @@ export function createOpenAIEmbeddings(config: EmbeddingConfig): EmbeddingServic
           dimensions: config.dimensions
         })
         return response.data[0]?.embedding ?? null
-      } catch {
+      } catch (err) {
+        console.error('[mcp-typesense] OpenAI embedding failed:', err)
         return null
       }
     }

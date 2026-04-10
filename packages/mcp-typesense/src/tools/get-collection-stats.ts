@@ -19,6 +19,8 @@ interface CollectionStats {
   displayName: string
   total_documents: number
   taxonomy_distribution: TaxonomyStat[]
+  error?: string
+  error_message?: string
 }
 
 async function getStatsForCollection(
@@ -71,7 +73,9 @@ async function getStatsForCollection(
       collection: collectionDef.chunkCollection,
       displayName: collectionDef.displayName,
       total_documents: 0,
-      taxonomy_distribution: []
+      taxonomy_distribution: [],
+      error: 'unavailable',
+      error_message: String(err)
     }
   }
 }
