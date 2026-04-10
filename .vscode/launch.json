@@ -9,6 +9,13 @@
       "cwd": "${workspaceFolder}/apps/server"
     },
     {
+      "name": "MCP",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "MCP_PORT=3030 bun --watch src/index.ts",
+      "cwd": "${workspaceFolder}/apps/mcp"
+    },
+    {
       "name": "Lint fix",
       "type": "node-terminal",
       "request": "launch",
@@ -33,7 +40,7 @@
   "compounds": [
     {
       "name": "Launch",
-      "configurations": ["Server"],
+      "configurations": ["Server", "MCP"],
       "stopAll": true
     },
     {

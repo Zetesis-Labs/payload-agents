@@ -1,0 +1,19 @@
+{
+  "name": "mcp",
+  "version": "0.2.2",
+  "description": "MCP server — thin wrapper around @zetesis/mcp-typesense with env-var config.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "MCP_PORT=3030 bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@zetesis/mcp-typesense": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^25.5.0"
+  }
+}
