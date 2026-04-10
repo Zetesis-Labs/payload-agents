@@ -1,6 +1,6 @@
 {
   "name": "mcp",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "MCP server — thin wrapper around @zetesis/mcp-typesense with env-var config.",
   "private": true,
   "type": "module",
