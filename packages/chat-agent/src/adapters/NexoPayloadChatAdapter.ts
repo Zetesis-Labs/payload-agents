@@ -222,7 +222,7 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
     }
   }
 
-  async loadSession(id: string): Promise<{ conversationId: string; messages: Message[] } | null> {
+  async loadSession(id: string): Promise<{ conversationId: string; messages: Message[]; agentSlug?: string } | null> {
     try {
       const response = await fetch(`/api/chat/session?conversationId=${encodeURIComponent(id)}`)
       if (response.ok) {
@@ -234,7 +234,8 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
         }
         return {
           conversationId: sessionData.conversation_id,
-          messages: this.parseBackendMessages(sessionData.messages)
+          messages: this.parseBackendMessages(sessionData.messages),
+          agentSlug: sessionData.agentSlug
         }
       }
       return null

@@ -19,10 +19,15 @@ interface UseChatSessionReturn {
   deleteSession: (conversationId: string) => Promise<boolean>
 }
 
+interface UseChatSessionOptions {
+  /** Called when a session is loaded with the agent slug it belongs to. */
+  onAgentChange?: (agentSlug: string) => void
+}
+
 /**
  * Hook to manage chat session state and persistence
  */
-export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
+export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOptions): UseChatSessionReturn {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoadingSession, setIsLoadingSession] = useState(true)
@@ -87,6 +92,9 @@ export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
         if (sessionData) {
           setConversationId(sessionData.conversationId)
           setMessages(sessionData.messages)
+          if (sessionData.agentSlug) {
+            options?.onAgentChange?.(sessionData.agentSlug)
+          }
         } else {
           console.error('[useChatSession] ❌ Failed to load session (adapter returned null)')
         }
@@ -96,7 +104,7 @@ export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
         setIsLoadingSession(false)
       }
     },
-    [adapter]
+    [adapter, options?.onAgentChange]
   )
 
   // Rename session
