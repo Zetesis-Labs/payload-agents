@@ -7,8 +7,6 @@ import type { CollectionSlug } from 'payload'
 import type { TypesenseFieldMapping } from '../adapter/types'
 import type {
   AdvancedSearchConfig,
-  AgentConfig,
-  AgentProvider,
   HNSWConfig,
   HybridSearchConfig,
   RAGCallbacks,
@@ -55,9 +53,6 @@ export interface TypesenseRAGPluginConfig {
 
   /** Search configuration */
   search?: TypesenseSearchConfig
-
-  /** RAG agent configurations */
-  agents?: AgentConfig[] | AgentProvider
 
   /** Callback functions for permissions, session management, etc. */
   callbacks?: RAGCallbacks

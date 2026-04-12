@@ -55,11 +55,7 @@ export type {
   StreamProcessingResult
 } from './features/rag'
 // Plugin configuration types
-export type {
-  AgentConfig,
-  AgentProvider,
-  TypesenseConnectionConfig
-} from './shared/types/plugin-types'
+export type { TypesenseConnectionConfig } from './shared/types/plugin-types'
 // Core library types (Typesense-specific)
 export type {
   ApiResponse,
@@ -133,7 +129,7 @@ export { createRAGPayloadHandlers } from './features/rag/endpoints'
 // Search endpoints factory
 export { createSearchEndpoints } from './features/search/endpoints'
 
-// Schema management and RAG agent management are internal to createTypesenseRAGPlugin
+// Schema management is internal to createTypesenseRAGPlugin
 
 // ============================================================================
 // TYPESENSE-SPECIFIC CONSTANTS

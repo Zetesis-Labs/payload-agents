@@ -1,4 +1,3 @@
-import type { AgentConfig } from '@zetesis/payload-typesense'
 import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
 import { logger } from '../../../../core/logging/logger'
 import type {
@@ -27,7 +26,7 @@ export type ChatEndpointConfig = {
   checkPermissions: (request: PayloadRequest) => Promise<boolean>
   /** Typesense connection config */
   typesense: TypesenseConnectionConfig
-  /** RAG search configuration (full config for multi-agent resolution) */
+  /** RAG search configuration */
   rag: RAGFeatureConfig
   /** Get Payload instance */
   getPayload: () => Promise<Payload>
@@ -64,8 +63,7 @@ export type ChatEndpointConfig = {
     assistantMessage: string,
     sources: ChunkSource[],
     spendingEntries: SpendingEntry[],
-    collectionName: CollectionSlug,
-    agentSlug?: string
+    collectionName: CollectionSlug
   ) => Promise<void>
   /** Handle streaming response function */
   handleStreamingResponse: (
@@ -104,62 +102,6 @@ export type ChatEndpointConfig = {
    * @default 120_000 (2 minutes)
    */
   streamTimeoutMs?: number
-}
-
-/**
- * Resolve agents from RAG config (can be array or function)
- */
-async function resolveAgents(config: ChatEndpointConfig, payload: Payload): Promise<AgentConfig<readonly string[]>[]> {
-  if (!config.rag?.agents) {
-    return []
-  }
-  if (typeof config.rag.agents === 'function') {
-    return await config.rag.agents(payload)
-  }
-  if (Array.isArray(config.rag.agents)) {
-    return config.rag.agents
-  }
-  return []
-}
-
-/**
- * Build RAG search config from an agent
- */
-function buildSearchConfigFromAgent(
-  agent: AgentConfig<readonly string[]>,
-  advancedConfig: RAGFeatureConfig['advanced']
-): RAGSearchConfig {
-  return {
-    modelId: agent.slug,
-    searchCollections: agent.searchCollections,
-    kResults: agent.kResults,
-    taxonomySlugs: agent.taxonomySlugs,
-    requireTaxonomies: agent.requireTaxonomies,
-    advancedConfig
-  }
-}
-
-/**
- * Resolve agent and build search config, returning a Response on error
- */
-function resolveSearchConfig(
-  agents: AgentConfig<readonly string[]>[],
-  agentSlug: string | undefined,
-  advancedConfig: RAGFeatureConfig['advanced']
-): RAGSearchConfig | Response {
-  if (agentSlug && agents.length > 0) {
-    const agent = agents.find(a => a.slug === agentSlug)
-    if (!agent) {
-      return new Response(JSON.stringify({ error: `Agent not found: ${agentSlug}` }), { status: 404 })
-    }
-    return buildSearchConfigFromAgent(agent, advancedConfig)
-  }
-  if (agents.length > 0) {
-    const agent = agents[0]
-    if (!agent) throw new Error('Default agent not found')
-    return buildSearchConfigFromAgent(agent, advancedConfig)
-  }
-  return new Response(JSON.stringify({ error: 'No RAG configuration available' }), { status: 500 })
 }
 
 /**
@@ -225,15 +167,11 @@ export function createChatPOSTHandler(config: ChatEndpointConfig) {
       }
 
       const { userId, userEmail, payload, userMessage, body } = validated
-      const agentSlug = body.agentSlug
 
-      // Resolve Agent Configuration
-      const agents = await resolveAgents(config, payload)
-      const searchConfigOrError = resolveSearchConfig(agents, agentSlug, config.rag.advanced)
-      if (searchConfigOrError instanceof Response) {
-        return searchConfigOrError
+      // Build search config from RAG config
+      const searchConfig: RAGSearchConfig = {
+        advancedConfig: config.rag.advanced
       }
-      const searchConfig = searchConfigOrError
 
       // Check token limits if configured.
       // Serialized per-user to prevent TOCTOU race where concurrent requests
@@ -250,8 +188,6 @@ export function createChatPOSTHandler(config: ChatEndpointConfig) {
       logger.info('Processing chat message', {
         userId,
         chatId: body.chatId || 'new',
-        agentSlug: agentSlug || 'default',
-        modelId: searchConfig.modelId,
         isFollowUp: !!body.chatId,
         hasSelectedDocuments: !!body.selectedDocuments,
         messageLength: userMessage.length
@@ -326,8 +262,7 @@ export function createChatPOSTHandler(config: ChatEndpointConfig) {
               userMessage,
               streamResult.fullAssistantMessage,
               streamResult.sources,
-              spendingEntries,
-              agentSlug
+              spendingEntries
             )
 
             logger.info('Chat request completed successfully', {

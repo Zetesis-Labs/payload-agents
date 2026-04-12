@@ -7,7 +7,6 @@
 
 import type { PayloadHandler } from 'payload'
 import type { TypesenseRAGPluginConfig } from '../../plugin/rag-types'
-import { createAgentsGETHandler } from './endpoints/chat/agents/route'
 import { createChatPOSTHandler } from './endpoints/chat/route'
 import {
   createSessionDELETEHandler,
@@ -34,17 +33,15 @@ export function createRAGPayloadHandlers(config: TypesenseRAGPluginConfig): Arra
     handler: PayloadHandler
   }> = []
 
-  // Validate required config
-  if (!config.agents || (Array.isArray(config.agents) && config.agents.length === 0) || !config.callbacks) {
+  if (!config.callbacks) {
     return endpoints
   }
 
-  const { agents, callbacks, typesense } = config
+  const { callbacks, typesense } = config
 
   // Build RAG feature config for handlers that still need it
   const ragFeatureConfig = {
     enabled: true,
-    agents,
     callbacks,
     hybrid: config.hybrid,
     hnsw: config.hnsw,
@@ -119,16 +116,7 @@ export function createRAGPayloadHandlers(config: TypesenseRAGPluginConfig): Arra
     handler: createChunksGETHandler({
       typesense,
       checkPermissions: callbacks.checkPermissions,
-      agents
-    })
-  })
-
-  endpoints.push({
-    path: '/chat/agents',
-    method: 'get' as const,
-    handler: createAgentsGETHandler({
-      ragConfig: ragFeatureConfig,
-      checkPermissions: callbacks.checkPermissions
+      allowedCollections: config.search?.defaults?.tables || []
     })
   })
 

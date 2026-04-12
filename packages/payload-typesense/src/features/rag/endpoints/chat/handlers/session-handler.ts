@@ -14,8 +14,7 @@ export async function saveChatSessionIfNeeded(
   userMessage: string,
   assistantMessage: string,
   sources: ChunkSource[],
-  spendingEntries: SpendingEntry[],
-  agentSlug?: string
+  spendingEntries: SpendingEntry[]
 ): Promise<void> {
   if (!conversationId || !config.saveChatSession) {
     return
@@ -29,12 +28,10 @@ export async function saveChatSessionIfNeeded(
     assistantMessage,
     sources,
     spendingEntries,
-    config.collectionName,
-    agentSlug
+    config.collectionName
   )
 
   logger.info('Chat session saved to PayloadCMS', {
-    conversationId,
-    agentSlug
+    conversationId
   })
 }

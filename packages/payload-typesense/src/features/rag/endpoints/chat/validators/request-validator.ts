@@ -29,7 +29,6 @@ export async function validateChatRequest(
         message: string
         chatId?: string
         selectedDocuments?: string[]
-        agentSlug?: string
       }
     }
 > {

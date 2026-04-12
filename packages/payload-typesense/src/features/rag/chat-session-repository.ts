@@ -45,7 +45,6 @@ interface ChatSessionDocument extends ChatSessionBase {
  * @param sources - Source chunks used for the response
  * @param spending - Token spending entries
  * @param collectionName - Collection name for sessions (default: 'chat-sessions')
- * @param agentSlug - Slug of the agent used in this conversation (optional)
  */
 export async function saveChatSession(
   payload: Payload,
@@ -55,8 +54,7 @@ export async function saveChatSession(
   assistantMessage: string,
   sources: ChunkSource[],
   spending: SpendingEntry[],
-  collectionName: CollectionSlug,
-  agentSlug?: string
+  collectionName: CollectionSlug
 ): Promise<void> {
   try {
     // Check if session already exists
@@ -97,8 +95,7 @@ export async function saveChatSession(
         newUserMessage,
         newAssistantMessage,
         spending,
-        collectionName,
-        agentSlug
+        collectionName
       )
     } else {
       // Create new session
@@ -109,8 +106,7 @@ export async function saveChatSession(
         newUserMessage,
         newAssistantMessage,
         spending,
-        collectionName,
-        agentSlug
+        collectionName
       )
     }
   } catch (error) {
@@ -131,8 +127,7 @@ async function updateExistingSession(
   newUserMessage: ChatMessageWithSources,
   newAssistantMessage: ChatMessageWithSources,
   spending: SpendingEntry[],
-  collectionName: CollectionSlug,
-  agentSlug?: string
+  collectionName: CollectionSlug
 ): Promise<void> {
   const existingMessages = (session.messages as ChatMessageWithSources[]) || []
   const existingSpending = (session.spending as SpendingEntry[]) || []
@@ -151,9 +146,7 @@ async function updateExistingSession(
       total_tokens: totalTokens,
       total_cost: totalCost,
       last_activity: new Date().toISOString(),
-      status: 'active',
-      // Only update agentSlug if provided and session doesn't have one yet
-      ...(agentSlug && !(session as unknown as Record<string, unknown>).agentSlug ? { agentSlug } : {})
+      status: 'active'
     }
   } as Parameters<Payload['update']>[0])
 
@@ -175,8 +168,7 @@ async function createNewSession(
   newUserMessage: ChatMessageWithSources,
   newAssistantMessage: ChatMessageWithSources,
   spending: SpendingEntry[],
-  collectionName: CollectionSlug,
-  agentSlug?: string
+  collectionName: CollectionSlug
 ): Promise<void> {
   const totalTokens = spending.reduce((sum, e) => sum + e.tokens.total, 0)
   const totalCost = spending.reduce((sum, e) => sum + (e.cost_usd || 0), 0)
@@ -187,7 +179,6 @@ async function createNewSession(
       user: typeof userId === 'string' ? Number(userId) : userId,
       conversation_id: conversationId,
       status: 'active',
-      agentSlug,
       messages: [newUserMessage, newAssistantMessage],
       spending,
       total_tokens: totalTokens,
