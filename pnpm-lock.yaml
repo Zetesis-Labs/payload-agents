@@ -220,6 +220,28 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
 
+  packages/payload-agents-core:
+    dependencies:
+      '@toon-format/toon':
+        specifier: ^2.1.0
+        version: 2.1.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.5.4
+        version: 22.19.13
+      payload:
+        specifier: ^3.0.0
+        version: 3.81.0(graphql@16.13.1)(typescript@5.7.3)
+      rimraf:
+        specifier: 3.0.2
+        version: 3.0.2
+      tsdown:
+        specifier: ^0.16.5
+        version: 0.16.8(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
   packages/payload-indexer:
     dependencies:
       '@google/generative-ai':
