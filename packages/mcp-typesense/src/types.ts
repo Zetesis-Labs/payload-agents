@@ -185,6 +185,8 @@ export type McpAuthStrategy = {
 export interface McpAuthContext {
   /** Tenant slug — if present, searches are auto-scoped by `tenant`. */
   tenantSlug?: string
+  /** Taxonomy slugs — if present, searches are auto-scoped by `taxonomy_slugs`. */
+  taxonomySlugs?: string[]
   /** User identifier, for logging/auditing. */
   userId?: string
   /** Arbitrary metadata the auth strategy wants to propagate. */
