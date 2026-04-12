@@ -85,11 +85,12 @@ export class MockAdapter implements ChatAdapter {
   async getActiveSession(): Promise<{
     conversationId: string
     messages: Message[]
+    agentSlug?: string
   } | null> {
     // Return last session or null
     if (this.sessions.size > 0) {
       const last = Array.from(this.sessions.values()).pop()
-      return last ? { conversationId: last.id, messages: last.messages } : null
+      return last ? { conversationId: last.id, messages: last.messages, agentSlug: 'mock-agent' } : null
     }
     return null
   }
@@ -103,9 +104,9 @@ export class MockAdapter implements ChatAdapter {
     }))
   }
 
-  async loadSession(id: string): Promise<{ conversationId: string; messages: Message[] } | null> {
+  async loadSession(id: string): Promise<{ conversationId: string; messages: Message[]; agentSlug?: string } | null> {
     const session = this.sessions.get(id)
-    return session ? { conversationId: session.id, messages: session.messages } : null
+    return session ? { conversationId: session.id, messages: session.messages, agentSlug: 'mock-agent' } : null
   }
 
   async renameSession(id: string, newTitle: string): Promise<boolean> {

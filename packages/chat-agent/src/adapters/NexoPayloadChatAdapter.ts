@@ -184,6 +184,7 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
   async getActiveSession(): Promise<{
     conversationId: string
     messages: Message[]
+    agentSlug?: string
   } | null> {
     try {
       const response = await fetch('/api/chat/session?active=true')
@@ -196,7 +197,8 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
         }
         return {
           conversationId: sessionData.conversation_id,
-          messages: this.parseBackendMessages(sessionData.messages)
+          messages: this.parseBackendMessages(sessionData.messages),
+          agentSlug: sessionData.agentSlug
         }
       }
       return null

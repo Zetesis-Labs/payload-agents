@@ -81,7 +81,7 @@ export interface ChatAdapter {
   ): Promise<void>
 
   // Session Management
-  getActiveSession(): Promise<{ conversationId: string; messages: Message[] } | null>
+  getActiveSession(): Promise<{ conversationId: string; messages: Message[]; agentSlug?: string } | null>
   getHistory(): Promise<SessionSummary[]>
   loadSession(id: string): Promise<{ conversationId: string; messages: Message[]; agentSlug?: string } | null>
   renameSession(id: string, newTitle: string): Promise<boolean>

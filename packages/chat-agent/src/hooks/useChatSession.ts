@@ -53,6 +53,9 @@ export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOpt
             setMessages(sessionData.messages)
             console.log('[useChatSession] ✅ Session restored with', sessionData.messages.length, 'messages')
           }
+          if (sessionData.agentSlug) {
+            options?.onAgentChange?.(sessionData.agentSlug)
+          }
         } else {
           // No active session found
           console.log('[useChatSession] ℹ️ No active session found (adapter returned null)')
@@ -65,7 +68,7 @@ export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOpt
     }
 
     loadActiveSession()
-  }, [adapter])
+  }, [adapter, options?.onAgentChange])
 
   // Load history
   const loadHistory = useCallback(async () => {

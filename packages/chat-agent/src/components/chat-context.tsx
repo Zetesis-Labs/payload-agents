@@ -94,9 +94,8 @@ export const ChatProvider = ({
   )
 
   // Use session hook with adapter — switch agent when loading a session
-  const chatSession = useChatSession(adapter, {
-    onAgentChange: slug => setSelectedAgent(slug)
-  })
+  const onAgentChange = useCallback((slug: string) => setSelectedAgent(slug), [])
+  const chatSession = useChatSession(adapter, { onAgentChange })
 
   // Token usage management - lazy loaded from SSE events
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null)
