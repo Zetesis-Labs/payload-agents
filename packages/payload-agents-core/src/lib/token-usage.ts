@@ -7,13 +7,16 @@
  * The daily *limit* comes from the consumer via `getDailyLimit()` callback.
  */
 
+import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import type { DailyTokenUsage, TokenUsageResult } from '../types'
 
 /** Drizzle handle from the Payload DB adapter. */
 function getDrizzle(payload: Payload) {
   return (
-    payload.db as unknown as { drizzle: { execute: (q: unknown) => Promise<{ rows: Record<string, unknown>[] }> } }
+    payload.db as unknown as {
+      drizzle: { execute: (q: ReturnType<typeof sql>) => Promise<{ rows: Record<string, unknown>[] }> }
+    }
   ).drizzle
 }
 
@@ -30,22 +33,19 @@ async function getCurrentDailyUsage(payload: Payload, userId: string | number): 
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
 
   const todayEpoch = Math.floor(today.getTime() / 1000)
+  const userIdStr = String(userId)
 
   try {
     const db = getDrizzle(payload)
 
-    // Use raw SQL string to avoid importing drizzle sql template tag
-    const result = await db.execute({
-      sql: `
-        SELECT COALESCE(SUM((r->>'total_tokens')::int), 0) AS daily_tokens
-        FROM agno.agno_sessions s,
-             jsonb_array_elements(s.runs) AS run,
-             jsonb_extract_path(run, 'metrics') AS r
-        WHERE s.user_id = $1
-          AND s.created_at >= $2
-      `,
-      params: [String(userId), todayEpoch]
-    })
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM((r->>'total_tokens')::int), 0) AS daily_tokens
+      FROM agno.agno_sessions s,
+           jsonb_array_elements(s.runs) AS run,
+           jsonb_extract_path(run, 'metrics') AS r
+      WHERE s.user_id = ${userIdStr}
+        AND s.created_at >= ${todayEpoch}
+    `)
 
     const totalTokens = Number(result.rows[0]?.daily_tokens ?? 0)
 
