@@ -21,7 +21,6 @@ import { comparePerspectives, comparePerspectivesSchema } from './compare-perspe
 import { extractClaims, extractClaimsSchema } from './extract-claims'
 import { getBookToc, getBookTocSchema } from './get-book-toc'
 import { getChunksByIds, getChunksByIdsSchema } from './get-chunks-by-ids'
-import { getChunksByParent, getChunksByParentSchema } from './get-chunks-by-parent'
 import { getFilterCriteria, getFilterCriteriaSchema } from './get-filter-criteria'
 import { getPostSummaries, getPostSummariesSchema } from './get-post-summaries'
 import { getTaxonomyTree, getTaxonomyTreeSchema } from './get-taxonomy-tree'
@@ -190,22 +189,9 @@ export function registerTools(opts: RegisterToolsOptions): void {
     }
   )
 
-  server.registerTool(
-    toolNames.getChunksByParent ?? 'get_chunks_by_parent',
-    {
-      description:
-        'Read chunks of a parent document in chunk_index order. Supports range (start_chunk/end_chunk) and pagination. For books (hundreds of chunks), always paginate or use a range. Default per_page 50, max 100. Response includes has_more and range_total.',
-      inputSchema: {
-        ...getChunksByParentSchema.shape,
-        collection: z.string().describe(`Chunk collection name: ${chunkNames}`),
-        format: formatParam
-      }
-    },
-    async input => {
-      const result = await getChunksByParent(input, ctx, auth)
-      return toolResult(result, input.format as OutputFormat)
-    }
-  )
+  // get_chunks_by_parent is intentionally NOT registered as a public tool.
+  // Agents should use search_collections with snippet_length: 0 and expand_context instead.
+  // The function remains available internally (summarize_document, extract_claims).
 
   // -- SYNTHESIZE (LLM-powered, requires client sampling support) ------------
 

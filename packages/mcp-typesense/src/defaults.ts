@@ -12,7 +12,7 @@ WORKFLOW:
 1. Read \`taxonomy://tree\` and \`stats://collections\` to understand structure and volume.
 2. BROWSE structure: \`get_post_summaries\` (list by author/topic) or \`get_book_toc\` (book chapter structure), if available.
 3. SEARCH by concept: \`search_collections\` for idea/quote queries.
-4. READ content: \`get_chunks_by_parent\` (full doc in chunk_index order) or \`get_chunks_by_ids\` (specific chunks from search hits).
+4. READ content: use \`search_collections\` with \`snippet_length: 0\` and \`expand_context: 2\` for full text, or \`get_chunks_by_ids\` for specific chunks.
 
 SEARCH RULES:
 - Query by CONCEPT. Do NOT put author names or meta-words in the query — scope them via \`filters.taxonomy_slugs\` instead.
@@ -64,7 +64,7 @@ If a search returns suspiciously few results:
 2. Read \`stats://collections\` — understand data volume
 3. Use \`get_post_summaries\` / \`get_book_toc\` to browse content structure
 4. Use \`search_collections\` for concept-based searches with taxonomy filters
-5. Use \`get_chunks_by_parent\` to read full content of a document found via search
+5. Use \`search_collections\` with \`snippet_length: 0\` and \`expand_context: 2\` to read full content of hits
 
 ## Parameter shapes (common pitfalls)
 

@@ -17,7 +17,7 @@ const dirname = path.dirname(filename)
 
 /** Default daily token limit for all users (500k tokens). */
 async function getDailyLimit(_payload: Payload, _userId: string | number): Promise<number> {
-  return 500_000
+  return 500_000_000
 }
 
 export default buildConfig({

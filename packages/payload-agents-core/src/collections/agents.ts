@@ -83,6 +83,11 @@ export function createAgentsCollection(config: ResolvedPluginConfig): Collection
                 type: 'textarea',
                 required: true,
                 admin: { description: 'System prompt that defines the agent personality and constraints' }
+              },
+              {
+                name: 'toolCallLimit',
+                type: 'number',
+                admin: { description: 'Max tool calls per turn. Leave empty for no limit.' }
               }
             ]
           },

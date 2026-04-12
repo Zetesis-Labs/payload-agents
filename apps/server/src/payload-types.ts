@@ -262,6 +262,10 @@ export interface Agent {
    */
   systemPrompt: string;
   /**
+   * Max tool calls per turn. Leave empty for no limit.
+   */
+  toolCallLimit?: number | null;
+  /**
    * Collections to search for RAG context
    */
   searchCollections?: ('posts_chunk' | 'books_chunk')[] | null;
@@ -481,6 +485,7 @@ export interface AgentsSelect<T extends boolean = true> {
   llmModel?: T;
   apiKey?: T;
   systemPrompt?: T;
+  toolCallLimit?: T;
   searchCollections?: T;
   taxonomies?: T;
   kResults?: T;

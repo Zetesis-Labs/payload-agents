@@ -40,6 +40,8 @@ def build_agent(cfg: dict[str, Any], *, db: PostgresDb) -> Agent:
     # Agno's reasoning=True is only useful for non-reasoning models.
     is_native_reasoner = any(model_id.startswith(p) for p in ("o1", "o3", "o4"))
 
+    tool_call_limit = cfg.get("toolCallLimit")
+
     return Agent(
         name=cfg.get("name", slug),
         id=slug,
@@ -49,8 +51,8 @@ def build_agent(cfg: dict[str, Any], *, db: PostgresDb) -> Agent:
         tools=[build_mcp_tools(tenant_slug, taxonomy_slugs)],
         add_history_to_context=True,
         num_history_runs=5,
-        markdown=True,
         reasoning=not is_native_reasoner,
+        tool_call_limit=int(tool_call_limit) if tool_call_limit is not None else None,
         telemetry=False,
     )
 
