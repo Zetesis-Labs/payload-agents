@@ -107,15 +107,16 @@ export const ChatProvider = ({
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [isLoadingAgents, setIsLoadingAgents] = useState(false)
 
-  // Load agents on mount
+  // Load agents on mount (only depends on adapter, not selectedAgent)
   useEffect(() => {
     const loadAgents = async () => {
       try {
         setIsLoadingAgents(true)
         const loadedAgents = await adapter.getAgents()
         setAgents(loadedAgents)
-        if (loadedAgents.length > 0 && !selectedAgent) {
-          setSelectedAgent(loadedAgents[0]?.slug || null)
+        // Only set default if no agent is selected yet
+        if (loadedAgents.length > 0) {
+          setSelectedAgent(prev => prev ?? loadedAgents[0]?.slug ?? null)
         }
       } catch (error) {
         console.error('[ChatContext] Error loading agents:', error)
@@ -125,7 +126,7 @@ export const ChatProvider = ({
     }
 
     loadAgents()
-  }, [adapter, selectedAgent])
+  }, [adapter])
 
   // Check if device is mobile or tablet (not desktop)
   const isMobileOrTablet = () => {
