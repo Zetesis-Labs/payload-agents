@@ -71,6 +71,7 @@ export interface Config {
     media: Media;
     posts: Post;
     taxonomy: Taxonomy;
+    agents: Agent;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -82,6 +83,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
     taxonomy: TaxonomySelect<false> | TaxonomySelect<true>;
+    agents: AgentsSelect<false> | AgentsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -231,6 +233,91 @@ export interface Taxonomy {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agents".
+ */
+export interface Agent {
+  id: number;
+  /**
+   * Display name for the agent
+   */
+  name: string;
+  /**
+   * URL-friendly identifier
+   */
+  slug: string;
+  /**
+   * Enable or disable this agent
+   */
+  isActive?: boolean | null;
+  /**
+   * LLM model to use (e.g., openai/gpt-4o, anthropic/claude-sonnet-4-20250514)
+   */
+  llmModel: string;
+  /**
+   * API Key for the LLM provider (encrypted at rest)
+   */
+  apiKey: string;
+  /**
+   * System prompt that defines the agent personality and constraints
+   */
+  systemPrompt: string;
+  /**
+   * Collections to search for RAG context
+   */
+  searchCollections?: ('posts_chunk' | 'books_chunk')[] | null;
+  /**
+   * Taxonomies that filter the RAG content. REQUIRED: if empty, agent will not search any content.
+   */
+  taxonomies?: (number | Taxonomy)[] | null;
+  /**
+   * Number of chunks to retrieve for RAG context
+   */
+  kResults?: number | null;
+  /**
+   * Maximum context size in bytes (default: 64KB)
+   */
+  maxContextBytes?: number | null;
+  /**
+   * TTL for conversation history in seconds (default: 24h)
+   */
+  ttl?: number | null;
+  /**
+   * Avatar image for the agent
+   */
+  avatar?: (number | null) | Media;
+  /**
+   * Welcome message title displayed when starting a new chat
+   */
+  welcomeTitle?: string | null;
+  /**
+   * Welcome message subtitle displayed when starting a new chat
+   */
+  welcomeSubtitle?: string | null;
+  /**
+   * Suggested questions to help users get started
+   */
+  suggestedQuestions?:
+    | {
+        /**
+         * The full prompt text to send when clicked
+         */
+        prompt: string;
+        /**
+         * Short title for the suggestion
+         */
+        title: string;
+        /**
+         * Brief description of what the question is about
+         */
+        description?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -268,6 +355,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'taxonomy';
         value: number | Taxonomy;
+      } | null)
+    | ({
+        relationTo: 'agents';
+        value: number | Agent;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -376,6 +467,36 @@ export interface TaxonomySelect<T extends boolean = true> {
   generateSlug?: T;
   slug?: T;
   payload?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agents_select".
+ */
+export interface AgentsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  isActive?: T;
+  llmModel?: T;
+  apiKey?: T;
+  systemPrompt?: T;
+  searchCollections?: T;
+  taxonomies?: T;
+  kResults?: T;
+  maxContextBytes?: T;
+  ttl?: T;
+  avatar?: T;
+  welcomeTitle?: T;
+  welcomeSubtitle?: T;
+  suggestedQuestions?:
+    | T
+    | {
+        prompt?: T;
+        title?: T;
+        description?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

@@ -12,12 +12,14 @@ dependencies = [
     "httpx>=0.28",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.6",
+    "structlog>=24.1",
     "uvicorn[standard]>=0.34",
 ]
 
 [dependency-groups]
 dev = [
     "mypy>=1.13",
+    "pyright>=1.1",
     "pytest-asyncio>=0.24",
     "pytest>=8.3",
     "ruff>=0.9",
@@ -35,8 +37,14 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "RUF"]
-ignore = ["E501"] # line length enforced by formatter, not linter
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "S", "SIM", "RUF"]
+ignore = [
+    "E501",  # line length enforced by formatter, not linter
+    "B008",  # Depends() / Header() in function defaults — idiomatic FastAPI
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = ["S101"] # allow assert in tests
 
 [tool.ruff.format]
 quote-style = "double"
@@ -47,7 +55,11 @@ python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
-ignore_missing_imports = true # agno lacks type stubs in some submodules
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = ["agno.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

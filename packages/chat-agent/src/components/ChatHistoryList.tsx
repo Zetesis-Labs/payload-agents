@@ -109,21 +109,14 @@ export const ChatHistoryList = ({
   return (
     <div className="space-y-1">
       {sessions.map((session, _index) => (
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           key={session.conversation_id}
           className={cn(
             'group relative flex items-center rounded-md px-2 py-2 text-sm transition-colors hover:bg-accent/50 cursor-pointer w-full text-left',
             activeSessionId === session.conversation_id ? 'bg-accent text-accent-foreground' : 'text-foreground'
           )}
           onClick={() => onSelectSession(session.conversation_id)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              onSelectSession(session.conversation_id)
-            }
-          }}
         >
           <MessageSquare className="mr-2 h-4 w-4 opacity-70 flex-shrink-0" />
 
@@ -245,7 +238,7 @@ export const ChatHistoryList = ({
               </div>
             </>
           )}
-        </div>
+        </button>
       ))}
     </div>
   )

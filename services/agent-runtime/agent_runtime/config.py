@@ -1,5 +1,9 @@
 """Typed configuration loaded from environment variables."""
 
+from __future__ import annotations
+
+from typing import Any
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,16 +18,18 @@ class Settings(BaseSettings):
     payload_service_token: str = ""
 
     # Direct MCP service URL (not the Next.js proxy).
-    # In dev: http://app:3030/mcp (MCP runs inside the app container)
-    # In prod: Helm sets this to the MCP service endpoint
     mcp_url: str = "http://app:3030/mcp"
 
-    database_url: str
+    database_url: str = ""
     database_schema: str = "agno"
 
-    internal_secret: str = "dev"
+    internal_secret: str = "dev"  # noqa: S105
 
     log_level: str = "INFO"
 
+    def model_post_init(self, __context: Any) -> None:
+        if not self.database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
 
-settings = Settings()  # type: ignore[call-arg]
+
+settings = Settings()

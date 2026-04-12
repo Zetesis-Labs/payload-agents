@@ -190,6 +190,9 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
       const response = await fetch('/api/chat/session?active=true')
       if (response.ok) {
         const sessionData = await response.json()
+        if (!sessionData) {
+          return null
+        }
         // Don't load if session is closed/expired
         if (sessionData.status === 'closed') {
           console.warn('[NexoPayloadChatAdapter] Active session is closed/expired, clearing')
@@ -229,6 +232,9 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
       const response = await fetch(`/api/chat/session?conversationId=${encodeURIComponent(id)}`)
       if (response.ok) {
         const sessionData = await response.json()
+        if (!sessionData) {
+          return null
+        }
         // Don't load if session is closed/expired
         if (sessionData.status === 'closed') {
           console.warn('[NexoPayloadChatAdapter] Session is closed/expired:', id)

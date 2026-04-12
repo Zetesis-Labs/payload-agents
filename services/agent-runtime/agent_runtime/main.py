@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import asyncio
 import hmac
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, cast
@@ -26,37 +25,24 @@ from typing import Any, cast
 from agno.agent import Agent
 from agno.agent.remote import RemoteAgent
 from agno.os import AgentOS
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 
 from agent_runtime.config import settings
+from agent_runtime.db import dispose_shared_engine
+from agent_runtime.dependencies import get_registry
+from agent_runtime.exceptions import (
+    AgentRuntimeError,
+    AuthenticationError,
+    agent_runtime_exception_handler,
+)
 from agent_runtime.health import router as health_router
-from agent_runtime.registry import AgentRegistry, dispose_shared_engine
+from agent_runtime.logging import configure_logging, get_logger
+from agent_runtime.middleware import RequestIdMiddleware
+from agent_runtime.registry import AgentRegistry
+from agent_runtime.schemas import ErrorResponse, ReloadResponse
 
-# ── Logging (JSON for structured log collection in K8s) ───────────────────
-
-
-class _JSONFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        import json as _json
-
-        return _json.dumps(
-            {
-                "ts": self.formatTime(record, self.datefmt),
-                "level": record.levelname,
-                "logger": record.name,
-                "msg": record.getMessage(),
-                **({"exc": self.formatException(record.exc_info)} if record.exc_info else {}),
-            },
-            default=str,
-            ensure_ascii=False,
-        )
-
-
-_handler = logging.StreamHandler()
-_handler.setFormatter(_JSONFormatter())
-logging.root.handlers = [_handler]
-logging.root.setLevel(settings.log_level)
-logger = logging.getLogger("agent_runtime")
+configure_logging(settings.log_level)
+logger = get_logger("agent_runtime")
 
 # ── Registry + AgentOS ─────────────────────────────────────────────────────
 
@@ -75,36 +61,37 @@ _BOOT_BACKOFF_MAX = 30.0
 
 @asynccontextmanager
 async def lifespan(app: Any) -> AsyncIterator[None]:
+    # Make registry available via app.state for Depends injection
+    app.state.registry = registry
+
     for attempt in range(1, _BOOT_MAX_RETRIES + 1):
         try:
             await registry.load_all()
             agent_os.agents = _agents_as_union(registry.all())
-            logger.info("AgentOS initialised with %d agents", len(registry.all()))
+            logger.info("AgentOS initialised", agent_count=len(registry.all()))
             break
         except Exception:
             delay = min(_BOOT_BACKOFF_BASE**attempt, _BOOT_BACKOFF_MAX)
             if attempt < _BOOT_MAX_RETRIES:
                 logger.warning(
-                    "Bootstrap attempt %d/%d failed, retrying in %.0fs",
-                    attempt,
-                    _BOOT_MAX_RETRIES,
-                    delay,
+                    "Bootstrap failed, retrying",
+                    attempt=attempt,
+                    max_retries=_BOOT_MAX_RETRIES,
+                    delay_s=delay,
                     exc_info=True,
                 )
                 await asyncio.sleep(delay)
             else:
                 logger.exception(
-                    "Failed to bootstrap agent registry after %d attempts; starting empty",
-                    _BOOT_MAX_RETRIES,
+                    "Failed to bootstrap after max retries; starting empty",
+                    max_retries=_BOOT_MAX_RETRIES,
                 )
     yield
 
-    # ── Shutdown cleanup ──────────────────────────────────────────────────
     logger.info("Shutting down — disposing shared DB engine")
     await dispose_shared_engine()
 
 
-# AgentOS accepts lifespan in its constructor
 agent_os = AgentOS(
     name="zetesis-agent-runtime",
     db=registry.db,
@@ -115,8 +102,9 @@ agent_os = AgentOS(
     lifespan=lifespan,
 )
 
-# Build the full AgentOS FastAPI app (includes /agents/*/runs, /sessions, etc.)
 app = agent_os.get_app()
+app.add_middleware(RequestIdMiddleware)
+app.add_exception_handler(AgentRuntimeError, agent_runtime_exception_handler)  # type: ignore[arg-type]
 app.include_router(health_router)
 
 # ── Custom endpoints ───────────────────────────────────────────────────────
@@ -124,24 +112,24 @@ app.include_router(health_router)
 internal_router = APIRouter(prefix="/internal", tags=["internal"])
 
 
-@internal_router.post("/agents/reload")
+@internal_router.post(
+    "/agents/reload",
+    response_model=ReloadResponse,
+    responses={401: {"model": ErrorResponse}},
+)
 async def reload_agents(
+    reg: AgentRegistry = Depends(get_registry),
     x_internal_secret: str | None = Header(default=None, alias="X-Internal-Secret"),
-) -> dict[str, Any]:
-    """Refresh the in-memory agent registry from Payload CMS.
-
-    Called by Payload ``afterChange``/``afterDelete`` hooks on the Agents
-    collection. Updates the AgentOS agent list so subsequent requests
-    use the latest configurations.
-    """
+) -> ReloadResponse:
+    """Refresh the in-memory agent registry from Payload CMS."""
     if not hmac.compare_digest(x_internal_secret or "", settings.internal_secret):
-        raise HTTPException(status_code=401, detail="invalid internal secret")
+        raise AuthenticationError()
     async with _reload_lock:
-        await registry.reload()
-        agent_os.agents = _agents_as_union(registry.all())
-    count = len(registry.all())
-    logger.info("Reloaded %d agents", count)
-    return {"count": count, "slugs": registry.slugs()}
+        await reg.reload()
+        agent_os.agents = _agents_as_union(reg.all())
+    count = len(reg.all())
+    logger.info("Agents reloaded", count=count, slugs=reg.slugs())
+    return ReloadResponse(count=count, slugs=reg.slugs())
 
 
 app.include_router(internal_router)
