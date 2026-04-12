@@ -13,7 +13,10 @@ type SSEEvent =
   | { type: 'conversation_id'; data: string }
   | { type: 'token'; data: string }
   | { type: 'sources'; data: Source[] }
-  | { type: 'tool_call'; data: { id: string; name: string; input: Record<string, unknown>; result?: string } }
+  | {
+      type: 'tool_call'
+      data: { id: string; name: string; input: Record<string, unknown>; result?: string; sources?: Source[] }
+    }
   | { type: 'done' }
   | { type: 'usage'; data: { daily_limit: number; daily_used: number; daily_remaining: number; reset_at: string } }
   | { type: 'error'; data?: { error?: string; message?: string; chatId?: string } }
@@ -38,6 +41,7 @@ function handleSSEEvent(event: SSEEvent, callbacks: StreamCallbacks): void {
         name: event.data.name,
         input: event.data.input,
         result: event.data.result,
+        sources: event.data.sources,
         isLoading: !event.data.result
       }
       callbacks.onToolCall?.(tc)

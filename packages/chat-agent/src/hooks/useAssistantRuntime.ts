@@ -2,7 +2,7 @@
 
 import { type AppendMessage, type ThreadMessage, useExternalStoreRuntime } from '@assistant-ui/react'
 import { useCallback, useMemo, useState } from 'react'
-import type { Message, Source, ToolCall } from '../adapters/ChatAdapter'
+import type { Message, ToolCall } from '../adapters/ChatAdapter'
 import { useChat } from '../components/chat-context'
 import type { Document } from '../components/useDocumentSelector'
 
@@ -95,7 +95,6 @@ export function useAssistantRuntime({
       ])
 
       let accumulatedContent = ''
-      let receivedSources: Source[] = []
       const toolCalls: ToolCall[] = []
 
       try {
@@ -124,15 +123,19 @@ export function useAssistantRuntime({
               })
             },
             onSources: sources => {
-              receivedSources = sources
-              setMessages(prev => {
-                const updated = [...prev]
-                const lastIdx = updated.length - 1
-                if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
-                  updated[lastIdx] = { ...updated[lastIdx], sources: sources }
-                }
-                return updated
-              })
+              // Backward compat: if backend still sends a global sources event,
+              // merge them into the message only if toolCalls didn't provide any
+              const hasToolSources = toolCalls.some(tc => tc.sources && tc.sources.length > 0)
+              if (!hasToolSources) {
+                setMessages(prev => {
+                  const updated = [...prev]
+                  const lastIdx = updated.length - 1
+                  if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
+                    updated[lastIdx] = { ...updated[lastIdx], sources }
+                  }
+                  return updated
+                })
+              }
             },
             onToolCall: tc => {
               const idx = toolCalls.findIndex(t => t.id === tc.id)
@@ -141,11 +144,17 @@ export function useAssistantRuntime({
               } else {
                 toolCalls.push(tc)
               }
+              // Derive message-level sources from all completed toolCalls
+              const derivedSources = toolCalls.flatMap(t => t.sources ?? [])
               setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
                 if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
-                  updated[lastIdx] = { ...updated[lastIdx], toolCalls: [...toolCalls] }
+                  updated[lastIdx] = {
+                    ...updated[lastIdx],
+                    toolCalls: [...toolCalls],
+                    sources: derivedSources.length > 0 ? derivedSources : updated[lastIdx].sources
+                  }
                 }
                 return updated
               })
@@ -162,7 +171,8 @@ export function useAssistantRuntime({
               }
             },
             onDone: () => {
-              // Final update to ensure consistency
+              // Final update: derive sources from toolCalls for consistency
+              const derivedSources = toolCalls.flatMap(t => t.sources ?? [])
               setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
@@ -170,7 +180,7 @@ export function useAssistantRuntime({
                   updated[lastIdx] = {
                     ...updated[lastIdx],
                     content: accumulatedContent,
-                    sources: updated[lastIdx].sources || receivedSources,
+                    sources: derivedSources.length > 0 ? derivedSources : updated[lastIdx].sources,
                     toolCalls: toolCalls.length > 0 ? [...toolCalls] : updated[lastIdx].toolCalls
                   }
                 }
