@@ -10,11 +10,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, ArrowRight, ArrowUpIcon, Sparkles, SquareIcon, X } from 'lucide-react'
 import type { FC } from 'react'
 import { createContext, useContext, useEffect, useState } from 'react'
-import type { Source } from '../../adapters/ChatAdapter'
+import type { Source, ToolCall } from '../../adapters/ChatAdapter'
 import { cn } from '../../lib/utils'
 import type { LinkComponent } from '../../types/components'
 import { useChat } from '../chat-context'
 import { SourcesList } from '../SourcesList'
+import { ToolCallsDisplay } from '../ToolCallsDisplay'
 import { MarkdownText } from './markdown-text'
 
 interface ThreadContextValue {
@@ -404,10 +405,11 @@ const AssistantMessage: FC = () => {
   const messageRuntime = useMessageRuntime()
   const context = useContext(ThreadContext)
 
-  // Extract sources from metadata with type-safe access
+  // Extract sources and tool calls from metadata
   const messageState = messageRuntime.getState()
-  const metadata = messageState.metadata as { custom?: { sources?: Source[] } } | undefined
+  const metadata = messageState.metadata as { custom?: { sources?: Source[]; toolCalls?: ToolCall[] } } | undefined
   const sources = metadata?.custom?.sources
+  const toolCalls = metadata?.custom?.toolCalls
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
@@ -426,6 +428,8 @@ const AssistantMessage: FC = () => {
             Text: MarkdownText
           }}
         />
+
+        {toolCalls && toolCalls.length > 0 && <ToolCallsDisplay toolCalls={toolCalls} />}
 
         {sources && sources.length > 0 && context && (
           <SourcesList sources={sources} generateHref={context.generateHref} LinkComponent={context.LinkComponent} />

@@ -9,11 +9,20 @@ export interface Source {
   excerpt?: string
 }
 
+export interface ToolCall {
+  id: string
+  name: string
+  input: Record<string, unknown>
+  result?: string
+  isLoading?: boolean
+}
+
 export interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
   sources?: Source[]
+  toolCalls?: ToolCall[]
 }
 
 export interface SessionSummary {
@@ -55,6 +64,7 @@ export interface StreamCallbacks {
   onConversationId?: (id: string) => void
   onToken?: (token: string) => void
   onSources?: (sources: Source[]) => void
+  onToolCall?: (toolCall: ToolCall) => void
   onDone?: () => void
   onUsage?: (usage: { daily_limit: number; daily_used: number; daily_remaining: number; reset_at: string }) => void
   onError?: (error: Error) => void

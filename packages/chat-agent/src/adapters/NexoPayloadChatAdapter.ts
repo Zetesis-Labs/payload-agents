@@ -5,13 +5,15 @@ import type {
   SendMessageContext,
   SessionSummary,
   Source,
-  StreamCallbacks
+  StreamCallbacks,
+  ToolCall
 } from './ChatAdapter'
 
 type SSEEvent =
   | { type: 'conversation_id'; data: string }
   | { type: 'token'; data: string }
   | { type: 'sources'; data: Source[] }
+  | { type: 'tool_call'; data: { id: string; name: string; input: Record<string, unknown>; result?: string } }
   | { type: 'done' }
   | { type: 'usage'; data: { daily_limit: number; daily_used: number; daily_remaining: number; reset_at: string } }
   | { type: 'error'; data?: { error?: string; message?: string; chatId?: string } }
@@ -29,6 +31,18 @@ function handleSSEEvent(event: SSEEvent, callbacks: StreamCallbacks): void {
     case 'sources':
       callbacks.onSources?.(event.data)
       break
+
+    case 'tool_call': {
+      const tc: ToolCall = {
+        id: event.data.id,
+        name: event.data.name,
+        input: event.data.input,
+        result: event.data.result,
+        isLoading: !event.data.result
+      }
+      callbacks.onToolCall?.(tc)
+      break
+    }
 
     case 'done':
       callbacks.onDone?.()

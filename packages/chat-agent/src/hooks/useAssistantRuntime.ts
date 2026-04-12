@@ -2,7 +2,7 @@
 
 import { type AppendMessage, type ThreadMessage, useExternalStoreRuntime } from '@assistant-ui/react'
 import { useCallback, useMemo, useState } from 'react'
-import type { Message, Source } from '../adapters/ChatAdapter'
+import type { Message, Source, ToolCall } from '../adapters/ChatAdapter'
 import { useChat } from '../components/chat-context'
 import type { Document } from '../components/useDocumentSelector'
 
@@ -21,10 +21,10 @@ interface UseAssistantRuntimeProps {
  */
 function toThreadMessages(messages: Message[]): ThreadMessage[] {
   return messages.map((msg, index) => {
-    // Only include custom metadata - other fields are optional and should be undefined
-    const metadata = {
-      custom: msg.sources ? { sources: msg.sources } : {}
-    }
+    const custom: Record<string, unknown> = {}
+    if (msg.sources) custom.sources = msg.sources
+    if (msg.toolCalls) custom.toolCalls = msg.toolCalls
+    const metadata = { custom }
 
     if (msg.role === 'user') {
       return {
@@ -96,6 +96,7 @@ export function useAssistantRuntime({
 
       let accumulatedContent = ''
       let receivedSources: Source[] = []
+      const toolCalls: ToolCall[] = []
 
       try {
         // Use adapter to send message
@@ -133,6 +134,22 @@ export function useAssistantRuntime({
                 return updated
               })
             },
+            onToolCall: tc => {
+              const idx = toolCalls.findIndex(t => t.id === tc.id)
+              if (idx >= 0) {
+                toolCalls[idx] = tc
+              } else {
+                toolCalls.push(tc)
+              }
+              setMessages(prev => {
+                const updated = [...prev]
+                const lastIdx = updated.length - 1
+                if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
+                  updated[lastIdx] = { ...updated[lastIdx], toolCalls: [...toolCalls] }
+                }
+                return updated
+              })
+            },
             onUsage: usage => {
               if (usage) {
                 updateTokenUsage({
@@ -153,7 +170,8 @@ export function useAssistantRuntime({
                   updated[lastIdx] = {
                     ...updated[lastIdx],
                     content: accumulatedContent,
-                    sources: updated[lastIdx].sources || receivedSources
+                    sources: updated[lastIdx].sources || receivedSources,
+                    toolCalls: toolCalls.length > 0 ? [...toolCalls] : updated[lastIdx].toolCalls
                   }
                 }
                 return updated
