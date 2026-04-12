@@ -2,7 +2,7 @@
  * Type definitions for payload-typesense plugin configuration
  */
 
-import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
+import type { PayloadRequest } from 'payload'
 
 /**
  * Hybrid search configuration for combining semantic and keyword search
@@ -220,51 +220,13 @@ export interface BatchEmbeddingWithUsage {
   }
 }
 
-// --- RAG Feature Config ---
+// --- RAG Callbacks (minimal — chat/sessions moved to payload-agents-core) ---
 
 export interface RAGCallbacks {
-  /** Get Payload instance (required) */
-  getPayload: () => Promise<Payload>
-  /** Check permissions function (required) */
+  /** Check permissions function (required for chunks endpoint) */
   checkPermissions: (request: PayloadRequest) => Promise<boolean>
-  /** Check token limit function (optional) */
-  checkTokenLimit?: (
-    payload: Payload,
-    userId: string | number,
-    tokens: number
-  ) => Promise<{
-    allowed: boolean
-    limit: number
-    used: number
-    remaining: number
-    reset_at?: string
-  }>
-  /** Get user usage stats function (optional) */
-  getUserUsageStats?: (
-    payload: Payload,
-    userId: string | number
-  ) => Promise<{
-    limit: number
-    used: number
-    remaining: number
-    reset_at?: string
-  }>
-  /** Save chat session function (optional) */
-  saveChatSession?: (
-    payload: Payload,
-    userId: string | number,
-    conversationId: string,
-    userMessage: string,
-    assistantMessage: string,
-    sources: ChunkSource[],
-    spending: SpendingEntry[],
-    collectionName: CollectionSlug
-  ) => Promise<void>
-  /** Create embedding spending function (optional) */
-  createEmbeddingSpending?: (model: string, tokens: number) => SpendingEntry
-  /** Estimate tokens from text function (optional) */
-  estimateTokensFromText?: (text: string) => number
 }
+
 /**
  * Complete RAG configuration
  */
@@ -275,11 +237,6 @@ export interface RAGConfig {
   hnsw?: HNSWConfig
   /** Advanced search settings */
   advanced?: AdvancedSearchConfig
-}
-
-export interface RAGFeatureConfig extends RAGConfig {
-  enabled: boolean
-  callbacks?: RAGCallbacks
 }
 
 // Re-export embedding types from payload-indexer (single source of truth)

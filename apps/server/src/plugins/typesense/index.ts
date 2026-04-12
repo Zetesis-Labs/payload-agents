@@ -1,7 +1,6 @@
 import { createIndexerPlugin } from '@zetesis/payload-indexer'
 import { createTypesenseAdapter, createTypesenseRAGPlugin } from '@zetesis/payload-typesense'
 import type { Config } from 'payload'
-import { callbacks } from './callbacks'
 import { collections } from './collections'
 import { embeddingConfig, typesenseConnection } from './config'
 
@@ -29,7 +28,6 @@ const typesenseRAGPlugin = createTypesenseRAGPlugin({
   typesense: typesenseConnection,
   embeddingConfig,
   collections,
-  collectionName: 'chat-sessions',
   search: {
     enabled: true,
     defaults: {
@@ -38,7 +36,6 @@ const typesenseRAGPlugin = createTypesenseRAGPlugin({
       tables: SEARCH_COLLECTIONS
     }
   },
-  callbacks,
   hybrid: {
     alpha: 0.9,
     rerankMatches: true,

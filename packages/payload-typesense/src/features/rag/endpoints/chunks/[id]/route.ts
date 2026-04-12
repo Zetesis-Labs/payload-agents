@@ -2,7 +2,13 @@ import type { PayloadRequest } from 'payload'
 import { createTypesenseClient } from '../../../../../core/client/typesense-client'
 import { logger } from '../../../../../core/logging/logger'
 import { fetchChunkById, type TypesenseConnectionConfig } from '../../../index'
-import { jsonResponse } from '../../chat/validators/index'
+
+function jsonResponse(data: unknown, options?: ResponseInit) {
+  return new Response(JSON.stringify(data), {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  })
+}
 
 /**
  * Configuration for chunks endpoint

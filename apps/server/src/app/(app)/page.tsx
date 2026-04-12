@@ -87,9 +87,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
           <div className="grid gap-4">
             {posts.map((post) => {
               const categories = Array.isArray(post.categories)
-                ? post.categories.filter(
-                    (c): c is Record<string, unknown> => typeof c === 'object' && c !== null,
-                  )
+                ? (post.categories.filter(
+                    (c) => typeof c === 'object' && c !== null,
+                  ) as unknown as Record<string, unknown>[])
                 : []
 
               return (

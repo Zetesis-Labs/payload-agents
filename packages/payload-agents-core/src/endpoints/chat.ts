@@ -148,7 +148,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
           session_id: sessionId,
           stream: 'true'
         }),
-        signal: AbortSignal.timeout(30_000)
+        signal: AbortSignal.timeout(120_000)
       })
 
     const upstream = await callWithRetry(callRuntime, config.runtimeUrl, config.runtimeSecret)

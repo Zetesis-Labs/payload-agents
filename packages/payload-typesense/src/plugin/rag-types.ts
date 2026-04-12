@@ -3,7 +3,6 @@
  */
 
 import type { EmbeddingProviderConfig, TableConfig } from '@zetesis/payload-indexer'
-import type { CollectionSlug } from 'payload'
 import type { TypesenseFieldMapping } from '../adapter/types'
 import type {
   AdvancedSearchConfig,
@@ -15,7 +14,6 @@ import type {
 
 /**
  * Search feature configuration for the Typesense RAG plugin
- * ...
  */
 export interface TypesenseSearchConfig {
   /** Enable search endpoints */
@@ -33,19 +31,12 @@ export interface TypesenseSearchConfig {
 
 /**
  * Configuration for the Typesense RAG plugin
- * ...
  */
 export interface TypesenseRAGPluginConfig {
   /** Typesense connection configuration */
   typesense: TypesenseConnectionConfig
 
-  collectionName: CollectionSlug
-
-  /**
-   * Embedding provider config (for RAG query embedding)
-   * Note: The RAG handler creates its own provider instance to track usage/spending.
-   * The EmbeddingService from createIndexerPlugin is used for document sync, not RAG queries.
-   */
+  /** Embedding provider config (for search query embedding) */
   embeddingConfig?: EmbeddingProviderConfig
 
   /** Collection configurations (for schema sync) */
@@ -54,7 +45,7 @@ export interface TypesenseRAGPluginConfig {
   /** Search configuration */
   search?: TypesenseSearchConfig
 
-  /** Callback functions for permissions, session management, etc. */
+  /** Callback functions for permissions */
   callbacks?: RAGCallbacks
 
   /** Hybrid search configuration */

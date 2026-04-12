@@ -63,6 +63,9 @@ importers:
       '@zetesis/chat-agent':
         specifier: workspace:*
         version: link:../../packages/chat-agent
+      '@zetesis/payload-agents-core':
+        specifier: workspace:*
+        version: link:../../packages/payload-agents-core
       '@zetesis/payload-indexer':
         specifier: workspace:*
         version: link:../../packages/payload-indexer

@@ -18,7 +18,7 @@ from agno.agent import Agent
 from agno.db.postgres import PostgresDb
 from agno.models.anthropic import Claude
 from agno.models.base import Model
-from agno.models.openai import OpenAIChat
+from agno.models.openai import OpenAIChat, OpenAIResponses
 from agno.tools.mcp import MCPTools
 from agno.tools.mcp.params import StreamableHTTPClientParams
 
@@ -154,6 +154,12 @@ class AgentRegistry:
         # Extract taxonomy slugs for server-enforced content scoping
         taxonomy_slugs = self._extract_taxonomy_slugs(cfg.get("taxonomies"))
 
+        # Native reasoning models (o-series) already think step-by-step;
+        # Agno's reasoning=True is only useful for non-reasoning models.
+        is_native_reasoner = any(
+            model_id.startswith(p) for p in ("o1", "o3", "o4")
+        )
+
         return Agent(
             name=cfg.get("name", cfg["slug"]),
             id=cfg["slug"],
@@ -164,7 +170,7 @@ class AgentRegistry:
             add_history_to_context=True,
             num_history_runs=5,
             markdown=True,
-            reasoning=True,
+            reasoning=not is_native_reasoner,
             telemetry=False,
         )
 
@@ -204,17 +210,24 @@ class AgentRegistry:
             return MCPTools(server_params=params, transport="streamable-http")
         return MCPTools(url=settings.mcp_url, transport="streamable-http")
 
+    # Models that require the OpenAI Responses API instead of Chat Completions.
+    # Includes reasoning models (o-series) and next-gen models (gpt-4.1+).
+    _OPENAI_RESPONSES_PREFIXES = ("o1", "o3", "o4", "gpt-4.1", "gpt-5")
+
     @staticmethod
     def _build_model(provider: str, model_id: str, api_key: str) -> Model:
         """Map a ``provider/model-id`` tuple to an Agno model instance.
 
-        Reasoning models (e.g. ``openai/gpt-5``, ``openai/o3-mini``) inherit the
-        default ``reasoning_effort`` from the LLM provider. Override explicitly
-        in the Payload Agent's system prompt if needed.
+        OpenAI models that match ``_OPENAI_RESPONSES_PREFIXES`` use the Responses
+        API (``OpenAIResponses``); everything else uses Chat Completions
+        (``OpenAIChat``).  Reasoning models (o3, o4-mini, etc.) have native
+        chain-of-thought and are significantly better at multi-step tool use.
         """
         if provider == "anthropic":
             return Claude(id=model_id, api_key=api_key)
         if provider == "openai":
+            if any(model_id.startswith(p) for p in AgentRegistry._OPENAI_RESPONSES_PREFIXES):
+                return OpenAIResponses(id=model_id, api_key=api_key)
             return OpenAIChat(id=model_id, api_key=api_key)
         raise ValueError(
             f"Unsupported LLM provider {provider!r}. "

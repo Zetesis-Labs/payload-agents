@@ -19,7 +19,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
   const categories =
     Array.isArray(post.categories)
-      ? post.categories.filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
+      ? (post.categories.filter((c) => typeof c === 'object' && c !== null) as unknown as Record<string, unknown>[])
       : []
 
   return (
