@@ -2,9 +2,24 @@
 
 import { type AppendMessage, type ThreadMessage, useExternalStoreRuntime } from '@assistant-ui/react'
 import { useCallback, useMemo, useState } from 'react'
-import type { Message, ToolCall } from '../adapters/ChatAdapter'
+import type { Message, Source, ToolCall } from '../adapters/ChatAdapter'
 import { useChat } from '../components/chat-context'
 import type { Document } from '../components/useDocumentSelector'
+
+/** Aggregate and deduplicate sources from all completed tool calls. */
+function deriveSources(toolCalls: ToolCall[]): Source[] {
+  const seen = new Set<string>()
+  const result: Source[] = []
+  for (const tc of toolCalls) {
+    for (const s of tc.sources ?? []) {
+      if (!seen.has(s.id)) {
+        seen.add(s.id)
+        result.push(s)
+      }
+    }
+  }
+  return result
+}
 
 interface UseAssistantRuntimeProps {
   messages: Message[]
@@ -145,7 +160,7 @@ export function useAssistantRuntime({
                 toolCalls.push(tc)
               }
               // Derive message-level sources from all completed toolCalls
-              const derivedSources = toolCalls.flatMap(t => t.sources ?? [])
+              const derivedSources = deriveSources(toolCalls)
               setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
@@ -172,7 +187,7 @@ export function useAssistantRuntime({
             },
             onDone: () => {
               // Final update: derive sources from toolCalls for consistency
-              const derivedSources = toolCalls.flatMap(t => t.sources ?? [])
+              const derivedSources = deriveSources(toolCalls)
               setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
