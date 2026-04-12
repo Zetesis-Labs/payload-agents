@@ -299,6 +299,21 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
         chunkIndex: (s.chunk_index as number) || 0,
         relevanceScore: 0,
         content: ''
+      })),
+      toolCalls: (msg.toolCalls as Record<string, unknown>[])?.map((tc: Record<string, unknown>) => ({
+        id: tc.id as string,
+        name: tc.name as string,
+        input: (tc.input as Record<string, unknown>) || {},
+        result: tc.result as string | undefined,
+        sources: (tc.sources as Record<string, unknown>[])?.map((s: Record<string, unknown>) => ({
+          id: s.id as string,
+          title: s.title as string,
+          slug: s.slug as string,
+          type: (s.type as string) || 'document',
+          chunkIndex: 0,
+          relevanceScore: 0,
+          content: ''
+        }))
       }))
     }))
   }
