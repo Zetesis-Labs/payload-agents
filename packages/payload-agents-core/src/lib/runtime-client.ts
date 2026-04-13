@@ -1,25 +1,32 @@
 /**
  * Agent Runtime HTTP client.
  *
- * Thin wrapper around the internal HTTP API exposed by the Python
- * agent-runtime service. Used by Payload hooks to tell the runtime
- * to refresh its in-memory agent registry.
+ * All requests to the runtime include the `X-Internal-Secret` header
+ * so the runtime can verify the caller is trusted.
  */
 
 import type { ReloadResult } from '../types'
 
 const RELOAD_TIMEOUT_MS = 5_000
 
+/**
+ * Authenticated fetch to the agent-runtime.
+ * Merges the `X-Internal-Secret` header into whatever headers the
+ * caller provides.
+ */
+export function runtimeFetch(url: string, runtimeSecret: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers)
+  headers.set('X-Internal-Secret', runtimeSecret)
+  return fetch(url, { ...init, headers })
+}
+
 export async function reloadAgents(runtimeUrl: string, runtimeSecret: string): Promise<ReloadResult | null> {
   const url = `${runtimeUrl}/internal/agents/reload`
 
   try {
-    const res = await fetch(url, {
+    const res = await runtimeFetch(url, runtimeSecret, {
       method: 'POST',
-      headers: {
-        'X-Internal-Secret': runtimeSecret,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(RELOAD_TIMEOUT_MS)
     })
 

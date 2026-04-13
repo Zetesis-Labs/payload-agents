@@ -8,6 +8,7 @@
  */
 
 import type { PayloadHandler } from 'payload'
+import { runtimeFetch } from '../lib/runtime-client'
 import { validateSessionOwnership } from '../lib/session-id'
 import { dedupSources, extractSources } from '../lib/sources'
 import type { ResolvedPluginConfig, Source } from '../types'
@@ -144,16 +145,17 @@ function extractMessagesFromRuns(runs: Array<{ messages?: AgnoMessage[] }>): Agn
 /** Fetch session detail + runs and return a formatted response body. */
 async function fetchSessionDetail(
   runtimeUrl: string,
+  runtimeSecret: string,
   sessionId: string,
   userId: string | number
 ): Promise<Record<string, unknown> | null> {
   const encodedId = encodeURIComponent(sessionId)
   const params = new URLSearchParams({ type: 'agent', user_id: String(userId) })
   const [sessionRes, runsRes] = await Promise.all([
-    fetch(`${runtimeUrl}/sessions/${encodedId}?${params}`, {
+    runtimeFetch(`${runtimeUrl}/sessions/${encodedId}?${params}`, runtimeSecret, {
       signal: AbortSignal.timeout(5_000)
     }),
-    fetch(`${runtimeUrl}/sessions/${encodedId}/runs?${params}`, {
+    runtimeFetch(`${runtimeUrl}/sessions/${encodedId}/runs?${params}`, runtimeSecret, {
       signal: AbortSignal.timeout(5_000)
     })
   ])
@@ -190,12 +192,12 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
         if (!validateSessionOwnership(conversationId, tenantId, userId)) {
           return Response.json({ error: 'Forbidden' }, { status: 403 })
         }
-        const detail = await fetchSessionDetail(config.runtimeUrl, conversationId, userId)
+        const detail = await fetchSessionDetail(config.runtimeUrl, config.runtimeSecret, conversationId, userId)
         return detail ? Response.json(detail) : Response.json(null, { status: 404 })
       }
 
       if (isActive) {
-        return await handleActiveSession(config.runtimeUrl, tenantId, userId)
+        return await handleActiveSession(config.runtimeUrl, config.runtimeSecret, tenantId, userId)
       }
 
       return Response.json(null, { status: 400 })
@@ -206,7 +208,12 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
   }
 }
 
-async function handleActiveSession(runtimeUrl: string, tenantId: string, userId: string | number): Promise<Response> {
+async function handleActiveSession(
+  runtimeUrl: string,
+  runtimeSecret: string,
+  tenantId: string,
+  userId: string | number
+): Promise<Response> {
   const params = new URLSearchParams({
     type: 'agent',
     user_id: String(userId),
@@ -214,7 +221,7 @@ async function handleActiveSession(runtimeUrl: string, tenantId: string, userId:
     sort_order: 'desc',
     limit: '10'
   })
-  const listRes = await fetch(`${runtimeUrl}/sessions?${params}`, {
+  const listRes = await runtimeFetch(`${runtimeUrl}/sessions?${params}`, runtimeSecret, {
     signal: AbortSignal.timeout(5_000)
   })
   if (!listRes.ok) return Response.json(null)
@@ -223,7 +230,7 @@ async function handleActiveSession(runtimeUrl: string, tenantId: string, userId:
   const match = (listBody.data || []).find(s => validateSessionOwnership(s.session_id, tenantId, userId))
   if (!match) return Response.json(null)
 
-  const detail = await fetchSessionDetail(runtimeUrl, match.session_id, userId)
+  const detail = await fetchSessionDetail(runtimeUrl, runtimeSecret, match.session_id, userId)
   return detail ? Response.json(detail) : Response.json(null)
 }
 
@@ -259,8 +266,9 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
 
     try {
       const renameParams = new URLSearchParams({ type: 'agent', user_id: String(userId) })
-      const res = await fetch(
+      const res = await runtimeFetch(
         `${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}/rename?${renameParams}`,
+        config.runtimeSecret,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -301,10 +309,14 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
 
     try {
       const deleteParams = new URLSearchParams({ type: 'agent', user_id: String(userId) })
-      const res = await fetch(`${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}?${deleteParams}`, {
-        method: 'DELETE',
-        signal: AbortSignal.timeout(5_000)
-      })
+      const res = await runtimeFetch(
+        `${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}?${deleteParams}`,
+        config.runtimeSecret,
+        {
+          method: 'DELETE',
+          signal: AbortSignal.timeout(5_000)
+        }
+      )
       if (!res.ok) {
         return Response.json({ error: 'Delete failed' }, { status: res.status })
       }
