@@ -288,13 +288,10 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
 
     try {
       const deleteParams = new URLSearchParams({ type: 'agent', user_id: String(userId) })
-      const res = await fetch(
-        `${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}?${deleteParams}`,
-        {
-          method: 'DELETE',
-          signal: AbortSignal.timeout(5_000)
-        }
-      )
+      const res = await fetch(`${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}?${deleteParams}`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(5_000)
+      })
       if (!res.ok) {
         return Response.json({ error: 'Delete failed' }, { status: res.status })
       }

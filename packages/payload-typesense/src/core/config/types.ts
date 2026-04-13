@@ -1,10 +1,7 @@
 import type { TableConfig } from '@zetesis/payload-indexer'
 import type { CollectionSlug } from 'payload'
 import type { TypesenseFieldMapping } from '../../adapter/types'
-import type {
-  EmbeddingProviderConfig,
-  TypesenseConnectionConfig
-} from '../../shared/types/plugin-types'
+import type { EmbeddingProviderConfig, TypesenseConnectionConfig } from '../../shared/types/plugin-types'
 
 // --- Search Feature Config ---
 

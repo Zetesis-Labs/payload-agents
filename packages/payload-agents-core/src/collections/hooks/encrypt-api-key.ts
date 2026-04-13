@@ -31,8 +31,7 @@ export function createDecryptAfterReadHook(config: ResolvedPluginConfig): Collec
 
     const isLocalAPI = req.payloadAPI === 'local'
     const isRuntimeRequest =
-      config.runtimeSecret !== '' &&
-      req.headers?.get?.('x-runtime-secret') === config.runtimeSecret
+      config.runtimeSecret !== '' && req.headers?.get?.('x-runtime-secret') === config.runtimeSecret
     const userRoles = req.user && 'role' in req.user ? (req.user as unknown as { role: string[] }).role : []
     const isSuperAdminUser = Array.isArray(userRoles) && userRoles.includes('superadmin')
 
