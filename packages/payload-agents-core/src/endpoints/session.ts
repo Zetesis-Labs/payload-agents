@@ -8,6 +8,7 @@
  */
 
 import type { PayloadHandler } from 'payload'
+import { validateSessionOwnership } from '../lib/session-id'
 import { dedupSources, extractSources } from '../lib/sources'
 import type { ResolvedPluginConfig, Source } from '../types'
 
@@ -179,12 +180,16 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
     }
 
     const userId = (user as unknown as { id: string | number }).id
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     const isActive = url.searchParams.get('active') === 'true'
 
     try {
       if (conversationId) {
+        if (!validateSessionOwnership(conversationId, tenantId, userId)) {
+          return Response.json({ error: 'Forbidden' }, { status: 403 })
+        }
         const detail = await fetchSessionDetail(config.runtimeUrl, conversationId, userId)
         return detail ? Response.json(detail) : Response.json(null, { status: 404 })
       }
@@ -232,10 +237,14 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
     }
 
     const userId = (user as unknown as { id: string | number }).id
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
+    }
+    if (!validateSessionOwnership(conversationId, tenantId, userId)) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     let body: { title?: string }
@@ -280,10 +289,14 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
     }
 
     const userId = (user as unknown as { id: string | number }).id
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
+    }
+    if (!validateSessionOwnership(conversationId, tenantId, userId)) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     try {
