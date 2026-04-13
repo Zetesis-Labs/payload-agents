@@ -1,7 +1,7 @@
 // Plugin
 
 export { decrypt, encrypt, isEncrypted } from './lib/encryption'
-export { reloadAgents } from './lib/runtime-client'
+export { reloadAgents, runtimeFetch } from './lib/runtime-client'
 export type { SessionIdParts } from './lib/session-id'
 export { createSessionId, parseSessionId, validateSessionOwnership } from './lib/session-id'
 // Utilities (for advanced consumers)

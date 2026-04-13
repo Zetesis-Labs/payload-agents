@@ -5,6 +5,7 @@
  */
 
 import type { PayloadHandler } from 'payload'
+import { runtimeFetch } from '../lib/runtime-client'
 import type { ResolvedPluginConfig } from '../types'
 
 export function createSessionsListHandler(config: ResolvedPluginConfig): PayloadHandler {
@@ -31,7 +32,7 @@ export function createSessionsListHandler(config: ResolvedPluginConfig): Payload
     }
 
     try {
-      const res = await fetch(`${config.runtimeUrl}/sessions?${params}`, {
+      const res = await runtimeFetch(`${config.runtimeUrl}/sessions?${params}`, config.runtimeSecret, {
         signal: AbortSignal.timeout(5_000)
       })
 

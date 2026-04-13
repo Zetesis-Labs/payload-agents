@@ -10,7 +10,7 @@
  */
 
 import type { PayloadHandler, Where } from 'payload'
-import { reloadAgents } from '../lib/runtime-client'
+import { reloadAgents, runtimeFetch } from '../lib/runtime-client'
 import { createSessionId, validateSessionOwnership } from '../lib/session-id'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
@@ -143,7 +143,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     const upstreamUrl = `${config.runtimeUrl}/agents/${encodeURIComponent(agentSlugValue)}/runs`
 
     const callRuntime = () =>
-      fetch(upstreamUrl, {
+      runtimeFetch(upstreamUrl, config.runtimeSecret, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({

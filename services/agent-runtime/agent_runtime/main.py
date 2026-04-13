@@ -37,7 +37,7 @@ from agent_runtime.exceptions import (
 )
 from agent_runtime.health import router as health_router
 from agent_runtime.logging import configure_logging, get_logger
-from agent_runtime.middleware import RequestIdMiddleware
+from agent_runtime.middleware import InternalAuthMiddleware, RequestIdMiddleware
 from agent_runtime.registry import AgentRegistry
 from agent_runtime.schemas import ErrorResponse, ReloadResponse
 
@@ -105,6 +105,7 @@ agent_os = AgentOS(
 
 app = agent_os.get_app()
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(InternalAuthMiddleware, secret=settings.internal_secret)
 app.add_exception_handler(AgentRuntimeError, agent_runtime_exception_handler)  # type: ignore[arg-type]
 app.include_router(health_router)
 
