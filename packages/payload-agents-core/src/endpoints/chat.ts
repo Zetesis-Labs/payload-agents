@@ -11,7 +11,6 @@
 
 import type { PayloadHandler, Where } from 'payload'
 import { reloadAgents, runtimeFetch } from '../lib/runtime-client'
-import { createSessionId, validateSessionOwnership } from '../lib/session-id'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
 import type { ResolvedPluginConfig } from '../types'
@@ -93,12 +92,8 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Load agent from Payload ─────────────────────────────────────────
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
+    const userRecord = user as unknown as Record<string, unknown>
     const where: Where = { isActive: { equals: true } }
-
-    if (tenantId !== 'default') {
-      where.tenant = { equals: tenantId }
-    }
     if (agentSlug) {
       where.slug = { equals: agentSlug }
     }
@@ -138,10 +133,17 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
 
     // ── Session ID ──────────────────────────────────────────────────────
     const agentSlugValue = agent.slug as string
-    if (chatId && !validateSessionOwnership(chatId, tenantId, userId)) {
-      return Response.json({ error: 'Forbidden' }, { status: 403 })
+    if (chatId) {
+      const ok = await config.validateSessionOwnership(chatId, { user: userRecord, payload, req })
+      if (!ok) return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
-    const sessionId = chatId || createSessionId(agentSlugValue, tenantId, userId)
+    const sessionId = await config.buildSessionId({
+      user: userRecord,
+      agentSlug: agentSlugValue,
+      chatId,
+      payload,
+      req
+    })
     const upstreamUrl = `${config.runtimeUrl}/agents/${encodeURIComponent(agentSlugValue)}/runs`
 
     const callRuntime = () =>

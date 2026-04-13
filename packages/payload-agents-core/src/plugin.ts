@@ -10,8 +10,8 @@ import { createAgentsListHandler } from './endpoints/agents-list'
 import { createChatHandler } from './endpoints/chat'
 import { createSessionDeleteHandler, createSessionGetHandler, createSessionPatchHandler } from './endpoints/session'
 import { createSessionsListHandler } from './endpoints/sessions'
+import { defaultBuildSessionId, defaultValidateSessionOwnership } from './lib/session-id'
 import type { AgentPluginConfig, ResolvedPluginConfig } from './types'
-import { defaultExtractTenantId } from './utils/extract-tenant'
 
 function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
   const runtimeSecret = userConfig.runtimeSecret ?? ''
@@ -22,13 +22,14 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
     runtimeUrl: userConfig.runtimeUrl,
     runtimeSecret,
     getDailyLimit: userConfig.getDailyLimit,
-    extractTenantId: userConfig.extractTenantId ?? defaultExtractTenantId,
+    buildSessionId: userConfig.buildSessionId ?? defaultBuildSessionId,
+    validateSessionOwnership: userConfig.validateSessionOwnership ?? defaultValidateSessionOwnership,
     collectionSlug: userConfig.collectionSlug ?? 'agents',
     basePath: userConfig.basePath ?? '/agents',
     encryptionKey: userConfig.encryptionKey,
     mediaCollectionSlug: userConfig.mediaCollectionSlug ?? 'media',
     taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug ?? 'taxonomy',
-    collectionOverrides: userConfig.collectionOverrides ?? {}
+    collectionOverrides: userConfig.collectionOverrides
   }
 }
 
