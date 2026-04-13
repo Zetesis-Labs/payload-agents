@@ -182,7 +182,7 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
     }
 
     const userId = (user as unknown as { id: string | number }).id
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>, req)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     const isActive = url.searchParams.get('active') === 'true'
@@ -244,7 +244,7 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
     }
 
     const userId = (user as unknown as { id: string | number }).id
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>, req)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
@@ -297,7 +297,7 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
     }
 
     const userId = (user as unknown as { id: string | number }).id
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>, req)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {

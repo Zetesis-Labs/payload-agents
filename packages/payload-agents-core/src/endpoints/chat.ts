@@ -93,7 +93,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Load agent from Payload ─────────────────────────────────────────
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>, req)
     const where: Where = { isActive: { equals: true } }
 
     if (tenantId !== 'default') {

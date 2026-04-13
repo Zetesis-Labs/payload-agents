@@ -22,7 +22,7 @@ export function createAgentsListHandler(config: ResolvedPluginConfig): PayloadHa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
+    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>, req)
     const where: Where = { isActive: { equals: true } }
     if (tenantId !== 'default') {
       where.tenant = { equals: tenantId }

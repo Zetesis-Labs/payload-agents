@@ -31,10 +31,16 @@ export interface AgentPluginConfig {
   getDailyLimit: (payload: Payload, userId: string | number) => Promise<number>
 
   /**
-   * Extract a tenant identifier from the authenticated Payload user.
-   * Defaults to `'default'` when not provided.
+   * Extract the active tenant identifier from the authenticated user.
+   *
+   * The default reads the `payload-tenant` cookie from the request
+   * (set by the multi-tenant plugin), falling back to the first tenant
+   * in the user's `tenants` array.
    */
-  extractTenantId?: (user: Record<string, unknown>) => string
+  extractTenantId?: (
+    user: Record<string, unknown>,
+    req: { headers: { get: (name: string) => string | null } }
+  ) => string
 
   /**
    * Override the Payload collection slug. Default: `'agents'`.
@@ -131,7 +137,7 @@ export interface ResolvedPluginConfig {
   runtimeUrl: string
   runtimeSecret: string
   getDailyLimit: (payload: Payload, userId: string | number) => Promise<number>
-  extractTenantId: (user: Record<string, unknown>) => string
+  extractTenantId: (user: Record<string, unknown>, req: { headers: { get: (name: string) => string | null } }) => string
   collectionSlug: string
   basePath: string
   encryptionKey: string | undefined
