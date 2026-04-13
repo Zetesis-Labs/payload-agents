@@ -11,6 +11,7 @@
 
 import type { PayloadHandler, Where } from 'payload'
 import { reloadAgents } from '../lib/runtime-client'
+import { createSessionId, validateSessionOwnership } from '../lib/session-id'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
 import type { ResolvedPluginConfig } from '../types'
@@ -135,7 +136,10 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
 
     // ── Session ID ──────────────────────────────────────────────────────
     const agentSlugValue = agent.slug as string
-    const sessionId = chatId || `${agentSlugValue}:${tenantId}:${userId}:${crypto.randomUUID()}`
+    if (chatId && !validateSessionOwnership(chatId, tenantId, userId)) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const sessionId = chatId || createSessionId(agentSlugValue, tenantId, userId)
     const upstreamUrl = `${config.runtimeUrl}/agents/${encodeURIComponent(agentSlugValue)}/runs`
 
     const callRuntime = () =>
