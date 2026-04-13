@@ -118,7 +118,9 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     // ── Token budget ────────────────────────────────────────────────────
     const userId = (user as unknown as { id: string | number }).id
     const usage = await getTokenUsage(payload, userId, config.getDailyLimit)
-    const estimated = Math.ceil(message.length / 4)
+    // Conservative estimate: user message tokens + fixed overhead for
+    // system prompt, RAG context, tool calls, and model output.
+    const estimated = Math.ceil(message.length / 3) + 2000
     if (!usage.canUse(estimated)) {
       return Response.json(
         {
