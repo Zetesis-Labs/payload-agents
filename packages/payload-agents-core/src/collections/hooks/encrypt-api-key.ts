@@ -11,7 +11,7 @@ import { decrypt, encrypt, isEncrypted } from '../../lib/encryption'
 import type { ResolvedPluginConfig } from '../../types'
 
 export function createEncryptBeforeChangeHook(config: ResolvedPluginConfig): CollectionBeforeChangeHook {
-  return async ({ data, originalDoc }) => {
+  return async ({ data }) => {
     if (!config.encryptionKey) return data
 
     if (data.apiKey) {

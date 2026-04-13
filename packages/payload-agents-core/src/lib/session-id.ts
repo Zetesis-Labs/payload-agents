@@ -36,11 +36,7 @@ export function parseSessionId(sessionId: string): SessionIdParts | null {
  * Verify that `sessionId` was created for the given tenant + user.
  * Returns `false` for malformed IDs or mismatched ownership.
  */
-export function validateSessionOwnership(
-  sessionId: string,
-  tenantId: string,
-  userId: string | number
-): boolean {
+export function validateSessionOwnership(sessionId: string, tenantId: string, userId: string | number): boolean {
   const parsed = parseSessionId(sessionId)
   if (!parsed) return false
   return parsed.tenantId === tenantId && parsed.userId === String(userId)
