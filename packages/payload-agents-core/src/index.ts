@@ -9,7 +9,7 @@ export type { SessionIdParts } from './lib/session-id'
 export { createSessionId, parseSessionId, validateSessionOwnership } from './lib/session-id'
 export { dedupSources, extractSources } from './lib/sources'
 export { translateAgnoStream } from './lib/sse-translator'
-export { getTokenUsage } from './lib/token-usage'
+export { effectiveTokensFromMetrics, getTokenUsage } from './lib/token-usage'
 export { agentPlugin } from './plugin'
 // Types
 export type {

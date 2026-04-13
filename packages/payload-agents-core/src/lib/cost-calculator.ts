@@ -62,7 +62,7 @@ function getPricing(llmModel: string): ModelPricing {
 export function estimateRunCost(llmModel: string, metrics: RunMetrics): number {
   const pricing = getPricing(llmModel)
   const cached = metrics.cache_read_tokens ?? 0
-  const nonCachedInput = metrics.input_tokens - cached
+  const nonCachedInput = Math.max(0, metrics.input_tokens - cached)
   const cachedRate = pricing.cachedInput ?? pricing.input
 
   return (
@@ -86,7 +86,7 @@ export function estimateRunCost(llmModel: string, metrics: RunMetrics): number {
 export function effectiveTokens(llmModel: string, metrics: RunMetrics): number {
   const pricing = getPricing(llmModel)
   const cached = metrics.cache_read_tokens ?? 0
-  const nonCachedInput = metrics.input_tokens - cached
+  const nonCachedInput = Math.max(0, metrics.input_tokens - cached)
 
   const inputRatio = 1
   const cachedRatio = (pricing.cachedInput ?? pricing.input) / pricing.input
@@ -116,7 +116,7 @@ export function costBreakdown(
 } {
   const pricing = getPricing(llmModel)
   const cached = metrics.cache_read_tokens ?? 0
-  const nonCached = metrics.input_tokens - cached
+  const nonCached = Math.max(0, metrics.input_tokens - cached)
   const cachedRate = pricing.cachedInput ?? pricing.input
 
   const inputCost = (nonCached / 1_000_000) * pricing.input

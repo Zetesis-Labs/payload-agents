@@ -6,7 +6,8 @@
  *
  * Uses cost-weighted "effective tokens" instead of raw totals so the daily
  * budget reflects real spend. Cached input counts at 25% and output tokens
- * are weighted by the model's output/input price ratio.
+ * count at 100% (model-agnostic approximation — for precise per-model
+ * weighting use `costBreakdown()` from cost-calculator.ts).
  *
  * The daily *limit* comes from the consumer via `getDailyLimit()` callback.
  */
@@ -14,6 +15,25 @@
 import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import type { DailyTokenUsage, TokenUsageResult } from '../types'
+
+/**
+ * Compute cost-weighted effective tokens from raw Agno metrics.
+ *
+ * Formula matches the one applied to the aggregated daily usage in
+ * `getCurrentDailyUsage()`, so per-run estimates and the running daily
+ * total stay in the same unit.
+ */
+export function effectiveTokensFromMetrics(metrics: {
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_tokens?: number
+}): number {
+  const input = metrics.input_tokens ?? 0
+  const output = metrics.output_tokens ?? 0
+  const cacheRead = metrics.cache_read_tokens ?? 0
+  const nonCachedInput = Math.max(0, input - cacheRead)
+  return Math.ceil(nonCachedInput + cacheRead * 0.25 + output)
+}
 
 /** Drizzle handle from the Payload DB adapter. */
 function getDrizzle(payload: Payload) {
@@ -64,11 +84,11 @@ async function getCurrentDailyUsage(payload: Payload, userId: string | number): 
     const reasoningTokens = Number(row.reasoning_tokens ?? 0)
     const totalTokens = Number(row.total_tokens ?? 0)
 
-    // Effective tokens: cached input weighted at 25%, output at 100%.
-    // This is a model-agnostic approximation — for precise per-model
-    // weighting, use costBreakdown() from cost-calculator.ts.
-    const nonCachedInput = inputTokens - cacheReadTokens
-    const effectiveTokens = Math.ceil(nonCachedInput + cacheReadTokens * 0.25 + outputTokens)
+    const effectiveTokens = effectiveTokensFromMetrics({
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cache_read_tokens: cacheReadTokens
+    })
 
     return {
       date: today.toISOString().split('T')[0] ?? '',

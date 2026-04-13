@@ -13,6 +13,7 @@
  */
 
 import { extractSources } from './sources'
+import { effectiveTokensFromMetrics } from './token-usage'
 
 interface UsageSnapshot {
   limit: number
@@ -128,16 +129,23 @@ function emitRunCompleted(
     emit({ type: 'sources', data: state.sources })
   }
   const metrics = parsed.metrics as Record<string, unknown> | undefined
-  const realTokens =
+  // Use the same effective-token formula as `getCurrentDailyUsage()` so
+  // the running daily total stays in the same unit as the baseline
+  // consumed by `getTokenUsage()`.
+  const runTokens =
     typeof metrics?.input_tokens === 'number' && typeof metrics?.output_tokens === 'number'
-      ? (metrics.input_tokens as number) + (metrics.output_tokens as number)
+      ? effectiveTokensFromMetrics({
+          input_tokens: metrics.input_tokens as number,
+          output_tokens: metrics.output_tokens as number,
+          cache_read_tokens: typeof metrics.cache_read_tokens === 'number' ? (metrics.cache_read_tokens as number) : 0
+        })
       : Math.ceil(state.accumulatedText.length / 4)
   emit({
     type: 'usage',
     data: {
       daily_limit: usage.limit,
-      daily_used: usage.used + realTokens,
-      daily_remaining: Math.max(0, usage.remaining - realTokens),
+      daily_used: usage.used + runTokens,
+      daily_remaining: Math.max(0, usage.remaining - runTokens),
       reset_at: usage.reset_at
     }
   })
