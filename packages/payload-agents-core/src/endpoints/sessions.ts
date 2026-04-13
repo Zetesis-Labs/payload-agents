@@ -23,7 +23,7 @@ export function createSessionsListHandler(config: ResolvedPluginConfig): Payload
       user_id: String(userId),
       sort_by: 'updated_at',
       sort_order: 'desc',
-      limit: url.searchParams.get('limit') || '20',
+      limit: String(Math.min(Math.max(1, Number(url.searchParams.get('limit')) || 20), 100)),
       page: url.searchParams.get('page') || '1'
     })
     if (agentSlug) {
