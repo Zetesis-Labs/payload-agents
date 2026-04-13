@@ -14,9 +14,13 @@ import type { AgentPluginConfig, ResolvedPluginConfig } from './types'
 import { defaultExtractTenantId } from './utils/extract-tenant'
 
 function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
+  const runtimeSecret = userConfig.runtimeSecret ?? ''
+  if (!runtimeSecret) {
+    console.warn('[agent-plugin] runtimeSecret is empty — all runtime requests will be unauthenticated')
+  }
   return {
     runtimeUrl: userConfig.runtimeUrl,
-    runtimeSecret: userConfig.runtimeSecret ?? '',
+    runtimeSecret,
     getDailyLimit: userConfig.getDailyLimit,
     extractTenantId: userConfig.extractTenantId ?? defaultExtractTenantId,
     collectionSlug: userConfig.collectionSlug ?? 'agents',
