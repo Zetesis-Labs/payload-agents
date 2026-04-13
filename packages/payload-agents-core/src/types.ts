@@ -112,7 +112,14 @@ export interface Source {
 
 export interface DailyTokenUsage {
   date: string
+  /** Cost-weighted effective tokens (cached input at 25%, output at 100%). */
   tokens_used: number
+  /** Raw total from Agno (input + output, no weighting). */
+  raw_total_tokens: number
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  reasoning_tokens: number
   reset_at: string
 }
 
