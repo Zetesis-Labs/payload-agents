@@ -11,6 +11,7 @@ export { agentPlugin } from './plugin'
 // Types
 export type {
   AgentPluginConfig,
+  AgentsCollectionOverrides,
   DailyTokenUsage,
   ReloadResult,
   ResolvedPluginConfig,

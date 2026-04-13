@@ -70,12 +70,13 @@ class AgentRegistry:
             "depth": 1,
             "limit": 1000,
         }
-        headers: dict[str, str] = {"X-Internal-Request": "true"}
+        headers: dict[str, str] = {"X-Runtime-Secret": settings.internal_secret}
         if settings.payload_service_token:
             headers["Authorization"] = f"Bearer {settings.payload_service_token}"
 
         async with httpx.AsyncClient(timeout=_PAYLOAD_TIMEOUT_S) as client:
             response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
+            data: dict[str, list[dict[str, Any]]] = response.json()
 
-        return response.json().get("docs", [])
+        return data.get("docs", [])

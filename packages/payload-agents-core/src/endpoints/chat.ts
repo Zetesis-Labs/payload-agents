@@ -43,8 +43,8 @@ async function callWithRetry(
 
   if (upstream.ok && upstream.body) return upstream
 
-  if (upstream.status >= 400 && upstream.status < 500) {
-    console.warn(`[chat] agent-runtime returned ${upstream.status}, attempting reload`)
+  if (upstream.status === 404) {
+    console.warn('[chat] agent-runtime returned 404 (agent not found), attempting reload')
     return retryAfterReload(callRuntime, runtimeUrl, runtimeSecret)
   }
 

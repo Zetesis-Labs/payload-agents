@@ -12,10 +12,17 @@ import { createDecryptAfterReadHook, createEncryptBeforeChangeHook } from './hoo
 import { createAfterChangeHook, createAfterDeleteHook } from './hooks/reload-runtime'
 
 export function createAgentsCollection(config: ResolvedPluginConfig): CollectionConfig {
+  const { access: accessOverride, admin: adminOverride, labels: labelsOverride } = config.collectionOverrides
+
   return {
     slug: config.collectionSlug,
+    ...(labelsOverride ? { labels: labelsOverride } : {}),
     access: {
-      read: () => true
+      read: () => true,
+      create: ({ req: { user } }) => Boolean(user),
+      update: ({ req: { user } }) => Boolean(user),
+      delete: ({ req: { user } }) => Boolean(user),
+      ...accessOverride
     },
     hooks: {
       beforeChange: [createEncryptBeforeChangeHook(config)],
@@ -26,7 +33,8 @@ export function createAgentsCollection(config: ResolvedPluginConfig): Collection
     admin: {
       useAsTitle: 'name',
       group: 'Chat',
-      defaultColumns: ['name', 'slug', 'llmModel', 'isActive']
+      defaultColumns: ['name', 'slug', 'llmModel', 'isActive'],
+      ...adminOverride
     },
     fields: [
       {

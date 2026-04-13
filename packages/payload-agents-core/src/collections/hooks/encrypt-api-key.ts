@@ -16,10 +16,7 @@ export function createEncryptBeforeChangeHook(config: ResolvedPluginConfig): Col
 
     if (data.apiKey) {
       if (!isEncrypted(data.apiKey)) {
-        console.log('[Agents Security] Encrypting API key before save')
         data.apiKey = encrypt(data.apiKey, config.encryptionKey)
-      } else if (originalDoc?.apiKey === data.apiKey) {
-        console.log('[Agents Security] API key unchanged, keeping encrypted value')
       }
     }
 
@@ -32,11 +29,14 @@ export function createDecryptAfterReadHook(config: ResolvedPluginConfig): Collec
     if (!config.encryptionKey) return doc
     if (!doc.apiKey || !isEncrypted(doc.apiKey)) return doc
 
-    const isInternalRequest = req.headers?.get?.('x-internal-request') === 'true'
+    const isLocalAPI = req.payloadAPI === 'local'
+    const isRuntimeRequest =
+      config.runtimeSecret !== '' &&
+      req.headers?.get?.('x-runtime-secret') === config.runtimeSecret
     const userRoles = req.user && 'role' in req.user ? (req.user as unknown as { role: string[] }).role : []
     const isSuperAdminUser = Array.isArray(userRoles) && userRoles.includes('superadmin')
 
-    if (!isInternalRequest && !isSuperAdminUser) {
+    if (!isLocalAPI && !isRuntimeRequest && !isSuperAdminUser) {
       doc.apiKey = undefined
       return doc
     }
@@ -44,7 +44,7 @@ export function createDecryptAfterReadHook(config: ResolvedPluginConfig): Collec
     try {
       doc.apiKey = decrypt(doc.apiKey, config.encryptionKey)
     } catch (error) {
-      console.error('[Agents Security] Failed to decrypt API key:', error)
+      console.error('[Agents Security] Failed to decrypt API key:', error instanceof Error ? error.message : 'unknown')
       doc.apiKey = '[DECRYPTION_FAILED]'
     }
 

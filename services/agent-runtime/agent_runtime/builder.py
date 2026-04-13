@@ -15,6 +15,9 @@ from agno.tools.mcp.params import StreamableHTTPClientParams
 from agent_runtime.config import settings
 from agent_runtime.exceptions import InvalidModelError, MissingApiKeyError, UnsupportedProviderError
 from agent_runtime.instructions import compose_instructions, extract_taxonomy_slugs
+from agent_runtime.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Models that require the OpenAI Responses API instead of Chat Completions.
 _OPENAI_RESPONSES_PREFIXES = ("o1", "o3", "o4", "gpt-4.1", "gpt-5")
@@ -23,9 +26,12 @@ _OPENAI_RESPONSES_PREFIXES = ("o1", "o3", "o4", "gpt-4.1", "gpt-5")
 def build_agent(cfg: dict[str, Any], *, db: PostgresDb) -> Agent:
     """Construct an Agno Agent from a Payload Agents document."""
     slug = cfg.get("slug", "unknown")
-    provider, _, model_id = str(cfg["llmModel"]).partition("/")
+    llm_model = cfg.get("llmModel")
+    if not llm_model:
+        raise InvalidModelError(slug=slug, llm_model="")
+    provider, _, model_id = str(llm_model).partition("/")
     if not model_id:
-        raise InvalidModelError(slug=slug, llm_model=str(cfg.get("llmModel", "")))
+        raise InvalidModelError(slug=slug, llm_model=str(llm_model))
 
     api_key = cfg.get("apiKey")
     if not api_key:
@@ -40,7 +46,13 @@ def build_agent(cfg: dict[str, Any], *, db: PostgresDb) -> Agent:
     # Agno's reasoning=True is only useful for non-reasoning models.
     is_native_reasoner = any(model_id.startswith(p) for p in ("o1", "o3", "o4"))
 
-    tool_call_limit = cfg.get("toolCallLimit")
+    raw_limit = cfg.get("toolCallLimit")
+    tool_call_limit: int | None = None
+    if raw_limit is not None:
+        try:
+            tool_call_limit = int(raw_limit)
+        except (ValueError, TypeError):
+            logger.warning("Invalid toolCallLimit, ignoring", slug=slug, value=raw_limit)
 
     return Agent(
         name=cfg.get("name", slug),
@@ -52,7 +64,7 @@ def build_agent(cfg: dict[str, Any], *, db: PostgresDb) -> Agent:
         add_history_to_context=True,
         num_history_runs=5,
         reasoning=not is_native_reasoner,
-        tool_call_limit=int(tool_call_limit) if tool_call_limit is not None else None,
+        tool_call_limit=tool_call_limit,
         telemetry=False,
     )
 

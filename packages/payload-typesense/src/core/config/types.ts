@@ -3,7 +3,6 @@ import type { CollectionSlug } from 'payload'
 import type { TypesenseFieldMapping } from '../../adapter/types'
 import type {
   EmbeddingProviderConfig,
-  RAGFeatureConfig,
   TypesenseConnectionConfig
 } from '../../shared/types/plugin-types'
 
@@ -35,7 +34,6 @@ export interface SyncFeatureConfig {
 export interface FeatureFlags {
   embedding?: EmbeddingProviderConfig
   search?: SearchFeatureConfig
-  rag?: RAGFeatureConfig
   sync?: SyncFeatureConfig
 }
 

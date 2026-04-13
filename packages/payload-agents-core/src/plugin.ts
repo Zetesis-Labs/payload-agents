@@ -23,7 +23,8 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
     basePath: userConfig.basePath ?? '/agents',
     encryptionKey: userConfig.encryptionKey,
     mediaCollectionSlug: userConfig.mediaCollectionSlug ?? 'media',
-    taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug ?? 'taxonomy'
+    taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug ?? 'taxonomy',
+    collectionOverrides: userConfig.collectionOverrides ?? {}
   }
 }
 

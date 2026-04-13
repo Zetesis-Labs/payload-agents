@@ -28,6 +28,7 @@ interface UseChatSessionOptions {
  * Hook to manage chat session state and persistence
  */
 export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOptions): UseChatSessionReturn {
+  const onAgentChange = options?.onAgentChange
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoadingSession, setIsLoadingSession] = useState(true)
@@ -54,7 +55,7 @@ export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOpt
             console.log('[useChatSession] ✅ Session restored with', sessionData.messages.length, 'messages')
           }
           if (sessionData.agentSlug) {
-            options?.onAgentChange?.(sessionData.agentSlug)
+            onAgentChange?.(sessionData.agentSlug)
           }
         } else {
           // No active session found
@@ -68,7 +69,7 @@ export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOpt
     }
 
     loadActiveSession()
-  }, [adapter, options?.onAgentChange])
+  }, [adapter, onAgentChange])
 
   // Load history
   const loadHistory = useCallback(async () => {
@@ -96,7 +97,7 @@ export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOpt
           setConversationId(sessionData.conversationId)
           setMessages(sessionData.messages)
           if (sessionData.agentSlug) {
-            options?.onAgentChange?.(sessionData.agentSlug)
+            onAgentChange?.(sessionData.agentSlug)
           }
         } else {
           console.error('[useChatSession] ❌ Failed to load session (adapter returned null)')
@@ -107,7 +108,7 @@ export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOpt
         setIsLoadingSession(false)
       }
     },
-    [adapter, options?.onAgentChange]
+    [adapter, onAgentChange]
   )
 
   // Rename session

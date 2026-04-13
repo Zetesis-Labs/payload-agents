@@ -13,6 +13,8 @@ export default defineConfig({
   tsconfig: './tsconfig.json',
   external: [
     'payload',
+    'drizzle-orm',
+    'node:crypto',
     '@toon-format/toon',
   ],
 })

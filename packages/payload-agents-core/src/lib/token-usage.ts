@@ -55,12 +55,8 @@ async function getCurrentDailyUsage(payload: Payload, userId: string | number): 
       reset_at: tomorrow.toISOString()
     }
   } catch (error) {
-    console.error('[Token Limits] Error querying Agno sessions:', error)
-    return {
-      date: today.toISOString().split('T')[0] ?? '',
-      tokens_used: 0,
-      reset_at: tomorrow.toISOString()
-    }
+    console.error('[Token Limits] Error querying Agno sessions:', error instanceof Error ? error.message : error)
+    throw error
   }
 }
 

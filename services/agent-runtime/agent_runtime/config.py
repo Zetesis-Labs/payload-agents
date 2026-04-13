@@ -23,13 +23,15 @@ class Settings(BaseSettings):
     database_url: str = ""
     database_schema: str = "agno"
 
-    internal_secret: str = "dev"  # noqa: S105
+    internal_secret: str = ""
 
     log_level: str = "INFO"
 
     def model_post_init(self, __context: Any) -> None:
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable is required")
+        if not self.internal_secret:
+            raise ValueError("INTERNAL_SECRET environment variable is required")
 
 
 settings = Settings()

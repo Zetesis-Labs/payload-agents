@@ -37,8 +37,11 @@ def compose_instructions(cfg: dict[str, Any]) -> str:
         sections.append(f"<RAG_CONFIG>\n{chr(10).join(rag_parts)}\n</RAG_CONFIG>")
 
     # -- Tool protocol & output format --
-    tool_call_limit = cfg.get("toolCallLimit")
-    limit_line = f"\nMax {int(tool_call_limit)} tool calls per turn." if tool_call_limit is not None else ""
+    raw_limit = cfg.get("toolCallLimit")
+    try:
+        limit_line = f"\nMax {int(raw_limit)} tool calls per turn." if raw_limit is not None else ""
+    except (ValueError, TypeError):
+        limit_line = ""
     sections.append(f"<TOOL_PROTOCOL>\n{_TOOL_PROTOCOL}{limit_line}\n</TOOL_PROTOCOL>")
     sections.append(f"<OUTPUT_FORMAT>\n{_OUTPUT_FORMAT}\n</OUTPUT_FORMAT>")
 

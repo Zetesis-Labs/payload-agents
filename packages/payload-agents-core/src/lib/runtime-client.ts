@@ -10,10 +10,6 @@ import type { ReloadResult } from '../types'
 
 const RELOAD_TIMEOUT_MS = 5_000
 
-export function getRuntimeUrl(runtimeUrl: string): string {
-  return runtimeUrl
-}
-
 export async function reloadAgents(runtimeUrl: string, runtimeSecret: string): Promise<ReloadResult | null> {
   const url = `${runtimeUrl}/internal/agents/reload`
 

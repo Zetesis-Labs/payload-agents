@@ -1,4 +1,10 @@
-import type { Payload } from 'payload'
+import type { CollectionConfig, Payload } from 'payload'
+
+/**
+ * Subset of `CollectionConfig` that consumers can override on the Agents collection.
+ * The plugin owns slug, hooks, and core fields — everything else is customizable.
+ */
+export type AgentsCollectionOverrides = Partial<Pick<CollectionConfig, 'access' | 'admin' | 'labels'>>
 
 /**
  * Plugin configuration for `agentPlugin()`.
@@ -64,6 +70,26 @@ export interface AgentPluginConfig {
    * Default: `'taxonomy'`.
    */
   taxonomyCollectionSlug?: string
+
+  /**
+   * Override `access`, `admin`, or `labels` on the generated Agents collection.
+   *
+   * Use this to plug in your own auth system. By default the collection allows
+   * read for everyone and requires authentication for write operations.
+   *
+   * @example
+   * ```ts
+   * collectionOverrides: {
+   *   access: {
+   *     read: () => true,
+   *     create: ({ req }) => isAdmin(req.user),
+   *     update: ({ req }) => isAdmin(req.user),
+   *     delete: ({ req }) => isAdmin(req.user),
+   *   }
+   * }
+   * ```
+   */
+  collectionOverrides?: AgentsCollectionOverrides
 }
 
 // ── Runtime client types ──────────────────────────────────────────────────
@@ -111,4 +137,5 @@ export interface ResolvedPluginConfig {
   encryptionKey: string | undefined
   mediaCollectionSlug: string
   taxonomyCollectionSlug: string
+  collectionOverrides: AgentsCollectionOverrides
 }

@@ -82,9 +82,10 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
                 )
                 await asyncio.sleep(delay)
             else:
-                logger.exception(
-                    "Failed to bootstrap after max retries; starting empty",
+                logger.critical(
+                    "Failed to bootstrap after max retries — service will only expose health endpoints",
                     max_retries=_BOOT_MAX_RETRIES,
+                    exc_info=True,
                 )
     yield
 

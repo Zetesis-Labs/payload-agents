@@ -147,11 +147,12 @@ async function fetchSessionDetail(
   userId: string | number
 ): Promise<Record<string, unknown> | null> {
   const encodedId = encodeURIComponent(sessionId)
+  const params = new URLSearchParams({ type: 'agent', user_id: String(userId) })
   const [sessionRes, runsRes] = await Promise.all([
-    fetch(`${runtimeUrl}/sessions/${encodedId}?type=agent&user_id=${userId}`, {
+    fetch(`${runtimeUrl}/sessions/${encodedId}?${params}`, {
       signal: AbortSignal.timeout(5_000)
     }),
-    fetch(`${runtimeUrl}/sessions/${encodedId}/runs?type=agent&user_id=${userId}`, {
+    fetch(`${runtimeUrl}/sessions/${encodedId}/runs?${params}`, {
       signal: AbortSignal.timeout(5_000)
     })
   ])
@@ -237,14 +238,20 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
     }
 
-    const body = (await req.json?.()) as { title?: string }
+    let body: { title?: string }
+    try {
+      body = (await req.json?.()) as { title?: string }
+    } catch {
+      return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
     if (!body.title) {
       return Response.json({ error: 'Missing title' }, { status: 400 })
     }
 
     try {
+      const renameParams = new URLSearchParams({ type: 'agent', user_id: String(userId) })
       const res = await fetch(
-        `${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}/rename?type=agent&user_id=${userId}`,
+        `${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}/rename?${renameParams}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -280,8 +287,9 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
     }
 
     try {
+      const deleteParams = new URLSearchParams({ type: 'agent', user_id: String(userId) })
       const res = await fetch(
-        `${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}?type=agent&user_id=${userId}`,
+        `${config.runtimeUrl}/sessions/${encodeURIComponent(conversationId)}?${deleteParams}`,
         {
           method: 'DELETE',
           signal: AbortSignal.timeout(5_000)

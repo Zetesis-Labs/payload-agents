@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+
+from sqlalchemy.ext.asyncio import AsyncEngine
+
 from agent_runtime.config import settings
 from agent_runtime.logging import get_logger
 
@@ -20,17 +24,23 @@ class _EngineHolder:
     """Module-level singleton — avoids bare `global` statements."""
 
     def __init__(self) -> None:
-        self.engine = None
+        self.engine: AsyncEngine | None = None
+        self._lock = asyncio.Lock()
 
-    def get(self):  # type: ignore[return]
-        if self.engine is None:
+    async def get(self) -> AsyncEngine:
+        if self.engine is not None:
+            return self.engine
+        async with self._lock:
+            # Double-check after acquiring lock
+            if self.engine is not None:
+                return self.engine
             from sqlalchemy.ext.asyncio import create_async_engine
 
-            url = normalize_pg_url(settings.database_url).replace(
-                "postgresql+psycopg://", "postgresql+psycopg_async://"
-            )
-            self.engine = create_async_engine(url, pool_size=1, pool_pre_ping=True)
-        return self.engine
+            sync_url = normalize_pg_url(settings.database_url)
+            # Use the explicit psycopg_async dialect for create_async_engine
+            async_url = sync_url.replace("postgresql+psycopg://", "postgresql+psycopg_async://")
+            self.engine = create_async_engine(async_url, pool_size=5, pool_pre_ping=True)
+            return self.engine
 
     async def dispose(self) -> None:
         if self.engine is not None:
@@ -44,7 +54,7 @@ _holder = _EngineHolder()
 async def check_db() -> bool:
     """Quick SELECT 1 for readiness probes."""
     try:
-        engine = _holder.get()
+        engine = await _holder.get()
         async with engine.connect() as conn:
             from sqlalchemy import text
 
