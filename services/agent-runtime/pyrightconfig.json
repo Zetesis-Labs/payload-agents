@@ -1,0 +1,8 @@
+{
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard",
+  "include": ["agent_runtime", "tests"],
+  "reportMissingImports": true,
+  "reportUnusedImport": true,
+  "reportUnusedVariable": true
+}

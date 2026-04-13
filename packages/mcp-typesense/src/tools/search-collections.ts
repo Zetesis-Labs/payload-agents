@@ -348,9 +348,17 @@ export async function searchCollections(
   ctx: ToolContext,
   auth: McpAuthContext | null
 ): Promise<SearchResult> {
-  // Auto-scope by tenant when auth provides one.
-  const scopedFilters =
-    auth?.tenantSlug && !input.filters?.tenant ? { ...input.filters, tenant: auth.tenantSlug } : input.filters
+  // Auto-scope by tenant and taxonomy when auth provides them.
+  let scopedFilters = input.filters
+  if (auth?.tenantSlug && !scopedFilters?.tenant) {
+    scopedFilters = { ...scopedFilters, tenant: auth.tenantSlug }
+  }
+  if (auth?.taxonomySlugs?.length && !scopedFilters?.taxonomy_slugs) {
+    scopedFilters = {
+      ...scopedFilters,
+      taxonomy_slugs: auth.taxonomySlugs.length === 1 ? auth.taxonomySlugs[0] : auth.taxonomySlugs
+    }
+  }
 
   const targets = resolveTargets(ctx, input.collections)
   if (targets === null) return emptyResult(input)

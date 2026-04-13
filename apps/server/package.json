@@ -19,6 +19,7 @@
     "@payloadcms/richtext-lexical": "^3.81.0",
     "@payloadcms/ui": "^3.81.0",
     "@zetesis/chat-agent": "workspace:*",
+    "@zetesis/payload-agents-core": "workspace:*",
     "@zetesis/payload-indexer": "workspace:*",
     "@zetesis/payload-lexical-blocks-builder": "workspace:*",
     "@zetesis/payload-taxonomies": "workspace:*",

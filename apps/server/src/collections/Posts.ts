@@ -7,7 +7,14 @@ export const Posts: CollectionConfig = {
     read: () => true
   },
   admin: {
-    useAsTitle: 'title'
+    useAsTitle: 'title',
+    components: {
+      views: {
+        list: {
+          actions: ['@/modules/payload-admin/sync-typesense-button']
+        }
+      }
+    }
   },
   fields: [
     {

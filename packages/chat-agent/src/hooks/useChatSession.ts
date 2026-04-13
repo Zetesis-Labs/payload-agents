@@ -19,10 +19,16 @@ interface UseChatSessionReturn {
   deleteSession: (conversationId: string) => Promise<boolean>
 }
 
+interface UseChatSessionOptions {
+  /** Called when a session is loaded with the agent slug it belongs to. */
+  onAgentChange?: (agentSlug: string) => void
+}
+
 /**
  * Hook to manage chat session state and persistence
  */
-export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
+export function useChatSession(adapter: ChatAdapter, options?: UseChatSessionOptions): UseChatSessionReturn {
+  const onAgentChange = options?.onAgentChange
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoadingSession, setIsLoadingSession] = useState(true)
@@ -48,6 +54,9 @@ export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
             setMessages(sessionData.messages)
             console.log('[useChatSession] ✅ Session restored with', sessionData.messages.length, 'messages')
           }
+          if (sessionData.agentSlug) {
+            onAgentChange?.(sessionData.agentSlug)
+          }
         } else {
           // No active session found
           console.log('[useChatSession] ℹ️ No active session found (adapter returned null)')
@@ -60,7 +69,7 @@ export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
     }
 
     loadActiveSession()
-  }, [adapter])
+  }, [adapter, onAgentChange])
 
   // Load history
   const loadHistory = useCallback(async () => {
@@ -87,6 +96,9 @@ export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
         if (sessionData) {
           setConversationId(sessionData.conversationId)
           setMessages(sessionData.messages)
+          if (sessionData.agentSlug) {
+            onAgentChange?.(sessionData.agentSlug)
+          }
         } else {
           console.error('[useChatSession] ❌ Failed to load session (adapter returned null)')
         }
@@ -96,7 +108,7 @@ export function useChatSession(adapter: ChatAdapter): UseChatSessionReturn {
         setIsLoadingSession(false)
       }
     },
-    [adapter]
+    [adapter, onAgentChange]
   )
 
   // Rename session

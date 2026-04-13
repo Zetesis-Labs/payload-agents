@@ -3,12 +3,13 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
-  "runServices": ["db", "typesense", "app"],
-  "forwardPorts": [3000, 3030, 5432, 8108],
+  "runServices": ["db", "typesense", "app", "agent-runtime"],
+  "forwardPorts": [3000, 3030, 5432, 8000, 8108],
   "portsAttributes": {
     "3000": { "label": "Payload CMS", "onAutoForward": "openPreview" },
     "3030": { "label": "MCP Server", "onAutoForward": "ignore" },
     "5432": { "label": "PostgreSQL", "onAutoForward": "ignore" },
+    "8000": { "label": "Agent Runtime", "onAutoForward": "ignore" },
     "8108": { "label": "Typesense", "onAutoForward": "ignore" }
   },
   "customizations": {

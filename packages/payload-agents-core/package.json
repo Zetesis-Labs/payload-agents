@@ -1,0 +1,82 @@
+{
+  "name": "@zetesis/payload-agents-core",
+  "version": "0.1.0",
+  "description": "Payload CMS plugin for AI agent management — collections, endpoints, and SSE proxy for Agno-based agent runtimes",
+  "license": "MIT",
+  "author": {
+    "name": "Zetesis - Rubén Garcia",
+    "email": "ruben@zetesis.xyz",
+    "url": "https://zetesis.xyz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zetesis-Labs/PayloadAgents.git",
+    "directory": "packages/payload-agents-core"
+  },
+  "homepage": "https://github.com/Zetesis-Labs/PayloadAgents/tree/main/packages/payload-agents-core#readme",
+  "bugs": {
+    "url": "https://github.com/Zetesis-Labs/PayloadAgents/issues"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "clean": "rimraf -g {dist,*.tsbuildinfo}",
+    "prepublishOnly": "pnpm clean && pnpm build"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0"
+  },
+  "peerDependencies": {
+    "drizzle-orm": ">=0.36",
+    "payload": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.4",
+    "payload": "^3.0.0",
+    "rimraf": "3.0.2",
+    "tsdown": "^0.16.5",
+    "typescript": "5.7.3"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": "^9 || ^10"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "plugin",
+    "ai",
+    "agent",
+    "agno",
+    "chat",
+    "sse",
+    "rag"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      }
+    },
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

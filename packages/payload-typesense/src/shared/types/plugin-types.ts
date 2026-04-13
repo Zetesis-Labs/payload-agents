@@ -2,7 +2,7 @@
  * Type definitions for payload-typesense plugin configuration
  */
 
-import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
+import type { PayloadRequest } from 'payload'
 
 /**
  * Hybrid search configuration for combining semantic and keyword search
@@ -220,52 +220,13 @@ export interface BatchEmbeddingWithUsage {
   }
 }
 
-// --- RAG Feature Config ---
+// --- RAG Callbacks (minimal — chat/sessions moved to payload-agents-core) ---
 
 export interface RAGCallbacks {
-  /** Get Payload instance (required) */
-  getPayload: () => Promise<Payload>
-  /** Check permissions function (required) */
+  /** Check permissions function (required for chunks endpoint) */
   checkPermissions: (request: PayloadRequest) => Promise<boolean>
-  /** Check token limit function (optional) */
-  checkTokenLimit?: (
-    payload: Payload,
-    userId: string | number,
-    tokens: number
-  ) => Promise<{
-    allowed: boolean
-    limit: number
-    used: number
-    remaining: number
-    reset_at?: string
-  }>
-  /** Get user usage stats function (optional) */
-  getUserUsageStats?: (
-    payload: Payload,
-    userId: string | number
-  ) => Promise<{
-    limit: number
-    used: number
-    remaining: number
-    reset_at?: string
-  }>
-  /** Save chat session function (optional) */
-  saveChatSession?: (
-    payload: Payload,
-    userId: string | number,
-    conversationId: string,
-    userMessage: string,
-    assistantMessage: string,
-    sources: ChunkSource[],
-    spending: SpendingEntry[],
-    collectionName: CollectionSlug,
-    agentSlug?: string
-  ) => Promise<void>
-  /** Create embedding spending function (optional) */
-  createEmbeddingSpending?: (model: string, tokens: number) => SpendingEntry
-  /** Estimate tokens from text function (optional) */
-  estimateTokensFromText?: (text: string) => number
 }
+
 /**
  * Complete RAG configuration
  */
@@ -276,17 +237,6 @@ export interface RAGConfig {
   hnsw?: HNSWConfig
   /** Advanced search settings */
   advanced?: AdvancedSearchConfig
-}
-
-/**
- * Function that retrieves agents dynamically (e.g. from DB)
- */
-export type AgentProvider = (payload: Payload) => Promise<AgentConfig[]>
-
-export interface RAGFeatureConfig extends RAGConfig {
-  enabled: boolean
-  callbacks?: RAGCallbacks
-  agents: AgentConfig[] | AgentProvider
 }
 
 // Re-export embedding types from payload-indexer (single source of truth)
@@ -310,113 +260,4 @@ export type TypesenseConnectionConfig = {
   retryIntervalSeconds?: number
   numRetries?: number
   nodes: [TypesenseNode, ...Array<TypesenseNode>]
-}
-
-/**
- * Main plugin configuration
- */
-/**
- * Configuration for a single conversational agent
- */
-export interface AgentConfig<SearchCollections extends readonly string[] = string[]> {
-  /**
-   * Unique identifier for the agent (used in API requests)
-   */
-  slug: string
-  /**
-   * Display name for the agent (shown in UI)
-   * If not provided, slug will be used.
-   */
-  name: string
-  /**
-   * Optional API Key for the LLM provider.
-   * If provided, this overrides the global embedding provider API key for this agent.
-   */
-  apiKey: string
-  /**
-   * System prompt that defines the agent's personality and constraints
-   */
-  systemPrompt: string
-  /**
-   * LLM model to use (e.g., 'openai/gpt-4o-mini')
-   */
-  llmModel: string
-  /**
-   * Collections this agent is allowed to search in
-   */
-  searchCollections: SearchCollections[number][]
-  /**
-   * Maximum context size in bytes. Default: 65536 (64KB)
-   */
-  maxContextBytes?: number
-  /**
-   * TTL for conversation history in seconds. Default: 86400 (24h)
-   */
-  ttl?: number
-  /**
-   * Number of chunks to retrieve for RAG context. Default: 10
-   */
-  kResults?: number
-  /**
-   * Welcome message title displayed when starting a new chat
-   */
-  welcomeTitle?: string
-  /**
-   * Welcome message subtitle displayed when starting a new chat
-   */
-  welcomeSubtitle?: string
-  /**
-   * Suggested questions displayed to help users get started
-   */
-  suggestedQuestions?: Array<{
-    /**
-     * The full prompt text to send when clicked
-     */
-    prompt: string
-    /**
-     * Short title for the suggestion
-     */
-    title: string
-    /**
-     * Brief description of what the question is about
-     */
-    description: string
-  }>
-  /**
-   * Avatar URL for the agent (displayed in chat header and floating button)
-   * If not provided, a default avatar will be used
-   */
-  avatar?: string
-  /**
-   * Taxonomy slugs to filter RAG content.
-   * If empty/undefined, searches all content.
-   */
-  taxonomySlugs?: string[]
-  /**
-   * When true, block search if no taxonomySlugs are assigned.
-   * Useful in multi-tenant setups to prevent global searches.
-   * Default: false (no taxonomies = search all content)
-   */
-  requireTaxonomies?: boolean
-  /**
-   * Maximum number of tokens the LLM can generate in responses.
-   * Default: 16000 (suitable for most use cases)
-   * Lower values save costs but may truncate responses.
-   * Higher values allow longer responses but cost more.
-   */
-  maxTokens?: number
-  /**
-   * Temperature controls randomness in the model's output.
-   * Range: 0.0 to 2.0
-   * - Lower values (e.g., 0.3): More focused and deterministic
-   * - Higher values (e.g., 0.9): More creative and varied
-   * Default: 0.7
-   */
-  temperature?: number
-  /**
-   * Top-p (nucleus sampling) controls diversity.
-   * Range: 0.0 to 1.0
-   * Default: 0.95
-   */
-  topP?: number
 }

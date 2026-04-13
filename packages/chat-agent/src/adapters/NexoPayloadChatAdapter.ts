@@ -5,13 +5,18 @@ import type {
   SendMessageContext,
   SessionSummary,
   Source,
-  StreamCallbacks
+  StreamCallbacks,
+  ToolCall
 } from './ChatAdapter'
 
 type SSEEvent =
   | { type: 'conversation_id'; data: string }
   | { type: 'token'; data: string }
   | { type: 'sources'; data: Source[] }
+  | {
+      type: 'tool_call'
+      data: { id: string; name: string; input: Record<string, unknown>; result?: string; sources?: Source[] }
+    }
   | { type: 'done' }
   | { type: 'usage'; data: { daily_limit: number; daily_used: number; daily_remaining: number; reset_at: string } }
   | { type: 'error'; data?: { error?: string; message?: string; chatId?: string } }
@@ -29,6 +34,19 @@ function handleSSEEvent(event: SSEEvent, callbacks: StreamCallbacks): void {
     case 'sources':
       callbacks.onSources?.(event.data)
       break
+
+    case 'tool_call': {
+      const tc: ToolCall = {
+        id: event.data.id,
+        name: event.data.name,
+        input: event.data.input,
+        result: event.data.result,
+        sources: event.data.sources,
+        isLoading: !event.data.result
+      }
+      callbacks.onToolCall?.(tc)
+      break
+    }
 
     case 'done':
       callbacks.onDone?.()
@@ -166,11 +184,15 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
   async getActiveSession(): Promise<{
     conversationId: string
     messages: Message[]
+    agentSlug?: string
   } | null> {
     try {
       const response = await fetch('/api/chat/session?active=true')
       if (response.ok) {
         const sessionData = await response.json()
+        if (!sessionData) {
+          return null
+        }
         // Don't load if session is closed/expired
         if (sessionData.status === 'closed') {
           console.warn('[NexoPayloadChatAdapter] Active session is closed/expired, clearing')
@@ -178,7 +200,8 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
         }
         return {
           conversationId: sessionData.conversation_id,
-          messages: this.parseBackendMessages(sessionData.messages)
+          messages: this.parseBackendMessages(sessionData.messages),
+          agentSlug: sessionData.agentSlug
         }
       }
       return null
@@ -204,11 +227,14 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
     }
   }
 
-  async loadSession(id: string): Promise<{ conversationId: string; messages: Message[] } | null> {
+  async loadSession(id: string): Promise<{ conversationId: string; messages: Message[]; agentSlug?: string } | null> {
     try {
       const response = await fetch(`/api/chat/session?conversationId=${encodeURIComponent(id)}`)
       if (response.ok) {
         const sessionData = await response.json()
+        if (!sessionData) {
+          return null
+        }
         // Don't load if session is closed/expired
         if (sessionData.status === 'closed') {
           console.warn('[NexoPayloadChatAdapter] Session is closed/expired:', id)
@@ -216,7 +242,8 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
         }
         return {
           conversationId: sessionData.conversation_id,
-          messages: this.parseBackendMessages(sessionData.messages)
+          messages: this.parseBackendMessages(sessionData.messages),
+          agentSlug: sessionData.agentSlug
         }
       }
       return null
@@ -280,6 +307,21 @@ export class NexoPayloadChatAdapter implements ChatAdapter {
         chunkIndex: (s.chunk_index as number) || 0,
         relevanceScore: 0,
         content: ''
+      })),
+      toolCalls: (msg.toolCalls as Record<string, unknown>[])?.map((tc: Record<string, unknown>) => ({
+        id: tc.id as string,
+        name: tc.name as string,
+        input: (tc.input as Record<string, unknown>) || {},
+        result: tc.result as string | undefined,
+        sources: (tc.sources as Record<string, unknown>[])?.map((s: Record<string, unknown>) => ({
+          id: s.id as string,
+          title: s.title as string,
+          slug: s.slug as string,
+          type: (s.type as string) || 'document',
+          chunkIndex: 0,
+          relevanceScore: 0,
+          content: ''
+        }))
       }))
     }))
   }

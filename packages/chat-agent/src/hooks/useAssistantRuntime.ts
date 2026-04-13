@@ -2,9 +2,24 @@
 
 import { type AppendMessage, type ThreadMessage, useExternalStoreRuntime } from '@assistant-ui/react'
 import { useCallback, useMemo, useState } from 'react'
-import type { Message, Source } from '../adapters/ChatAdapter'
+import type { Message, Source, ToolCall } from '../adapters/ChatAdapter'
 import { useChat } from '../components/chat-context'
 import type { Document } from '../components/useDocumentSelector'
+
+/** Aggregate and deduplicate sources from all completed tool calls. */
+function deriveSources(toolCalls: ToolCall[]): Source[] {
+  const seen = new Set<string>()
+  const result: Source[] = []
+  for (const tc of toolCalls) {
+    for (const s of tc.sources ?? []) {
+      if (!seen.has(s.id)) {
+        seen.add(s.id)
+        result.push(s)
+      }
+    }
+  }
+  return result
+}
 
 interface UseAssistantRuntimeProps {
   messages: Message[]
@@ -21,10 +36,10 @@ interface UseAssistantRuntimeProps {
  */
 function toThreadMessages(messages: Message[]): ThreadMessage[] {
   return messages.map((msg, index) => {
-    // Only include custom metadata - other fields are optional and should be undefined
-    const metadata = {
-      custom: msg.sources ? { sources: msg.sources } : {}
-    }
+    const custom: Record<string, unknown> = {}
+    if (msg.sources) custom.sources = msg.sources
+    if (msg.toolCalls) custom.toolCalls = msg.toolCalls
+    const metadata = { custom }
 
     if (msg.role === 'user') {
       return {
@@ -95,7 +110,7 @@ export function useAssistantRuntime({
       ])
 
       let accumulatedContent = ''
-      let receivedSources: Source[] = []
+      const toolCalls: ToolCall[] = []
 
       try {
         // Use adapter to send message
@@ -123,12 +138,38 @@ export function useAssistantRuntime({
               })
             },
             onSources: sources => {
-              receivedSources = sources
+              // Backward compat: if backend still sends a global sources event,
+              // merge them into the message only if toolCalls didn't provide any
+              const hasToolSources = toolCalls.some(tc => tc.sources && tc.sources.length > 0)
+              if (!hasToolSources) {
+                setMessages(prev => {
+                  const updated = [...prev]
+                  const lastIdx = updated.length - 1
+                  if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
+                    updated[lastIdx] = { ...updated[lastIdx], sources }
+                  }
+                  return updated
+                })
+              }
+            },
+            onToolCall: tc => {
+              const idx = toolCalls.findIndex(t => t.id === tc.id)
+              if (idx >= 0) {
+                toolCalls[idx] = tc
+              } else {
+                toolCalls.push(tc)
+              }
+              // Derive message-level sources from all completed toolCalls
+              const derivedSources = deriveSources(toolCalls)
               setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
                 if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
-                  updated[lastIdx] = { ...updated[lastIdx], sources: sources }
+                  updated[lastIdx] = {
+                    ...updated[lastIdx],
+                    toolCalls: [...toolCalls],
+                    sources: derivedSources.length > 0 ? derivedSources : updated[lastIdx].sources
+                  }
                 }
                 return updated
               })
@@ -145,7 +186,8 @@ export function useAssistantRuntime({
               }
             },
             onDone: () => {
-              // Final update to ensure consistency
+              // Final update: derive sources from toolCalls for consistency
+              const derivedSources = deriveSources(toolCalls)
               setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
@@ -153,7 +195,8 @@ export function useAssistantRuntime({
                   updated[lastIdx] = {
                     ...updated[lastIdx],
                     content: accumulatedContent,
-                    sources: updated[lastIdx].sources || receivedSources
+                    sources: derivedSources.length > 0 ? derivedSources : updated[lastIdx].sources,
+                    toolCalls: toolCalls.length > 0 ? [...toolCalls] : updated[lastIdx].toolCalls
                   }
                 }
                 return updated

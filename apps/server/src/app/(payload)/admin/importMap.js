@@ -24,6 +24,7 @@ import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { SyncStatusCell as SyncStatusCell_4a514ff607eb05ca6255fb0fd04affc3 } from '@zetesis/payload-indexer/client'
 import { SyncStatusField as SyncStatusField_4a514ff607eb05ca6255fb0fd04affc3 } from '@zetesis/payload-indexer/client'
+import { default as default_2b626bed1026074d9f37e7a587a41216 } from '@/modules/payload-admin/sync-typesense-button'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 export const importMap = {
@@ -53,5 +54,6 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#ItalicFeatureClient": ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@zetesis/payload-indexer/client#SyncStatusCell": SyncStatusCell_4a514ff607eb05ca6255fb0fd04affc3,
   "@zetesis/payload-indexer/client#SyncStatusField": SyncStatusField_4a514ff607eb05ca6255fb0fd04affc3,
+  "@/modules/payload-admin/sync-typesense-button#default": default_2b626bed1026074d9f37e7a587a41216,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

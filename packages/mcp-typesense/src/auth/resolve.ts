@@ -11,6 +11,7 @@ import type { IncomingMessage } from 'node:http'
 import type { McpAuthContext, McpAuthStrategy } from '../types'
 
 const DEFAULT_HEADER_NAME = 'x-tenant-slug'
+const TAXONOMY_HEADER_NAME = 'x-taxonomy-slugs'
 
 export function resolveAuth(req: IncomingMessage, strategy: McpAuthStrategy | undefined): McpAuthContext | null {
   // Default strategy: header with default header name.
@@ -21,7 +22,18 @@ export function resolveAuth(req: IncomingMessage, strategy: McpAuthStrategy | un
     const raw = req.headers[headerName]
     const tenantSlug = Array.isArray(raw) ? raw[0] : raw
     if (!tenantSlug) return null
-    return { tenantSlug }
+
+    // Optional: taxonomy slugs for server-enforced content scoping
+    const taxonomyRaw = req.headers[TAXONOMY_HEADER_NAME]
+    const taxonomyStr = Array.isArray(taxonomyRaw) ? taxonomyRaw[0] : taxonomyRaw
+    const taxonomySlugs = taxonomyStr
+      ? taxonomyStr
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+      : undefined
+
+    return { tenantSlug, taxonomySlugs }
   }
 
   // Exhaustive guard. When new variants are added, TypeScript will force

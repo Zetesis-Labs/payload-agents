@@ -1,7 +1,9 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { agentPlugin } from '@zetesis/payload-agents-core'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import type { Payload } from 'payload'
 import { buildConfig } from 'payload'
 import { Media } from './collections/Media'
 import { Posts } from './collections/Posts'
@@ -12,6 +14,11 @@ import { typesensePlugin } from './plugins/typesense'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+
+/** Default daily token limit for all users (500k tokens). */
+async function getDailyLimit(_payload: Payload, _userId: string | number): Promise<number> {
+  return 500_000_000
+}
 
 export default buildConfig({
   admin: {
@@ -38,5 +45,14 @@ export default buildConfig({
   graphQL: {
     schemaOutputFile: path.resolve(dirname, 'generated-schema.graphql')
   },
-  plugins: [typesensePlugin]
+  plugins: [
+    typesensePlugin,
+    agentPlugin({
+      runtimeUrl: process.env.AGENT_RUNTIME_URL || 'http://agent-runtime:8000',
+      runtimeSecret: process.env.INTERNAL_SECRET,
+      getDailyLimit,
+      encryptionKey: process.env.PAYLOAD_SECRET,
+      basePath: '/chat'
+    })
+  ]
 })

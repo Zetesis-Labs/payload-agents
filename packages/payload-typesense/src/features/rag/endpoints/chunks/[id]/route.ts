@@ -1,9 +1,14 @@
 import type { PayloadRequest } from 'payload'
 import { createTypesenseClient } from '../../../../../core/client/typesense-client'
 import { logger } from '../../../../../core/logging/logger'
-import type { AgentConfig, AgentProvider } from '../../../../../shared/types/plugin-types'
 import { fetchChunkById, type TypesenseConnectionConfig } from '../../../index'
-import { jsonResponse } from '../../chat/validators/index'
+
+function jsonResponse(data: unknown, options?: ResponseInit) {
+  return new Response(JSON.stringify(data), {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  })
+}
 
 /**
  * Configuration for chunks endpoint
@@ -13,8 +18,8 @@ export type ChunksEndpointConfig = {
   typesense: TypesenseConnectionConfig
   /** Check permissions function */
   checkPermissions: (request: PayloadRequest) => Promise<boolean>
-  /** Agents config — resolved lazily to extract valid collections */
-  agents: AgentConfig[] | AgentProvider
+  /** Collections that are allowed for chunk retrieval */
+  allowedCollections: string[]
 }
 
 /**
@@ -78,22 +83,6 @@ function mapChunkErrorToResponse(error: unknown, validCollections: string[]): Re
 }
 
 /**
- * Resolve valid collections from agents config (lazy — supports AgentProvider)
- */
-async function resolveValidCollections(
-  agents: AgentConfig[] | AgentProvider,
-  request: PayloadRequest
-): Promise<string[]> {
-  let resolved: AgentConfig[]
-  if (typeof agents === 'function') {
-    resolved = await agents(request.payload)
-  } else {
-    resolved = agents
-  }
-  return Array.from(new Set(resolved.flatMap(a => a.searchCollections)))
-}
-
-/**
  * Create a parameterizable GET handler for chunks endpoint
  *
  * GET /api/chat/chunks/[id]?collection=article_web_chunk
@@ -106,7 +95,7 @@ export function createChunksGETHandler(config: ChunksEndpointConfig) {
         return jsonResponse({ error: 'No tienes permisos para acceder a este chunk.' }, { status: 403 })
       }
 
-      const validCollections = await resolveValidCollections(config.agents, request)
+      const validCollections = config.allowedCollections
 
       const validated = validateChunkRequest(request, validCollections)
       if (validated instanceof Response) {
