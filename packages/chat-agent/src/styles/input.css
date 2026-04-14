@@ -5,10 +5,11 @@
 
 /*
  * Chat Agent Styles
- * @nexo-labs/chat-agent
+ * @zetesis/chat-agent
  *
- * This package expects the consuming app to have shadcn/ui configured
- * with the standard CSS Variables (--background, --foreground, etc.)
+ * The @theme inline block below ensures Tailwind v4 emits the shadcn utilities
+ * (bg-background, border-border, text-foreground, etc.) into dist/styles.css.
+ * The host app only needs to define --background/--foreground/--primary/... in :root.
  *
  * THEMING: Override these variables in your app's CSS to customize the chatbot:
  *
@@ -19,6 +20,28 @@
  *   --chat-status-online: 142 76% 36%;
  * }
  */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
 
 :root {
   /* Chat accent color (defaults to a blue tone, override with your brand color) */
