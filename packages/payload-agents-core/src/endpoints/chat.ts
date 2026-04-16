@@ -102,7 +102,9 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
       collection: config.collectionSlug,
       where,
       depth: 1,
-      limit: 1
+      limit: 1,
+      overrideAccess: false,
+      req
     })
 
     const agent = agents[0] as Record<string, unknown> | undefined

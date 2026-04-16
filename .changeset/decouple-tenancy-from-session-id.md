@@ -9,7 +9,7 @@ Decouple tenancy from the plugin core. The plugin no longer assumes a specific m
 - Removed `extractTenantId` config option.
 - Removed `AgentsCollectionOverrides` type and the partial-merge semantics of `collectionOverrides`.
 - Removed `createSessionId`, `parseSessionId`, `validateSessionOwnership` exports and the `SessionIdParts` type. Removed `defaultExtractTenantId`.
-- `agentPlugin` no longer auto-filters agent queries by tenant. The default `/agents` list endpoint returns every active agent unless the consumer adds an `access.read` rule via `collectionOverrides`.
+- `agentPlugin` no longer auto-filters agent queries by tenant. The default `/agents` list endpoint returns every active agent unless the consumer adds an `access.read` rule via `collectionOverrides`. Both `/agents` and `/chat` invoke the collection's `access.read` rule (calls use `overrideAccess: false` + `req`), so any rule added via `collectionOverrides` is enforced.
 
 **New API:**
 

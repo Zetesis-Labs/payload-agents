@@ -29,7 +29,9 @@ export function createAgentsListHandler(config: ResolvedPluginConfig): PayloadHa
       collection: config.collectionSlug,
       where,
       depth: 1,
-      limit: 100
+      limit: 100,
+      overrideAccess: false,
+      req
     })
 
     const agents = docs.map((a: Record<string, unknown>) => ({
