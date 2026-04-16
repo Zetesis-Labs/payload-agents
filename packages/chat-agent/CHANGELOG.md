@@ -1,5 +1,11 @@
 # @zetesis/chat-agent
 
+## 0.2.1
+
+### Patch Changes
+
+- [#17](https://github.com/Zetesis-Labs/PayloadAgents/pull/17) [`3c372ab`](https://github.com/Zetesis-Labs/PayloadAgents/commit/3c372abcc79f62c1133e7563feda381aa0724b3d) Thanks [@Fiser12](https://github.com/Fiser12)! - Emit shadcn utilities in `dist/styles.css` by adding `@theme inline` to `src/styles/input.css`. Tailwind v4 needs the `--color-*` tokens mapped to the host's CSS variables at package build time; without this block the bundled stylesheet was missing `bg-background`, `border-border`, `text-foreground`, etc., so chat widgets rendered transparent in host apps that didn't regenerate those utilities from their own source.
+
 ## 0.2.0
 
 ### Minor Changes
