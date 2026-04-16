@@ -9,7 +9,6 @@
 
 import type { PayloadHandler } from 'payload'
 import { runtimeFetch } from '../lib/runtime-client'
-import { validateSessionOwnership } from '../lib/session-id'
 import { dedupSources, extractSources } from '../lib/sources'
 import type { ResolvedPluginConfig, Source } from '../types'
 
@@ -176,28 +175,27 @@ async function fetchSessionDetail(
 
 export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHandler {
   return async req => {
-    const { user } = req
+    const { user, payload } = req
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const userRecord = user as unknown as Record<string, unknown>
     const userId = (user as unknown as { id: string | number }).id
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     const isActive = url.searchParams.get('active') === 'true'
 
     try {
       if (conversationId) {
-        if (!validateSessionOwnership(conversationId, tenantId, userId)) {
-          return Response.json({ error: 'Forbidden' }, { status: 403 })
-        }
+        const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+        if (!ok) return Response.json({ error: 'Forbidden' }, { status: 403 })
         const detail = await fetchSessionDetail(config.runtimeUrl, config.runtimeSecret, conversationId, userId)
         return detail ? Response.json(detail) : Response.json(null, { status: 404 })
       }
 
       if (isActive) {
-        return await handleActiveSession(config.runtimeUrl, config.runtimeSecret, tenantId, userId)
+        return await handleActiveSession(config, userRecord, userId, req)
       }
 
       return Response.json(null, { status: 400 })
@@ -209,10 +207,10 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
 }
 
 async function handleActiveSession(
-  runtimeUrl: string,
-  runtimeSecret: string,
-  tenantId: string,
-  userId: string | number
+  config: ResolvedPluginConfig,
+  userRecord: Record<string, unknown>,
+  userId: string | number,
+  req: import('payload').PayloadRequest
 ): Promise<Response> {
   const params = new URLSearchParams({
     type: 'agent',
@@ -221,16 +219,28 @@ async function handleActiveSession(
     sort_order: 'desc',
     limit: '10'
   })
-  const listRes = await runtimeFetch(`${runtimeUrl}/sessions?${params}`, runtimeSecret, {
+  const listRes = await runtimeFetch(`${config.runtimeUrl}/sessions?${params}`, config.runtimeSecret, {
     signal: AbortSignal.timeout(5_000)
   })
   if (!listRes.ok) return Response.json(null)
 
   const listBody = (await listRes.json()) as { data: Array<{ session_id: string }> }
-  const match = (listBody.data || []).find(s => validateSessionOwnership(s.session_id, tenantId, userId))
+  const candidates = listBody.data || []
+  let match: { session_id: string } | undefined
+  for (const candidate of candidates) {
+    const ok = await config.validateSessionOwnership(candidate.session_id, {
+      user: userRecord,
+      payload: req.payload,
+      req
+    })
+    if (ok) {
+      match = candidate
+      break
+    }
+  }
   if (!match) return Response.json(null)
 
-  const detail = await fetchSessionDetail(runtimeUrl, runtimeSecret, match.session_id, userId)
+  const detail = await fetchSessionDetail(config.runtimeUrl, config.runtimeSecret, match.session_id, userId)
   return detail ? Response.json(detail) : Response.json(null)
 }
 
@@ -238,19 +248,20 @@ async function handleActiveSession(
 
 export function createSessionPatchHandler(config: ResolvedPluginConfig): PayloadHandler {
   return async req => {
-    const { user } = req
+    const { user, payload } = req
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const userRecord = user as unknown as Record<string, unknown>
     const userId = (user as unknown as { id: string | number }).id
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
     }
-    if (!validateSessionOwnership(conversationId, tenantId, userId)) {
+    const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+    if (!ok) {
       return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -291,19 +302,20 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
 
 export function createSessionDeleteHandler(config: ResolvedPluginConfig): PayloadHandler {
   return async req => {
-    const { user } = req
+    const { user, payload } = req
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const userRecord = user as unknown as Record<string, unknown>
     const userId = (user as unknown as { id: string | number }).id
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
     }
-    if (!validateSessionOwnership(conversationId, tenantId, userId)) {
+    const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+    if (!ok) {
       return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
 

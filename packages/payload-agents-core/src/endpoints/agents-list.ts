@@ -1,8 +1,9 @@
 /**
  * GET {basePath}/list — List public agent info for the chat UI.
  *
- * Returns only public fields (no API keys or system prompts).
- * Filtered by the user's tenant when `extractTenantId` is provided.
+ * Returns only public fields (no API keys or system prompts). Access
+ * filtering by tenant/role is delegated to the collection's `access.read`
+ * rules — customize it via `collectionOverrides` if you need that.
  */
 
 import type { PayloadHandler, Where } from 'payload'
@@ -22,17 +23,15 @@ export function createAgentsListHandler(config: ResolvedPluginConfig): PayloadHa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const tenantId = config.extractTenantId(user as unknown as Record<string, unknown>)
     const where: Where = { isActive: { equals: true } }
-    if (tenantId !== 'default') {
-      where.tenant = { equals: tenantId }
-    }
 
     const { docs } = await payload.find({
       collection: config.collectionSlug,
       where,
       depth: 1,
-      limit: 100
+      limit: 100,
+      overrideAccess: false,
+      req
     })
 
     const agents = docs.map((a: Record<string, unknown>) => ({
