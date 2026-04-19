@@ -10,7 +10,7 @@
  */
 
 import type { PayloadHandler, Where } from 'payload'
-import { reloadAgents, runtimeFetch } from '../lib/runtime-client'
+import { runtimeFetch } from '../lib/runtime-client'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
 import type { ResolvedPluginConfig } from '../types'
@@ -24,52 +24,27 @@ interface ChatRequest {
 const SERVICE_UNAVAILABLE = { error: 'AI service temporarily unavailable' }
 
 /**
- * Attempt to call the runtime, retrying once after a reload if the first
- * attempt fails (network error or 4xx).
+ * Call the runtime once and surface failures directly.
+ *
+ * Previously tried a second time after firing an HTTP `/internal/agents/reload`
+ * at the Service, but that only reloaded one replica (round-robin) and the
+ * retry landed on whichever replica the LB picked — there was no guarantee
+ * it was the same one that just reloaded. With the collection hooks now
+ * broadcasting reloads via Postgres `NOTIFY agent_reload`, every replica
+ * stays fresh; the retry dance was solving a problem that no longer
+ * exists, so it's gone.
  */
-async function callWithRetry(
-  callRuntime: () => Promise<Response>,
-  runtimeUrl: string,
-  runtimeSecret: string
-): Promise<Response | null> {
-  let upstream: Response | undefined
-
+async function callRuntimeOnce(callRuntime: () => Promise<Response>): Promise<Response | null> {
   try {
-    upstream = await callRuntime()
+    const upstream = await callRuntime()
+    if (upstream.ok && upstream.body) return upstream
+    const text = await upstream.text().catch(() => '')
+    console.error(`[chat] agent-runtime returned ${upstream.status}: ${text}`)
+    return null
   } catch (err) {
-    console.error('[chat] agent-runtime fetch failed, attempting reload:', err)
-    return retryAfterReload(callRuntime, runtimeUrl, runtimeSecret)
+    console.error('[chat] agent-runtime fetch failed:', err)
+    return null
   }
-
-  if (upstream.ok && upstream.body) return upstream
-
-  if (upstream.status === 404) {
-    console.warn('[chat] agent-runtime returned 404 (agent not found), attempting reload')
-    return retryAfterReload(callRuntime, runtimeUrl, runtimeSecret)
-  }
-
-  const text = await upstream.text().catch(() => '')
-  console.error(`[chat] agent-runtime returned ${upstream.status}: ${text}`)
-  return null
-}
-
-async function retryAfterReload(
-  callRuntime: () => Promise<Response>,
-  runtimeUrl: string,
-  runtimeSecret: string
-): Promise<Response | null> {
-  const reloaded = await reloadAgents(runtimeUrl, runtimeSecret)
-  if (!reloaded || reloaded.count === 0) return null
-
-  try {
-    const retry = await callRuntime()
-    if (retry.ok && retry.body) return retry
-    const text = await retry.text().catch(() => '')
-    console.error(`[chat] agent-runtime returned ${retry.status} after reload: ${text}`)
-  } catch (retryErr) {
-    console.error('[chat] agent-runtime fetch failed after reload:', retryErr)
-  }
-  return null
 }
 
 export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler {
@@ -161,7 +136,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
         signal: AbortSignal.timeout(120_000)
       })
 
-    const upstream = await callWithRetry(callRuntime, config.runtimeUrl, config.runtimeSecret)
+    const upstream = await callRuntimeOnce(callRuntime)
     if (!upstream?.body) {
       return Response.json(SERVICE_UNAVAILABLE, { status: 503 })
     }

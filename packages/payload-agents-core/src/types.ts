@@ -145,13 +145,6 @@ export interface AgentPluginConfig {
   collectionOverrides?: CollectionOverrides
 }
 
-// ── Runtime client types ──────────────────────────────────────────────────
-
-export interface ReloadResult {
-  count: number
-  slugs: string[]
-}
-
 // ── Source types ───────────────────────────────────────────────────────────
 
 export interface Source {

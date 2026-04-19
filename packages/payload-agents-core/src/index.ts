@@ -6,7 +6,7 @@ export { costBreakdown, effectiveTokens, estimateRunCost } from './lib/cost-calc
 export { decrypt, encrypt, isEncrypted } from './lib/encryption'
 export type { MultiTenantSessionStrategy, MultiTenantSessionStrategyOptions } from './lib/multi-tenant'
 export { multiTenantSessionStrategy } from './lib/multi-tenant'
-export { reloadAgents, runtimeFetch } from './lib/runtime-client'
+export { runtimeFetch } from './lib/runtime-client'
 export { defaultBuildSessionId, defaultValidateSessionOwnership } from './lib/session-id'
 export { dedupSources, extractSources } from './lib/sources'
 export { translateAgnoStream } from './lib/sse-translator'
@@ -19,7 +19,6 @@ export type {
   BuildSessionIdContext,
   CollectionOverrides,
   DailyTokenUsage,
-  ReloadResult,
   ResolvedPluginConfig,
   Source,
   TokenUsageResult,
