@@ -27,9 +27,18 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
     collectionSlug: userConfig.collectionSlug ?? 'agents',
     basePath: userConfig.basePath ?? '/agents',
     encryptionKey: userConfig.encryptionKey,
-    mediaCollectionSlug: userConfig.mediaCollectionSlug ?? 'media',
-    taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug ?? 'taxonomy',
+    mediaCollectionSlug: userConfig.mediaCollectionSlug,
+    taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug,
     collectionOverrides: userConfig.collectionOverrides
+  }
+}
+
+function assertCollectionExists(config: Config, slug: string, configField: string): void {
+  const exists = (config.collections ?? []).some(c => c.slug === slug)
+  if (!exists) {
+    throw new Error(
+      `[agent-plugin] collection "${slug}" referenced by ${configField} is not registered in payload config`
+    )
   }
 }
 
@@ -37,6 +46,9 @@ export function agentPlugin(userConfig: AgentPluginConfig): Plugin {
   return (incomingConfig: Config): Config => {
     const config = resolveConfig(userConfig)
     const basePath = config.basePath
+
+    assertCollectionExists(incomingConfig, config.mediaCollectionSlug, 'mediaCollectionSlug')
+    assertCollectionExists(incomingConfig, config.taxonomyCollectionSlug, 'taxonomyCollectionSlug')
 
     // Create the agents collection
     const agentsCollection = createAgentsCollection(config)
