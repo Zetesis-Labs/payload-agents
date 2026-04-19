@@ -43,19 +43,34 @@ const extractSourceText = async (doc: PayloadDocument, tableConfig: TableConfig)
   return textParts.join('\n\n')
 }
 
+interface IndexedHashesLookup {
+  /** Hashes keyed by documentId. Missing key means "not indexed". */
+  hashes: Map<string, string | undefined>
+  /** Documents whose lookup raised — caller must surface as `'error'`, not `'not-indexed'`. */
+  errored: Map<string, string>
+  /** True when the adapter does not support filter-based search at all. */
+  adapterUnsupported: boolean
+}
+
 /**
- * Query the adapter for stored content hashes of one or more documents
+ * Query the adapter for stored content hashes of one or more documents.
+ *
+ * The returned shape distinguishes three states so callers can tell
+ * "really not indexed" apart from "we don't know because the lookup
+ * failed" — critical when Typesense is down and we would otherwise mark
+ * every document as `'not-indexed'`.
  */
 const getIndexedHashes = async (
   adapter: IndexerAdapter,
   tableName: string,
   docIds: string[],
   isChunked: boolean
-): Promise<Map<string, string | undefined>> => {
-  const result = new Map<string, string | undefined>()
+): Promise<IndexedHashesLookup> => {
+  const hashes = new Map<string, string | undefined>()
+  const errored = new Map<string, string>()
 
   if (!adapter.searchDocumentsByFilter) {
-    return result
+    return { hashes, errored, adapterUnsupported: true }
   }
 
   for (const docId of docIds) {
@@ -70,18 +85,20 @@ const getIndexedHashes = async (
 
       const firstDoc = docs[0]
       if (firstDoc) {
-        result.set(docId, firstDoc.content_hash)
+        hashes.set(docId, firstDoc.content_hash)
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       logger.warn('Failed to fetch indexed hash', {
         documentId: docId,
         tableName,
-        error: error instanceof Error ? error.message : String(error)
+        error: message
       })
+      errored.set(docId, message)
     }
   }
 
-  return result
+  return { hashes, errored, adapterUnsupported: false }
 }
 
 /**
@@ -175,19 +192,26 @@ export const checkBatchSyncStatus = async (
 
   // 2. Batch fetch indexed hashes
   const docIds = docs.map(d => String(d.id))
-  const indexedHashes = await getIndexedHashes(adapter, tableName, docIds, isChunked)
+  const lookup = await getIndexedHashes(adapter, tableName, docIds, isChunked)
 
-  // 3. Compare
+  // 3. Compare — if the adapter can't search at all, every doc is an error.
   for (const doc of docs) {
     const docId = String(doc.id)
     const currentHash = currentHashes.get(docId)
-    const indexedHash = indexedHashes.get(docId)
+    const indexedHash = lookup.hashes.get(docId)
 
     let status: SyncStatusValue
+    let error: string | undefined
 
-    if (!currentHash) {
+    if (lookup.adapterUnsupported) {
+      status = 'error'
+      error = 'Adapter does not support searchDocumentsByFilter'
+    } else if (lookup.errored.has(docId)) {
+      status = 'error'
+      error = lookup.errored.get(docId)
+    } else if (!currentHash) {
       status = 'not-indexed'
-    } else if (!indexedHashes.has(docId)) {
+    } else if (!lookup.hashes.has(docId)) {
       status = 'not-indexed'
     } else if (!indexedHash) {
       status = 'outdated'
@@ -195,7 +219,7 @@ export const checkBatchSyncStatus = async (
       status = currentHash === indexedHash ? 'synced' : 'outdated'
     }
 
-    results.set(docId, { status, documentId: docId, currentHash, indexedHash })
+    results.set(docId, { status, documentId: docId, currentHash, indexedHash, error })
     counts[status]++
   }
 
