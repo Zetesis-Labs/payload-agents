@@ -17,6 +17,7 @@ Custom additions:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hmac
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -39,6 +40,7 @@ from agent_runtime.health import router as health_router
 from agent_runtime.logging import configure_logging, get_logger
 from agent_runtime.middleware import InternalAuthMiddleware, RequestIdMiddleware
 from agent_runtime.registry import AgentRegistry
+from agent_runtime.reload_listener import run_reload_listener
 from agent_runtime.schemas import ErrorResponse, ReloadResponse
 
 configure_logging(settings.log_level)
@@ -57,6 +59,16 @@ def _agents_as_union(agents: list[Agent]) -> list[Agent | RemoteAgent]:
 _BOOT_MAX_RETRIES = 10
 _BOOT_BACKOFF_BASE = 2.0
 _BOOT_BACKOFF_MAX = 30.0
+
+
+async def _reload_registry(_payload: str | None = None) -> None:
+    """Callback handed to the listener; serialised with the lock used by
+    the internal HTTP endpoint so we never mutate ``agent_os.agents`` twice
+    at the same time."""
+    async with _reload_lock:
+        await registry.reload()
+        agent_os.agents = _agents_as_union(registry.all())
+    logger.info("Registry reloaded via notify", count=len(registry.all()), slugs=registry.slugs())
 
 
 @asynccontextmanager
@@ -87,7 +99,12 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
                     max_retries=_BOOT_MAX_RETRIES,
                     exc_info=True,
                 )
+
+    listener_task = asyncio.create_task(run_reload_listener(_reload_registry))
     yield
+    listener_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await listener_task
 
     logger.info("Shutting down — disposing shared DB engine")
     await dispose_shared_engine()

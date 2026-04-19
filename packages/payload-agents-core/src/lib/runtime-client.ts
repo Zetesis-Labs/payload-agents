@@ -3,6 +3,12 @@
  *
  * All requests to the runtime include the `X-Internal-Secret` header
  * so the runtime can verify the caller is trusted.
+ *
+ * Note on reload semantics: the Agents collection hooks fan out via
+ * Postgres `NOTIFY agent_reload` so every runtime replica refreshes its
+ * registry. The HTTP reload below is a single-pod, manual/debug fallback
+ * still useful for `curl` checks and the chat-endpoint self-heal retry
+ * (which only needs *some* pod to refresh before retrying).
  */
 
 import type { ReloadResult } from '../types'
