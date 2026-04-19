@@ -60,6 +60,11 @@ _BOOT_MAX_RETRIES = 10
 _BOOT_BACKOFF_BASE = 2.0
 _BOOT_BACKOFF_MAX = 30.0
 
+# Belt-and-braces full resync, independent of the LISTEN/NOTIFY channel.
+# Covers the gap where a reconnecting listener misses a NOTIFY: the next
+# tick picks the edit up at most this many seconds late.
+_RESYNC_INTERVAL_S = 300.0
+
 
 async def _reload_registry(_payload: str | None = None) -> None:
     """Callback handed to the listener; serialised with the lock used by
@@ -69,6 +74,22 @@ async def _reload_registry(_payload: str | None = None) -> None:
         await registry.reload()
         agent_os.agents = _agents_as_union(registry.all())
     logger.info("Registry reloaded via notify", count=len(registry.all()), slugs=registry.slugs())
+
+
+async def _periodic_resync() -> None:
+    """Unconditional full reload every `_RESYNC_INTERVAL_S` seconds.
+
+    Closes the durability gap of `LISTEN/NOTIFY`: if the listener connection
+    is dropped at the moment of a NOTIFY, the message is lost. This tick
+    guarantees bounded staleness — at worst `_RESYNC_INTERVAL_S` seconds
+    behind Payload.
+    """
+    while True:
+        await asyncio.sleep(_RESYNC_INTERVAL_S)
+        try:
+            await _reload_registry()
+        except Exception:
+            logger.exception("Periodic resync failed, will retry on next tick")
 
 
 @asynccontextmanager
@@ -101,10 +122,12 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
                 )
 
     listener_task = asyncio.create_task(run_reload_listener(_reload_registry))
+    resync_task = asyncio.create_task(_periodic_resync())
     yield
-    listener_task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await listener_task
+    for task in (listener_task, resync_task):
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
     logger.info("Shutting down — disposing shared DB engine")
     await dispose_shared_engine()
