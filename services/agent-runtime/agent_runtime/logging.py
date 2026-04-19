@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from structlog.stdlib import BoundLogger
@@ -45,9 +45,7 @@ def _format_processor(log_level: str) -> Any:
     return structlog.processors.JSONRenderer(ensure_ascii=False)
 
 
-def _add_request_id(
-    _logger: Any, _method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+def _add_request_id(_logger: Any, _method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     """Inject correlation ID from the request context if available."""
     from agent_runtime.middleware import request_id_var
 
@@ -59,4 +57,4 @@ def _add_request_id(
 
 def get_logger(name: str | None = None) -> BoundLogger:
     """Get a structured logger instance."""
-    return structlog.get_logger(name)  # type: ignore[return-value]
+    return cast(BoundLogger, structlog.get_logger(name))

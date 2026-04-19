@@ -84,9 +84,7 @@ class AuthenticationError(AgentRuntimeError):
         )
 
 
-async def agent_runtime_exception_handler(
-    request: Request, exc: AgentRuntimeError
-) -> JSONResponse:
+async def agent_runtime_exception_handler(request: Request, exc: AgentRuntimeError) -> JSONResponse:
     """Global exception handler — consistent JSON error responses."""
     logger.warning(
         "Request error",
