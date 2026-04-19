@@ -89,4 +89,3 @@ async def _send_401(send: Send) -> None:
         }
     )
     await send({"type": "http.response.body", "body": b'{"error":"Unauthorized"}'})
-

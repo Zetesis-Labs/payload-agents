@@ -35,3 +35,32 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  agent-runtime:
+    name: Agent Runtime (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/agent-runtime
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install Python + dependencies
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check .
+
+      - name: Type check (mypy)
+        run: uv run mypy agent_runtime/
+
+      - name: Tests (pytest)
+        run: uv run pytest -q

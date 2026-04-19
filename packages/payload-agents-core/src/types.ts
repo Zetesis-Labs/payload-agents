@@ -110,16 +110,19 @@ export interface AgentPluginConfig {
   encryptionKey?: string
 
   /**
-   * Slug of the `media` collection for agent avatars.
-   * Default: `'media'`.
+   * Slug of the `media` collection for agent avatars. Required — the plugin
+   * no longer guesses; you must pass the slug you use in your config so a
+   * rename elsewhere fails at boot instead of silently breaking uploads.
    */
-  mediaCollectionSlug?: string
+  mediaCollectionSlug: string
 
   /**
-   * Slug of the taxonomy collection for RAG filtering.
-   * Default: `'taxonomy'`.
+   * Slug of the taxonomy collection for RAG filtering. Required — the plugin
+   * no longer guesses; you must pass the slug you use in your config so a
+   * rename elsewhere fails at boot instead of silently breaking the
+   * taxonomies relationship on agents.
    */
-  taxonomyCollectionSlug?: string
+  taxonomyCollectionSlug: string
 
   /**
    * Transform the Agents collection config before it is registered.
@@ -140,13 +143,6 @@ export interface AgentPluginConfig {
    * ```
    */
   collectionOverrides?: CollectionOverrides
-}
-
-// ── Runtime client types ──────────────────────────────────────────────────
-
-export interface ReloadResult {
-  count: number
-  slugs: string[]
 }
 
 // ── Source types ───────────────────────────────────────────────────────────

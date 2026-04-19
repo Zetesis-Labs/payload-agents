@@ -16,7 +16,9 @@ class ReadyResponse(BaseModel):
 
 class ReloadResponse(BaseModel):
     count: int = Field(description="Number of agents after reload", examples=[3])
-    slugs: list[str] = Field(description="Slugs of loaded agents", examples=[["escohotado", "bastos"]])
+    slugs: list[str] = Field(
+        description="Slugs of loaded agents", examples=[["escohotado", "bastos"]]
+    )
 
 
 class ErrorDetail(BaseModel):
