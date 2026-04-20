@@ -87,6 +87,15 @@ export interface AgentPluginConfig {
   validateSessionOwnership?: ValidateSessionOwnership
 
   /**
+   * Extra headers forwarded to the agent-runtime on each chat request.
+   * Typically used to carry tenant/user metadata that the runtime
+   * persists into the Agno session's `metadata` JSONB.
+   *
+   * Keys must be valid HTTP header names. Values are coerced to strings.
+   */
+  getRuntimeHeaders?: (ctx: { user: TypedUser; payload: Payload; req: PayloadRequest }) => Record<string, string | number> | Promise<Record<string, string | number>>
+
+  /**
    * Override the Payload collection slug. Default: `'agents'`.
    */
   collectionSlug?: string
@@ -224,6 +233,7 @@ export interface ResolvedPluginConfig {
   getDailyLimit: (payload: Payload, userId: string | number) => Promise<number>
   buildSessionId: BuildSessionId
   validateSessionOwnership: ValidateSessionOwnership
+  getRuntimeHeaders: ((ctx: { user: TypedUser; payload: Payload; req: PayloadRequest }) => Record<string, string | number> | Promise<Record<string, string | number>>) | undefined
   collectionSlug: string
   basePath: string
   encryptionKey: string | undefined

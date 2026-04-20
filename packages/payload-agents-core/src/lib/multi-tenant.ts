@@ -40,6 +40,12 @@ export interface MultiTenantSessionStrategyOptions {
 export interface MultiTenantSessionStrategy {
   buildSessionId: BuildSessionId
   validateSessionOwnership: ValidateSessionOwnership
+  /**
+   * Forwards the current tenant id as `X-Tenant-Id` to the agent-runtime
+   * so it can persist it into the Agno session's `metadata` JSONB.
+   * Pass this into `agentPlugin({ getRuntimeHeaders })`.
+   */
+  getRuntimeHeaders: (ctx: { user: unknown; payload: Payload; req: PayloadRequest }) => Record<string, string>
 }
 
 interface DrizzleLike {
@@ -94,5 +100,11 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
     return rows.length > 0
   }
 
-  return { buildSessionId, validateSessionOwnership }
+  const getRuntimeHeaders = ({ user, req }: { user: unknown; payload: Payload; req: PayloadRequest }): Record<string, string> => {
+    const tenantId = options.extractTenantId(user as Record<string, unknown>, req)
+    if (tenantId === undefined || tenantId === null || tenantId === '') return {}
+    return { 'X-Tenant-Id': String(tenantId) }
+  }
+
+  return { buildSessionId, validateSessionOwnership, getRuntimeHeaders }
 }
