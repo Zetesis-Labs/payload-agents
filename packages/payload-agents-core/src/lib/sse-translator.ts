@@ -22,10 +22,15 @@ interface UsageSnapshot {
   reset_at: string
 }
 
+/** Callback fired (fire-and-forget) when the RunCompleted SSE event arrives. */
+export type OnStreamRunCompleted = (data: { metrics: Record<string, unknown>; runId?: string }) => void
+
 interface TranslatorState {
   accumulatedText: string
   completed: boolean
   sources: Array<{ id: string; title: string; slug: string; type: string }>
+  /** Captured from RunCompleted; fired after the stream ends. */
+  runCompletedData?: { metrics: Record<string, unknown>; runId?: string }
 }
 
 const _encoder = new TextEncoder()
@@ -151,57 +156,81 @@ function emitRunCompleted(
   })
   emit({ type: 'done' })
   state.completed = true
+
+  if (metrics) {
+    state.runCompletedData = {
+      metrics: metrics as Record<string, unknown>,
+      runId: typeof parsed.run_id === 'string' ? parsed.run_id : undefined
+    }
+  }
+}
+
+async function pipeStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  sessionId: string,
+  usage: UsageSnapshot,
+  onRunCompleted?: OnStreamRunCompleted
+): Promise<void> {
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const state: TranslatorState = { accumulatedText: '', completed: false, sources: [] }
+  const emit = (event: unknown) => controller.enqueue(formatLegacyEvent(event))
+
+  try {
+    emit({ type: 'conversation_id', data: sessionId })
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      buffer = processBuffer(buffer, state, usage, emit)
+    }
+
+    if (buffer.trim()) {
+      const parsed = parseSseFrame(buffer)
+      if (parsed?.event === 'RunContent' && typeof parsed.content === 'string') {
+        emit({ type: 'token', data: parsed.content })
+      }
+    }
+
+    if (!state.completed) emit({ type: 'done' })
+    controller.close()
+  } catch (err) {
+    console.error('[chat] translator error:', err)
+    try {
+      emit({ type: 'error', data: { error: err instanceof Error ? err.message : 'Stream error' } })
+    } catch {
+      /* controller may already be closed */
+    }
+    try {
+      controller.close()
+    } catch {
+      /* already closed */
+    }
+  } finally {
+    if (onRunCompleted && state.runCompletedData) {
+      try {
+        onRunCompleted(state.runCompletedData)
+      } catch {
+        /* fire-and-forget */
+      }
+    }
+  }
 }
 
 export function translateAgnoStream(
   upstreamBody: ReadableStream<Uint8Array>,
   sessionId: string,
-  usage: UsageSnapshot
+  usage: UsageSnapshot,
+  onRunCompleted?: OnStreamRunCompleted
 ): ReadableStream<Uint8Array> {
-  const decoder = new TextDecoder()
   const reader = upstreamBody.getReader()
 
   return new ReadableStream<Uint8Array>({
-    async start(controller) {
-      let buffer = ''
-      const state: TranslatorState = { accumulatedText: '', completed: false, sources: [] }
-      const emit = (event: unknown) => controller.enqueue(formatLegacyEvent(event))
-
-      try {
-        emit({ type: 'conversation_id', data: sessionId })
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          buffer = processBuffer(buffer, state, usage, emit)
-        }
-
-        // Flush remaining
-        if (buffer.trim()) {
-          const parsed = parseSseFrame(buffer)
-          if (parsed?.event === 'RunContent' && typeof parsed.content === 'string') {
-            emit({ type: 'token', data: parsed.content })
-          }
-        }
-
-        if (!state.completed) {
-          emit({ type: 'done' })
-        }
-        controller.close()
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Stream error'
-        console.error('[chat] translator error:', err)
-        try {
-          emit({ type: 'error', data: { error: msg } })
-        } catch {
-          /* controller may already be closed */
-        }
-        controller.close()
-      }
+    start(controller) {
+      return pipeStream(reader, controller, sessionId, usage, onRunCompleted)
     },
-
     async cancel(reason) {
       try {
         await reader.cancel(reason)

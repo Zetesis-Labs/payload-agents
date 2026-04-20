@@ -16,6 +16,7 @@ export function createEncryptBeforeChangeHook(config: ResolvedPluginConfig): Col
 
     if (data.apiKey) {
       if (!isEncrypted(data.apiKey)) {
+        data.apiKeyFingerprint = data.apiKey.slice(-4)
         data.apiKey = encrypt(data.apiKey, config.encryptionKey)
       }
     }

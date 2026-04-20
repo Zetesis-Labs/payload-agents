@@ -29,7 +29,8 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
     encryptionKey: userConfig.encryptionKey,
     mediaCollectionSlug: userConfig.mediaCollectionSlug,
     taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug,
-    collectionOverrides: userConfig.collectionOverrides
+    collectionOverrides: userConfig.collectionOverrides,
+    onRunCompleted: userConfig.onRunCompleted
   }
 }
 

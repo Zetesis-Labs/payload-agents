@@ -11,6 +11,7 @@
 
 import type { PayloadHandler, Where } from 'payload'
 import { runtimeFetch } from '../lib/runtime-client'
+import type { OnStreamRunCompleted } from '../lib/sse-translator'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
 import type { ResolvedPluginConfig } from '../types'
@@ -22,6 +23,41 @@ interface ChatRequest {
 }
 
 const SERVICE_UNAVAILABLE = { error: 'AI service temporarily unavailable' }
+
+interface RunCallbackContext {
+  agent: Record<string, unknown>
+  userId: string | number
+  agentSlug: string
+  sessionId: string
+}
+
+function buildOnRunCompleted(
+  config: ResolvedPluginConfig,
+  ctx: RunCallbackContext,
+  payload: unknown
+): OnStreamRunCompleted | undefined {
+  if (!config.onRunCompleted) return undefined
+  const cb = config.onRunCompleted
+  const llmModel = (ctx.agent.llmModel as string) || undefined
+  const apiKeyFingerprint = (ctx.agent.apiKeyFingerprint as string) || undefined
+  return data => {
+    Promise.resolve(
+      cb(
+        {
+          ...data,
+          userId: ctx.userId,
+          agentSlug: ctx.agentSlug,
+          sessionId: ctx.sessionId,
+          llmModel,
+          apiKeyFingerprint
+        },
+        payload as import('payload').Payload
+      )
+    ).catch(err => {
+      console.error('[chat] onRunCompleted callback failed:', err)
+    })
+  }
+}
 
 /**
  * Call the runtime once and surface failures directly.
@@ -141,7 +177,8 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
       return Response.json(SERVICE_UNAVAILABLE, { status: 503 })
     }
 
-    const stream = translateAgnoStream(upstream.body, sessionId, usage)
+    const onRunCompleted = buildOnRunCompleted(config, { agent, userId, agentSlug: agentSlugValue, sessionId }, payload)
+    const stream = translateAgnoStream(upstream.body, sessionId, usage, onRunCompleted)
 
     return new Response(stream, {
       headers: {

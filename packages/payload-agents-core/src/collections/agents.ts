@@ -82,6 +82,14 @@ export function createAgentsCollection(config: ResolvedPluginConfig): Collection
                 }
               },
               {
+                name: 'apiKeyFingerprint',
+                type: 'text',
+                admin: {
+                  readOnly: true,
+                  description: 'Last 4 characters of the API key (auto-computed)'
+                }
+              },
+              {
                 name: 'systemPrompt',
                 type: 'textarea',
                 required: true,
