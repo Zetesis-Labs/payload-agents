@@ -1,17 +1,19 @@
 /**
  * Opinionated helper for the common multi-tenant setup.
  *
- * Returns `buildSessionId` + `validateSessionOwnership` pre-wired to embed
- * the tenant id inside the session string, so session ownership covers
- * both tenant and user boundaries automatically.
+ * - `buildSessionId` returns an opaque UUID. The id carries no ownership data.
+ * - `validateSessionOwnership` queries `agno.agno_sessions` to verify the
+ *   current user owns the session. Ownership lives in Agno's session row —
+ *   `user_id` (native column) and `metadata->>'tenant_id'` (the agent-runtime
+ *   is expected to populate this on session create).
  *
- * This helper does NOT touch the Agents collection — filtering the
- * collection by tenant is usually handled by `@payloadcms/plugin-multi-tenant`
- * (or equivalent) that you already register elsewhere. If you're not using
- * such a plugin, add the filter yourself via `collectionOverrides`.
+ * The `agent-runtime` must write `{tenant_id, user_id}` into the session
+ * `metadata` JSONB when it creates a session. An expression index on
+ * `(metadata->>'tenant_id')` is recommended for query performance.
  */
 
-import type { PayloadRequest } from 'payload'
+import { sql } from 'drizzle-orm'
+import type { Payload, PayloadRequest } from 'payload'
 import type { BuildSessionId, ValidateSessionOwnership } from '../types'
 
 export interface MultiTenantSessionStrategyOptions {
@@ -23,10 +25,16 @@ export interface MultiTenantSessionStrategyOptions {
    * uses (cookie, header, subdomain…) instead of being restricted to the
    * user object.
    *
-   * Return `undefined` (or a falsy value) for users without a tenant —
-   * sessions will fall back to `'default'`.
+   * Return `undefined` (or a falsy value) for users without a tenant.
    */
   extractTenantId: (user: Record<string, unknown>, req: PayloadRequest) => string | number | undefined | null
+
+  /**
+   * Optional predicate: when `true`, `validateSessionOwnership` short-circuits
+   * to `true` regardless of the Agno session's tenant/user. Use this for
+   * superadmin roles that need to debug any conversation.
+   */
+  canBypass?: (user: Record<string, unknown>) => boolean
 }
 
 export interface MultiTenantSessionStrategy {
@@ -34,13 +42,20 @@ export interface MultiTenantSessionStrategy {
   validateSessionOwnership: ValidateSessionOwnership
 }
 
+interface DrizzleLike {
+  execute: (q: unknown) => Promise<{ rows: Record<string, unknown>[] }>
+}
+
+function getDrizzle(payload: Payload): DrizzleLike {
+  return (payload.db as unknown as { drizzle: DrizzleLike }).drizzle
+}
+
 /**
  * Session-id strategy for tenant-scoped chats.
  *
- * Use in tandem with `@payloadcms/plugin-multi-tenant`, which already filters
- * the Agents collection by tenant — this helper just makes sure session
- * identifiers carry the same tenant boundary so cross-tenant access is
- * rejected at the chat/session endpoints.
+ * Produces opaque UUID session ids and validates ownership against
+ * `agno.agno_sessions` — the agent-runtime must persist `tenant_id` and
+ * `user_id` into the session `metadata` JSONB when it creates the row.
  *
  * @example
  * ```ts
@@ -50,34 +65,33 @@ export interface MultiTenantSessionStrategy {
  * const { buildSessionId, validateSessionOwnership } = multiTenantSessionStrategy({
  *   extractTenantId: (user, req) =>
  *     getTenantFromCookie(req.headers, req.payload.db.defaultIDType) ??
- *     (user.tenants as Array<{ tenant: number | { id: number } }> | undefined)?.[0]?.tenant
- * })
- *
- * agentPlugin({
- *   // ...
- *   buildSessionId,
- *   validateSessionOwnership,
+ *     (user.tenants as Array<{ tenant: number | { id: number } }> | undefined)?.[0]?.tenant,
+ *   canBypass: user => Array.isArray((user as { role?: string[] }).role)
+ *     && (user as { role: string[] }).role.includes('superadmin')
  * })
  * ```
  */
 export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOptions): MultiTenantSessionStrategy {
-  const resolveTenant = (user: Record<string, unknown>, req: PayloadRequest): string => {
-    const value = options.extractTenantId(user, req)
-    return value === undefined || value === null || value === '' ? 'default' : String(value)
-  }
+  const buildSessionId: BuildSessionId = ({ chatId }) => chatId ?? crypto.randomUUID()
 
-  const buildSessionId: BuildSessionId = ({ user, agentSlug, chatId, req }) => {
-    if (chatId) return chatId
-    const tenantId = resolveTenant(user, req)
-    const userId = String((user as { id?: string | number }).id ?? 'anonymous')
-    return `${agentSlug}:${tenantId}:${userId}:${crypto.randomUUID()}`
-  }
+  const validateSessionOwnership: ValidateSessionOwnership = async (sessionId, { user, payload, req }) => {
+    if (options.canBypass?.(user as unknown as Record<string, unknown>)) return true
 
-  const validateSessionOwnership: ValidateSessionOwnership = (sessionId, { user, req }) => {
-    const tenantId = resolveTenant(user, req)
-    const userId = String((user as { id?: string | number }).id ?? '')
-    if (!userId) return false
-    return sessionId.includes(`:${tenantId}:${userId}:`)
+    const userId = (user as { id?: string | number }).id
+    if (userId === undefined || userId === null || userId === '') return false
+
+    const tenantId = options.extractTenantId(user as unknown as Record<string, unknown>, req)
+    if (tenantId === undefined || tenantId === null || tenantId === '') return false
+
+    const db = getDrizzle(payload)
+    const { rows } = await db.execute(sql`
+      SELECT 1 FROM agno.agno_sessions
+      WHERE session_id = ${sessionId}
+        AND metadata->>'tenant_id' = ${String(tenantId)}
+        AND user_id = ${String(userId)}
+      LIMIT 1
+    `)
+    return rows.length > 0
   }
 
   return { buildSessionId, validateSessionOwnership }

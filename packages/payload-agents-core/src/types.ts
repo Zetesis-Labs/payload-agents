@@ -1,4 +1,4 @@
-import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, Payload, PayloadRequest, TypedUser } from 'payload'
 
 /**
  * Context passed to `buildSessionId` when a new chat starts.
@@ -8,7 +8,7 @@ import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
  * string is later fed back to `validateSessionOwnership`.
  */
 export interface BuildSessionIdContext {
-  user: Record<string, unknown>
+  user: TypedUser
   agentSlug: string
   /** Present when the client is trying to continue an existing chat. */
   chatId?: string
@@ -21,7 +21,7 @@ export interface BuildSessionIdContext {
  * receives a session id from the client.
  */
 export interface ValidateSessionOwnershipContext {
-  user: Record<string, unknown>
+  user: TypedUser
   payload: Payload
   req: PayloadRequest
 }
