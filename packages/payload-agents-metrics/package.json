@@ -1,0 +1,116 @@
+{
+  "name": "@zetesis/payload-agents-metrics",
+  "version": "0.1.0",
+  "description": "Payload CMS plugin for LLM usage observability — token tracking, cost calculation, session analytics, and dashboard components",
+  "license": "MIT",
+  "author": {
+    "name": "Zetesis - Rubén Garcia",
+    "email": "ruben@zetesis.xyz",
+    "url": "https://zetesis.xyz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zetesis-Labs/PayloadAgents.git",
+    "directory": "packages/payload-agents-metrics"
+  },
+  "homepage": "https://github.com/Zetesis-Labs/PayloadAgents/tree/main/packages/payload-agents-metrics#readme",
+  "bugs": {
+    "url": "https://github.com/Zetesis-Labs/PayloadAgents/issues"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "types": "./dist/client.d.mts",
+      "import": "./src/client.ts",
+      "default": "./src/client.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "clean": "rimraf -g {dist,*.tsbuildinfo}",
+    "prepublishOnly": "pnpm clean && pnpm build"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^3.0.0",
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "@payloadcms/db-postgres": "^3.0.0",
+    "@zetesis/chat-agent": "workspace:*",
+    "drizzle-orm": ">=0.36",
+    "framer-motion": ">=11",
+    "payload": "^3.0.0",
+    "react": "^19.0.0",
+    "recharts": "^2.13.0"
+  },
+  "peerDependenciesMeta": {
+    "@zetesis/chat-agent": {
+      "optional": true
+    },
+    "framer-motion": {
+      "optional": true
+    },
+    "recharts": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@payloadcms/db-postgres": "^3.0.0",
+    "@types/node": "^22.5.4",
+    "@types/react": "^19.0.0",
+    "@zetesis/chat-agent": "workspace:*",
+    "framer-motion": "^12.0.0",
+    "payload": "^3.0.0",
+    "react": "^19.0.0",
+    "recharts": "^2.13.3",
+    "rimraf": "3.0.2",
+    "tsdown": "^0.16.5",
+    "typescript": "5.7.3"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": "^9 || ^10"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "plugin",
+    "llm",
+    "metrics",
+    "observability",
+    "token-usage",
+    "cost-tracking"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./client": {
+        "types": "./dist/client.d.mts",
+        "import": "./dist/client.mjs",
+        "default": "./dist/client.mjs"
+      }
+    },
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}
