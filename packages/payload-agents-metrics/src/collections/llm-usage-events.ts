@@ -8,6 +8,8 @@ export function createLlmUsageEventsCollection(config: ResolvedMetricsConfig): C
 
   const fields: Field[] = [
     // ── Relationships ───────────────────────────────────────────────
+    // Note: when `multiTenant: true`, the consumer's `@payloadcms/plugin-multi-tenant`
+    // injects the `tenant` relationship automatically — do NOT add it here or it collides.
     {
       name: 'user',
       type: 'relationship',

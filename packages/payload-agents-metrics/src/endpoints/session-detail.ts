@@ -33,12 +33,21 @@ interface MappedMessage {
   sources?: Array<{ id: string; title: string; slug: string; type: string }>
 }
 
-function extractSources(result: unknown): Array<{ id: string; title: string; slug: string; type: string }> {
-  // Lightweight extraction — avoids TOON dependency for portability.
-  // Consumers with @toon-format/toon can use extractSources from payload-agents-core.
+let toonDecodePromise: Promise<((s: string) => unknown) | null> | null = null
+function getToonDecode(): Promise<((s: string) => unknown) | null> {
+  if (!toonDecodePromise) {
+    toonDecodePromise = import('@toon-format/toon')
+      .then(mod => (mod as { decode: (s: string) => unknown }).decode)
+      .catch(() => null)
+  }
+  return toonDecodePromise
+}
+
+async function extractSources(result: unknown): Promise<Array<{ id: string; title: string; slug: string; type: string }>> {
   if (typeof result !== 'string') return []
+  const decode = await getToonDecode()
+  if (!decode) return []
   try {
-    const { decode } = require('@toon-format/toon') as { decode: (s: string) => unknown }
     const data = decode(result) as Record<string, unknown>
     const hits = Array.isArray(data) ? data : (data.hits as unknown[])
     if (!Array.isArray(hits)) return []
@@ -58,7 +67,7 @@ function extractSources(result: unknown): Array<{ id: string; title: string; slu
   }
 }
 
-function mapMessages(allMessages: AgnoMessage[]): MappedMessage[] {
+async function mapMessages(allMessages: AgnoMessage[]): Promise<MappedMessage[]> {
   const result: MappedMessage[] = []
   const toolResults = new Map<string, AgnoMessage>()
   for (const m of allMessages) {
@@ -82,7 +91,7 @@ function mapMessages(allMessages: AgnoMessage[]): MappedMessage[] {
         }
         const toolResult = toolResults.get(tc.id)
         const resultContent = toolResult?.content || undefined
-        const sources = resultContent ? extractSources(resultContent) : []
+        const sources = resultContent ? await extractSources(resultContent) : []
         pendingToolCalls.push({
           id: tc.id,
           name: tc.function.name,
@@ -130,6 +139,24 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) return Response.json({ error: 'conversationId is required' }, { status: 400 })
 
+    // Enforce tenant scoping: a tenant-scoped user must own at least one event
+    // for this conversationId before we expose the agno run payload.
+    if (!('allTenants' in access) && config.multiTenant) {
+      const ownsConversation = await payload.count({
+        collection: config.collectionSlug,
+        where: {
+          and: [
+            { conversationId: { equals: conversationId } },
+            { tenant: { in: access.tenantIds } }
+          ]
+        },
+        overrideAccess: true
+      })
+      if (ownsConversation.totalDocs === 0) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+
     const db = getDrizzle(payload)
     const result = await db.execute(sql`
       SELECT runs FROM agno.agno_sessions WHERE session_id = ${conversationId} LIMIT 1
@@ -147,6 +174,6 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
       if (run.messages) allMessages.push(...run.messages)
     }
 
-    return Response.json({ messages: mapMessages(allMessages) })
+    return Response.json({ messages: await mapMessages(allMessages) })
   }
 }

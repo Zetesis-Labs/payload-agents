@@ -130,7 +130,7 @@ const GROUP_LABELS: Record<GroupBy, string> = {
 export function LlmUsageDashboard({
   availableTenants = [],
   canPickTenant = false,
-  basePath = '/llm-usage',
+  basePath = '/metrics',
   LinkComponent,
   panelTopOffset = '4rem',
   accentColor = '#d4891a'
@@ -402,7 +402,7 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
 
   const toggleGroupBy = useCallback((dim: GroupBy) => {
     setGroupBy(prev => { const next = prev.includes(dim) ? prev.filter(d => d !== dim) : [...prev, dim]; return next.length > 0 ? next : [defaultGroup] })
-  }, [])
+  }, [defaultGroup])
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
