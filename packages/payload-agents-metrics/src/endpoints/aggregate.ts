@@ -5,6 +5,7 @@ import {
   type GroupBy,
   getBuckets,
   getSeries,
+  getTopBuckets,
   getTotals
 } from '../lib/aggregate-query'
 import type { ResolvedMetricsConfig } from '../types'
@@ -58,18 +59,23 @@ export function createAggregateHandler(config: ResolvedMetricsConfig): PayloadHa
       }
     }
 
-    const [totals, bucketsPageResult, series] = await Promise.all([
+    const [totals, bucketsPageResult, rawTopBuckets, series] = await Promise.all([
       getTotals(payload, config, filters),
       getBuckets(payload, config, groupBy, filters, bucketsPage),
+      getTopBuckets(payload, config, groupBy, filters),
       getSeries(payload, config, filters)
     ])
 
-    const buckets = await decorateBuckets(payload, config, groupBy, bucketsPageResult.rows)
+    const [buckets, topBuckets] = await Promise.all([
+      decorateBuckets(payload, config, groupBy, bucketsPageResult.rows),
+      decorateBuckets(payload, config, groupBy, rawTopBuckets)
+    ])
     return Response.json({
       groupBy,
       filters,
       totals,
       buckets,
+      topBuckets,
       bucketsPage: bucketsPageResult.page,
       bucketsTotalPages: bucketsPageResult.totalPages,
       bucketsTotal: bucketsPageResult.totalBuckets,

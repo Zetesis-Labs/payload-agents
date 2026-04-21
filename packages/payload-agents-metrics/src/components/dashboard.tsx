@@ -61,6 +61,7 @@ interface AggregateResponse {
   groupBy: GroupBy[]
   totals: { totalTokens: number; inputTokens: number; outputTokens: number; costUsd: number; events: number }
   buckets: BucketRow[]
+  topBuckets: BucketRow[]
   bucketsPage: number
   bucketsTotalPages: number
   bucketsTotal: number
@@ -450,7 +451,10 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
     return () => { cancelled = true }
   }, [queryString, props.basePath])
 
-  const totals = data?.totals; const buckets = data?.buckets ?? []; const series = data?.series ?? []
+  const totals = data?.totals
+  const buckets = data?.buckets ?? []
+  const topBuckets = data?.topBuckets ?? []
+  const series = data?.series ?? []
 
   return (
     <div>
@@ -496,9 +500,9 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
 
       <div className="rounded-xl border border-border bg-card p-4 mb-6">
         <h3 className="text-sm font-semibold mb-3">Top by cost</h3>
-        <div className="w-full" style={{ height: Math.max(220, Math.min(buckets.length, 12) * 32) }}>
+        <div className="w-full" style={{ height: Math.max(220, Math.min(topBuckets.length, 12) * 32) }}>
           <ResponsiveContainer>
-            <BarChart data={buckets.slice(0, 12)} layout="vertical">
+            <BarChart data={topBuckets} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis type="number" className="text-xs" /><YAxis type="category" dataKey="label" width={200} className="text-xs" />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => formatUsd(Number(v))} />

@@ -92,6 +92,61 @@ export async function getTotals(
   }
 }
 
+/**
+ * Top N buckets by cost, ignoring pagination. Used by the "Top by cost"
+ * chart so it shows a global top regardless of which page of the table
+ * the user is viewing.
+ */
+export async function getTopBuckets(
+  payload: BasePayload,
+  config: ResolvedMetricsConfig,
+  groupBy: GroupBy[],
+  filters: AggregateFilters,
+  limit = 12
+): Promise<BucketRow[]> {
+  if (groupBy.length === 0) return []
+  const where = buildWhere(filters)
+  const table = getTable(config)
+  const columns = groupBy.map(g => GROUP_COLUMN[g])
+  const selectParts = groupBy.map((g, i) => `${columns[i]} AS "dim_${g}"`).join(', ')
+  const groupByParts = columns.join(', ')
+
+  const result = await getDrizzle(payload).execute(sql`
+    SELECT
+      ${sql.raw(selectParts)},
+      COALESCE(SUM(total_tokens), 0)::bigint AS total_tokens,
+      COALESCE(SUM(input_tokens), 0)::bigint AS input_tokens,
+      COALESCE(SUM(output_tokens), 0)::bigint AS output_tokens,
+      COALESCE(SUM(cost_usd), 0)::numeric AS cost_usd,
+      COUNT(*)::bigint AS events
+    FROM ${sql.raw(`"${table}"`)}
+    WHERE ${where}
+    GROUP BY ${sql.raw(groupByParts)}
+    ORDER BY cost_usd DESC NULLS LAST
+    LIMIT ${limit}
+  `)
+
+  return result.rows.map(row => {
+    const keys: Record<string, string> = {}
+    for (const g of groupBy) {
+      const val = row[`dim_${g}`]
+      keys[g] = val === null || val === undefined ? '∅' : String(val)
+    }
+    const key = groupBy.map(g => keys[g]).join('||')
+    return {
+      key,
+      label: key,
+      keys,
+      labels: { ...keys },
+      totalTokens: Number(row.total_tokens ?? 0),
+      inputTokens: Number(row.input_tokens ?? 0),
+      outputTokens: Number(row.output_tokens ?? 0),
+      costUsd: Number(row.cost_usd ?? 0),
+      events: Number(row.events ?? 0)
+    }
+  })
+}
+
 export async function getBuckets(
   payload: BasePayload,
   config: ResolvedMetricsConfig,
