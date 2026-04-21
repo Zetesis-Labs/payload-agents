@@ -91,13 +91,34 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
 
     const db = getDrizzle(payload)
     const { rows } = await db.execute(sql`
-      SELECT 1 FROM agno.agno_sessions
+      SELECT user_id, metadata->>'tenant_id' AS tenant_id
+      FROM agno.agno_sessions
       WHERE session_id = ${sessionId}
-        AND metadata->>'tenant_id' = ${String(tenantId)}
-        AND user_id = ${String(userId)}
       LIMIT 1
     `)
-    return rows.length > 0
+    const row = rows[0]
+    if (!row) {
+      payload.logger.warn({ sessionId }, '[multi-tenant] session ownership denied: session not found in agno_sessions')
+      return false
+    }
+    const storedUserId = row.user_id as string | null
+    const storedTenantId = row.tenant_id as string | null
+    if (storedUserId !== String(userId) || storedTenantId !== String(tenantId)) {
+      payload.logger.warn(
+        {
+          sessionId,
+          expectedUserId: String(userId),
+          expectedTenantId: String(tenantId),
+          storedUserId,
+          storedTenantId
+        },
+        storedTenantId === null
+          ? '[multi-tenant] session ownership denied: metadata.tenant_id missing — runtime may not be forwarding X-Tenant-Id'
+          : '[multi-tenant] session ownership denied: tenant/user mismatch'
+      )
+      return false
+    }
+    return true
   }
 
   const getRuntimeHeaders = ({ user, req }: { user: TypedUser; payload: Payload; req: PayloadRequest }): Record<string, string> => {
