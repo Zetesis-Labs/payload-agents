@@ -5,7 +5,8 @@ export const buildDocumentsCollection = (slug: string): CollectionConfig => ({
   admin: {
     useAsTitle: 'filename',
     group: 'Content',
-    description: 'Documents parsed to markdown via LlamaParse.'
+    description: 'Documents parsed to markdown via LlamaParse.',
+    defaultColumns: ['filename', 'parse_status', 'parsed_at']
   },
   upload: {
     staticDir: slug,
@@ -13,65 +14,60 @@ export const buildDocumentsCollection = (slug: string): CollectionConfig => ({
   },
   fields: [
     {
+      name: 'parse_action',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@zetesis/payload-documents/client#ParseButtonField'
+        }
+      }
+    },
+    {
+      name: 'parse_status',
+      type: 'select',
+      defaultValue: 'idle',
+      options: [
+        { label: 'Idle', value: 'idle' },
+        { label: 'Pending', value: 'pending' },
+        { label: 'Processing', value: 'processing' },
+        { label: 'Done', value: 'done' },
+        { label: 'Error', value: 'error' }
+      ],
+      admin: {
+        readOnly: true,
+        position: 'sidebar'
+      }
+    },
+    {
+      name: 'parse_job_id',
+      type: 'text',
+      admin: {
+        readOnly: true,
+        position: 'sidebar'
+      }
+    },
+    {
+      name: 'parsed_at',
+      type: 'date',
+      admin: {
+        readOnly: true,
+        position: 'sidebar',
+        date: {
+          pickerAppearance: 'dayAndTime'
+        }
+      }
+    },
+    {
+      name: 'parse_error',
+      type: 'textarea',
+      admin: {
+        readOnly: true,
+        condition: (data: Record<string, unknown> | undefined) => data?.parse_status === 'error'
+      }
+    },
+    {
       type: 'tabs',
       tabs: [
-        {
-          label: 'Parsing',
-          fields: [
-            {
-              name: 'parse_action',
-              type: 'ui',
-              admin: {
-                components: {
-                  Field: '@zetesis/payload-documents/client#ParseButtonField'
-                }
-              }
-            },
-            {
-              name: 'parse_status',
-              type: 'select',
-              defaultValue: 'idle',
-              options: [
-                { label: 'Idle', value: 'idle' },
-                { label: 'Pending', value: 'pending' },
-                { label: 'Processing', value: 'processing' },
-                { label: 'Done', value: 'done' },
-                { label: 'Error', value: 'error' }
-              ],
-              admin: {
-                readOnly: true,
-                position: 'sidebar'
-              }
-            },
-            {
-              name: 'parse_job_id',
-              type: 'text',
-              admin: {
-                readOnly: true,
-                position: 'sidebar'
-              }
-            },
-            {
-              name: 'parsed_at',
-              type: 'date',
-              admin: {
-                readOnly: true,
-                position: 'sidebar',
-                date: {
-                  pickerAppearance: 'dayAndTime'
-                }
-              }
-            },
-            {
-              name: 'parse_error',
-              type: 'textarea',
-              admin: {
-                readOnly: true,
-                condition: (data: Record<string, unknown> | undefined) => data?.parse_status === 'error'
-              }
-            }
-          ]
-        },
         {
           label: 'Params',
           fields: [

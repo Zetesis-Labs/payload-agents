@@ -110,7 +110,7 @@ export const ParseButtonField: UIFieldClientComponent = () => {
         toast.error(data.error ?? 'Failed to start parsing')
         return
       }
-      toast.info('Parsing started')
+      toast.success('Parsing started')
       startPolling()
     } catch (error) {
       setLocalStatus('error')
@@ -120,6 +120,7 @@ export const ParseButtonField: UIFieldClientComponent = () => {
   }, [id, collectionSlug, startPolling])
 
   const description = useMemo(() => {
+    if (!id) return 'Upload a PDF and save the document to enable parsing.'
     switch (status) {
       case 'idle':
         return 'Click to parse the uploaded PDF with LlamaParse.'
@@ -132,7 +133,7 @@ export const ParseButtonField: UIFieldClientComponent = () => {
       case 'error':
         return 'Parsing failed. See the error details below.'
     }
-  }, [status])
+  }, [id, status])
 
   return (
     <div style={containerStyle}>
@@ -143,13 +144,11 @@ export const ParseButtonField: UIFieldClientComponent = () => {
         </Pill>
       </div>
       <span style={descStyle}>{description}</span>
-      {id && (
-        <div>
-          <Button buttonStyle="primary" size="small" onClick={handleStart} disabled={isRunning}>
-            {isRunning ? 'Parsing…' : 'Parse with LlamaParse'}
-          </Button>
-        </div>
-      )}
+      <div>
+        <Button buttonStyle="primary" size="small" onClick={handleStart} disabled={isRunning || !id}>
+          {isRunning ? 'Parsing…' : 'Parse with LlamaParse'}
+        </Button>
+      </div>
     </div>
   )
 }
