@@ -56,6 +56,10 @@ function getDrizzle(payload: Payload): DrizzleLike {
   return (payload.db as unknown as { drizzle: DrizzleLike }).drizzle
 }
 
+function isBlank(v: string | number | null | undefined): v is null | undefined | '' {
+  return v === undefined || v === null || v === ''
+}
+
 /**
  * Session-id strategy for tenant-scoped chats.
  *
@@ -83,11 +87,11 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
   const validateSessionOwnership: ValidateSessionOwnership = async (sessionId, { user, payload, req }) => {
     if (options.canBypass?.(user)) return true
 
-    const userId = (user as { id?: string | number }).id
-    if (userId === undefined || userId === null || userId === '') return false
+    const userId = user.id
+    if (isBlank(userId)) return false
 
     const tenantId = options.extractTenantId(user, req)
-    if (tenantId === undefined || tenantId === null || tenantId === '') return false
+    if (isBlank(tenantId)) return false
 
     const db = getDrizzle(payload)
     const { rows } = await db.execute(sql`
@@ -123,7 +127,7 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
 
   const getRuntimeHeaders = ({ user, req }: { user: TypedUser; payload: Payload; req: PayloadRequest }): Record<string, string> => {
     const tenantId = options.extractTenantId(user, req)
-    if (tenantId === undefined || tenantId === null || tenantId === '') return {}
+    if (isBlank(tenantId)) return {}
     return { 'X-Tenant-Id': String(tenantId) }
   }
 
