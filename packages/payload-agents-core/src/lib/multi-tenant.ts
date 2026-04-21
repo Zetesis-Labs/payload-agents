@@ -13,7 +13,7 @@
  */
 
 import { sql } from 'drizzle-orm'
-import type { Payload, PayloadRequest } from 'payload'
+import type { Payload, PayloadRequest, TypedUser } from 'payload'
 import type { BuildSessionId, ValidateSessionOwnership } from '../types'
 
 export interface MultiTenantSessionStrategyOptions {
@@ -27,14 +27,14 @@ export interface MultiTenantSessionStrategyOptions {
    *
    * Return `undefined` (or a falsy value) for users without a tenant.
    */
-  extractTenantId: (user: Record<string, unknown>, req: PayloadRequest) => string | number | undefined | null
+  extractTenantId: (user: TypedUser, req: PayloadRequest) => string | number | undefined | null
 
   /**
    * Optional predicate: when `true`, `validateSessionOwnership` short-circuits
    * to `true` regardless of the Agno session's tenant/user. Use this for
    * superadmin roles that need to debug any conversation.
    */
-  canBypass?: (user: Record<string, unknown>) => boolean
+  canBypass?: (user: TypedUser) => boolean
 }
 
 export interface MultiTenantSessionStrategy {
@@ -45,7 +45,7 @@ export interface MultiTenantSessionStrategy {
    * so it can persist it into the Agno session's `metadata` JSONB.
    * Pass this into `agentPlugin({ getRuntimeHeaders })`.
    */
-  getRuntimeHeaders: (ctx: { user: unknown; payload: Payload; req: PayloadRequest }) => Record<string, string>
+  getRuntimeHeaders: (ctx: { user: TypedUser; payload: Payload; req: PayloadRequest }) => Record<string, string>
 }
 
 interface DrizzleLike {
@@ -81,12 +81,12 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
   const buildSessionId: BuildSessionId = ({ chatId }) => chatId ?? crypto.randomUUID()
 
   const validateSessionOwnership: ValidateSessionOwnership = async (sessionId, { user, payload, req }) => {
-    if (options.canBypass?.(user as unknown as Record<string, unknown>)) return true
+    if (options.canBypass?.(user)) return true
 
     const userId = (user as { id?: string | number }).id
     if (userId === undefined || userId === null || userId === '') return false
 
-    const tenantId = options.extractTenantId(user as unknown as Record<string, unknown>, req)
+    const tenantId = options.extractTenantId(user, req)
     if (tenantId === undefined || tenantId === null || tenantId === '') return false
 
     const db = getDrizzle(payload)
@@ -100,8 +100,8 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
     return rows.length > 0
   }
 
-  const getRuntimeHeaders = ({ user, req }: { user: unknown; payload: Payload; req: PayloadRequest }): Record<string, string> => {
-    const tenantId = options.extractTenantId(user as Record<string, unknown>, req)
+  const getRuntimeHeaders = ({ user, req }: { user: TypedUser; payload: Payload; req: PayloadRequest }): Record<string, string> => {
+    const tenantId = options.extractTenantId(user, req)
     if (tenantId === undefined || tenantId === null || tenantId === '') return {}
     return { 'X-Tenant-Id': String(tenantId) }
   }

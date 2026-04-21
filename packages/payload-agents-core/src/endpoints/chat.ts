@@ -159,13 +159,9 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     })
     const upstreamUrl = `${config.runtimeUrl}/agents/${encodeURIComponent(agentSlugValue)}/runs`
 
-    const extraHeaders: Record<string, string> = {}
-    if (config.getRuntimeHeaders) {
-      const entries = await config.getRuntimeHeaders({ user: userRecord, payload, req })
-      for (const [k, v] of Object.entries(entries)) {
-        if (v !== undefined && v !== null && v !== '') extraHeaders[k] = String(v)
-      }
-    }
+    const extraHeaders = config.getRuntimeHeaders
+      ? await config.getRuntimeHeaders({ user, payload, req })
+      : {}
 
     const callRuntime = () =>
       runtimeFetch(upstreamUrl, config.runtimeSecret, {

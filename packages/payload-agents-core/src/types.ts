@@ -93,7 +93,11 @@ export interface AgentPluginConfig {
    *
    * Keys must be valid HTTP header names. Values are coerced to strings.
    */
-  getRuntimeHeaders?: (ctx: { user: TypedUser; payload: Payload; req: PayloadRequest }) => Record<string, string | number> | Promise<Record<string, string | number>>
+  getRuntimeHeaders?: (ctx: {
+    user: TypedUser
+    payload: Payload
+    req: PayloadRequest
+  }) => Record<string, string> | Promise<Record<string, string>>
 
   /**
    * Override the Payload collection slug. Default: `'agents'`.
@@ -233,7 +237,13 @@ export interface ResolvedPluginConfig {
   getDailyLimit: (payload: Payload, userId: string | number) => Promise<number>
   buildSessionId: BuildSessionId
   validateSessionOwnership: ValidateSessionOwnership
-  getRuntimeHeaders: ((ctx: { user: TypedUser; payload: Payload; req: PayloadRequest }) => Record<string, string | number> | Promise<Record<string, string | number>>) | undefined
+  getRuntimeHeaders:
+    | ((ctx: {
+        user: TypedUser
+        payload: Payload
+        req: PayloadRequest
+      }) => Record<string, string> | Promise<Record<string, string>>)
+    | undefined
   collectionSlug: string
   basePath: string
   encryptionKey: string | undefined
