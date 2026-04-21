@@ -2,7 +2,7 @@
 
 import { Button, Pill, toast, useFormFields } from '@payloadcms/ui'
 import type { UIFieldClientComponent } from 'payload'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type ParseStatus = 'idle' | 'pending' | 'processing' | 'done' | 'error'
 
@@ -51,6 +51,18 @@ export const ParseButtonField: UIFieldClientComponent = () => {
       pollingRef.current = null
     }
     setBusy(false)
+  }, [])
+
+  // Ensure the polling interval is cleared if the user navigates away
+  // while a job is in flight — otherwise setInterval would keep running,
+  // setting state on an unmounted component and potentially reloading the page.
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current !== null) {
+        window.clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+    }
   }, [])
 
   const startPolling = useCallback(

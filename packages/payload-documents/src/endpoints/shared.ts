@@ -75,8 +75,18 @@ export const fetchUploadedFile = async (
     return Response.json({ error: 'Document has no uploaded file yet.' }, { status: 400 })
   }
 
-  const serverURL = req.payload.config.serverURL ?? ''
-  const absoluteUrl = doc.url.startsWith('http') ? doc.url : `${serverURL}${doc.url}`
+  const serverURL = req.payload.config.serverURL
+  const isAbsolute = doc.url.startsWith('http')
+  if (!isAbsolute && !serverURL) {
+    return Response.json(
+      {
+        error:
+          'Cannot resolve file URL: Payload `serverURL` is not configured and the uploaded file URL is relative. Set `serverURL` in payload.config or use a storage adapter that returns absolute URLs.'
+      },
+      { status: 500 }
+    )
+  }
+  const absoluteUrl = isAbsolute ? doc.url : `${serverURL}${doc.url}`
   const cookieHeader = req.headers.get('cookie') ?? ''
 
   try {

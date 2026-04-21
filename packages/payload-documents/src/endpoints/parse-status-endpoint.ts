@@ -57,6 +57,7 @@ const resolveJob = async (
 ): Promise<Response> => {
   if (jobStatus === 'SUCCESS') return handleSuccess(args)
   if (jobStatus === 'ERROR') return handleError(args, errorMessage)
+  if (jobStatus === 'CANCELED') return handleError(args, errorMessage ?? 'LlamaParse job was canceled')
   return handleProcessing(args)
 }
 
