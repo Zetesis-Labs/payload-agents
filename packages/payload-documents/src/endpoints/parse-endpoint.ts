@@ -10,7 +10,7 @@ import {
 } from './shared'
 
 export const createParseEndpoint = (config: EndpointConfig): Endpoint => ({
-  path: `/${config.collectionSlug}/:id/parse`,
+  path: '/:id/parse',
   method: 'post',
   handler: async (req: PayloadRequest) => {
     const authError = requireAuth(req)

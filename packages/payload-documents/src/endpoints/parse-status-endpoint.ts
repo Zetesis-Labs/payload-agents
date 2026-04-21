@@ -61,7 +61,7 @@ const resolveJob = async (
 }
 
 export const createParseStatusEndpoint = (config: EndpointConfig): Endpoint => ({
-  path: `/${config.collectionSlug}/:id/parse-status`,
+  path: '/:id/parse-status',
   method: 'get',
   handler: async (req: PayloadRequest) => {
     const authError = requireAuth(req)

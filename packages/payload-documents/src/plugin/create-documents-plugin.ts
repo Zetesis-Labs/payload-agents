@@ -12,19 +12,22 @@ export const createDocumentsPlugin = (options: DocumentsPluginConfig = {}): Docu
   const plugin = (payloadConfig: Config): Config => {
     const apiKey = options.llamaParseApiKey ?? process.env.LLAMA_CLOUD_API_KEY
 
+    const endpointConfig = { collectionSlug: slug, apiKey, baseUrl }
+
     let collection = buildDocumentsCollection(slug)
+    collection = {
+      ...collection,
+      endpoints: [
+        ...(collection.endpoints ? collection.endpoints : []),
+        createParseEndpoint(endpointConfig),
+        createParseStatusEndpoint(endpointConfig)
+      ]
+    }
     if (options.overrides?.collection) {
       collection = options.overrides.collection(collection)
     }
 
     payloadConfig.collections = [...(payloadConfig.collections ?? []), collection]
-
-    const endpointConfig = { collectionSlug: slug, apiKey, baseUrl }
-    payloadConfig.endpoints = [
-      ...(payloadConfig.endpoints ?? []),
-      createParseEndpoint(endpointConfig),
-      createParseStatusEndpoint(endpointConfig)
-    ]
 
     return payloadConfig
   }
