@@ -118,6 +118,18 @@ const tooltipStyle: React.CSSProperties = {
 
 const inputCls = 'h-9 rounded-md border border-input bg-background px-3 text-sm'
 
+/** Convert the start of a `YYYY-MM-DD` day to UTC ISO. */
+function dayStartIso(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toISOString()
+}
+
+/** Convert the end of a `YYYY-MM-DD` day to UTC ISO (exclusive upper bound). */
+function dayEndExclusiveIso(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString()
+}
+
 const ALL_GROUPS_MT: GroupBy[] = ['tenant', 'agent', 'user', 'model', 'apiKeySource', 'apiKeyFingerprint', 'day']
 const ALL_GROUPS_ST: GroupBy[] = ['agent', 'user', 'model', 'apiKeySource', 'apiKeyFingerprint', 'day']
 const GROUP_LABELS: Record<GroupBy, string> = {
@@ -137,7 +149,7 @@ export function LlmUsageDashboard({
 }: LlmUsageDashboardProps) {
   const multiTenant = availableTenants.length > 0
   const [from, setFrom] = useState(() => { const d = new Date(); d.setUTCDate(d.getUTCDate() - 30); return d.toISOString().slice(0, 10) })
-  const [to, setTo] = useState(() => { const d = new Date(); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10) })
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [tenantId, setTenantId] = useState('')
   const [agentSlug, setAgentSlug] = useState('')
   const [modelFilter, setModelFilter] = useState('')
@@ -194,7 +206,7 @@ export function LlmUsageDashboard({
       )}
       {tab === 'overview' && (
         <OverviewTab basePath={basePath} from={from} to={to} tenantId={tenantId} agentSlug={agentSlug}
-          model={modelFilter} accentColor={accentColor} multiTenant={multiTenant} />
+          model={modelFilter} userId={userIdFilter} accentColor={accentColor} multiTenant={multiTenant} />
       )}
 
       <AnimatePresence>
@@ -227,8 +239,8 @@ function SessionsList(props: {
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
-    if (props.from) params.set('from', new Date(`${props.from}T00:00:00Z`).toISOString())
-    if (props.to) params.set('to', new Date(`${props.to}T00:00:00Z`).toISOString())
+    if (props.from) params.set('from', dayStartIso(props.from))
+    if (props.to) params.set('to', dayEndExclusiveIso(props.to))
     if (props.tenantId) params.set('tenantId', props.tenantId)
     if (props.agentSlug) params.set('agentSlug', props.agentSlug)
     if (props.model) params.set('model', props.model)
@@ -391,7 +403,7 @@ function ReadOnlyThread({ messages, setMessages, conversationId, generateHref, L
 
 /* ── Overview Tab ───────────────────────────────────────────────────��── */
 
-function OverviewTab(props: { basePath: string; from: string; to: string; tenantId: string; agentSlug: string; model: string; accentColor: string; multiTenant: boolean }) {
+function OverviewTab(props: { basePath: string; from: string; to: string; tenantId: string; agentSlug: string; model: string; userId: string; accentColor: string; multiTenant: boolean }) {
   const allGroups = props.multiTenant ? ALL_GROUPS_MT : ALL_GROUPS_ST
   const defaultGroup: GroupBy = props.multiTenant ? 'tenant' : 'agent'
   const [groupBy, setGroupBy] = useState<GroupBy[]>([defaultGroup])
@@ -407,14 +419,15 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
     params.set('groupBy', groupBy.join(','))
-    if (props.from) params.set('from', new Date(`${props.from}T00:00:00Z`).toISOString())
-    if (props.to) params.set('to', new Date(`${props.to}T00:00:00Z`).toISOString())
+    if (props.from) params.set('from', dayStartIso(props.from))
+    if (props.to) params.set('to', dayEndExclusiveIso(props.to))
     if (props.tenantId) params.set('tenantId', props.tenantId)
     if (props.agentSlug) params.set('agentSlug', props.agentSlug)
     if (props.model) params.set('model', props.model)
+    if (props.userId) params.set('userId', props.userId)
     if (apiKeySource) params.set('apiKeySource', apiKeySource)
     return params.toString()
-  }, [groupBy, props.from, props.to, props.tenantId, props.agentSlug, props.model, apiKeySource])
+  }, [groupBy, props.from, props.to, props.tenantId, props.agentSlug, props.model, props.userId, apiKeySource])
 
   useEffect(() => {
     let cancelled = false; setLoading(true); setError(null)

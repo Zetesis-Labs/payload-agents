@@ -27,7 +27,17 @@ export function buildWhere(filters: BaseFilters): unknown {
   }
 
   if (filters.agentSlug) clauses.push(sql`agent_slug = ${filters.agentSlug}`)
-  if (filters.userId !== undefined) clauses.push(sql`user_id = ${Number(filters.userId)}`)
+  if (filters.userId !== undefined && filters.userId !== '') {
+    const n = typeof filters.userId === 'number' ? filters.userId : Number(filters.userId)
+    if (Number.isFinite(n)) {
+      clauses.push(sql`user_id = ${n}`)
+    } else {
+      // Non-numeric id (e.g. mongo ObjectId). Cast the column to text so
+      // both integer and varchar user_id columns work; trades the index for
+      // correctness on the non-numeric path.
+      clauses.push(sql`user_id::text = ${String(filters.userId)}`)
+    }
+  }
   if (filters.apiKeySource) clauses.push(sql`api_key_source = ${filters.apiKeySource}`)
   if (filters.model) clauses.push(sql`model = ${filters.model}`)
   if (filters.apiKeyFingerprint) clauses.push(sql`api_key_fingerprint = ${filters.apiKeyFingerprint}`)
