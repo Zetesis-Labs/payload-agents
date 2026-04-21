@@ -61,6 +61,9 @@ interface AggregateResponse {
   groupBy: GroupBy[]
   totals: { totalTokens: number; inputTokens: number; outputTokens: number; costUsd: number; events: number }
   buckets: BucketRow[]
+  bucketsPage: number
+  bucketsTotalPages: number
+  bucketsTotal: number
   series: SeriesRow[]
 }
 
@@ -408,6 +411,7 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
   const defaultGroup: GroupBy = props.multiTenant ? 'tenant' : 'agent'
   const [groupBy, setGroupBy] = useState<GroupBy[]>([defaultGroup])
   const [apiKeySource, setApiKeySource] = useState<'' | 'agent' | 'user'>('')
+  const [bucketsPage, setBucketsPage] = useState(1)
   const [data, setData] = useState<AggregateResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -415,6 +419,12 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
   const toggleGroupBy = useCallback((dim: GroupBy) => {
     setGroupBy(prev => { const next = prev.includes(dim) ? prev.filter(d => d !== dim) : [...prev, dim]; return next.length > 0 ? next : [defaultGroup] })
   }, [defaultGroup])
+
+  const filterKey = useMemo(
+    () => `${props.from}|${props.to}|${props.tenantId}|${props.agentSlug}|${props.model}|${props.userId}|${apiKeySource}|${groupBy.join(',')}`,
+    [props.from, props.to, props.tenantId, props.agentSlug, props.model, props.userId, apiKeySource, groupBy]
+  )
+  useEffect(() => { setBucketsPage(1) }, [filterKey])
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -426,8 +436,9 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
     if (props.model) params.set('model', props.model)
     if (props.userId) params.set('userId', props.userId)
     if (apiKeySource) params.set('apiKeySource', apiKeySource)
+    params.set('bucketsPage', String(bucketsPage))
     return params.toString()
-  }, [groupBy, props.from, props.to, props.tenantId, props.agentSlug, props.model, props.userId, apiKeySource])
+  }, [groupBy, props.from, props.to, props.tenantId, props.agentSlug, props.model, props.userId, apiKeySource, bucketsPage])
 
   useEffect(() => {
     let cancelled = false; setLoading(true); setError(null)
@@ -524,6 +535,15 @@ function OverviewTab(props: { basePath: string; from: string; to: string; tenant
           </tbody>
         </table>
       </div>
+      {data && data.bucketsTotalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 mt-4">
+          <button type="button" disabled={bucketsPage <= 1} onClick={() => setBucketsPage(p => p - 1)}
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm disabled:opacity-40">← Prev</button>
+          <span className="text-sm text-muted-foreground">Page {data.bucketsPage} / {data.bucketsTotalPages} · {formatNumber(data.bucketsTotal)} groups</span>
+          <button type="button" disabled={bucketsPage >= data.bucketsTotalPages} onClick={() => setBucketsPage(p => p + 1)}
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm disabled:opacity-40">Next →</button>
+        </div>
+      )}
       {loading && <p className="mt-4 text-center text-sm text-muted-foreground">Loading…</p>}
     </div>
   )

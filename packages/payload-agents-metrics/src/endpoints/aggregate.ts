@@ -44,6 +44,7 @@ export function createAggregateHandler(config: ResolvedMetricsConfig): PayloadHa
     const apiKeySource = apiKeySourceParam === 'agent' || apiKeySourceParam === 'user' ? apiKeySourceParam : undefined
     const model = url.searchParams.get('model') ?? undefined
     const apiKeyFingerprint = url.searchParams.get('apiKeyFingerprint') ?? undefined
+    const bucketsPage = Math.max(1, Number(url.searchParams.get('bucketsPage') ?? 1))
 
     const filters: AggregateFilters = { from, to, agentSlug, userId, apiKeySource, model, apiKeyFingerprint }
 
@@ -57,13 +58,22 @@ export function createAggregateHandler(config: ResolvedMetricsConfig): PayloadHa
       }
     }
 
-    const [totals, rawBuckets, series] = await Promise.all([
+    const [totals, bucketsPageResult, series] = await Promise.all([
       getTotals(payload, config, filters),
-      getBuckets(payload, config, groupBy, filters),
+      getBuckets(payload, config, groupBy, filters, bucketsPage),
       getSeries(payload, config, filters)
     ])
 
-    const buckets = await decorateBuckets(payload, config, groupBy, rawBuckets)
-    return Response.json({ groupBy, filters, totals, buckets, series })
+    const buckets = await decorateBuckets(payload, config, groupBy, bucketsPageResult.rows)
+    return Response.json({
+      groupBy,
+      filters,
+      totals,
+      buckets,
+      bucketsPage: bucketsPageResult.page,
+      bucketsTotalPages: bucketsPageResult.totalPages,
+      bucketsTotal: bucketsPageResult.totalBuckets,
+      series
+    })
   }
 }
