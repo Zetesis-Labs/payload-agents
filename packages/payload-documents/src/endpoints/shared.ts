@@ -75,18 +75,14 @@ export const fetchUploadedFile = async (
     return Response.json({ error: 'Document has no uploaded file yet.' }, { status: 400 })
   }
 
-  const serverURL = req.payload.config.serverURL
   const isAbsolute = doc.url.startsWith('http')
-  if (!isAbsolute && !serverURL) {
-    return Response.json(
-      {
-        error:
-          'Cannot resolve file URL: Payload `serverURL` is not configured and the uploaded file URL is relative. Set `serverURL` in payload.config or use a storage adapter that returns absolute URLs.'
-      },
-      { status: 500 }
-    )
-  }
-  const absoluteUrl = isAbsolute ? doc.url : `${serverURL}${doc.url}`
+  // Same-process self-fetch: the file is served by Payload's own HTTP handler
+  // running in this very Node process. Hit it via localhost so we don't depend
+  // on `serverURL`, which is the browser-facing URL and may be unreachable
+  // from inside the server container (e.g. https://nexus.localhost under
+  // docker-compose, or the public ingress host inside a Kubernetes pod).
+  const port = process.env.PORT ?? '3000'
+  const absoluteUrl = isAbsolute ? doc.url : `http://localhost:${port}${doc.url}`
   const cookieHeader = req.headers.get('cookie') ?? ''
 
   try {
