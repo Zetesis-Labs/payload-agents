@@ -75,14 +75,23 @@ export const fetchUploadedFile = async (
     return Response.json({ error: 'Document has no uploaded file yet.' }, { status: 400 })
   }
 
-  const isAbsolute = doc.url.startsWith('http')
-  // Same-process self-fetch: the file is served by Payload's own HTTP handler
-  // running in this very Node process. Hit it via localhost so we don't depend
-  // on `serverURL`, which is the browser-facing URL and may be unreachable
-  // from inside the server container (e.g. https://nexus.localhost under
-  // docker-compose, or the public ingress host inside a Kubernetes pod).
+  // Payload sets `doc.url` to `${serverURL}${pathname}` when serverURL is
+  // configured, so the URL comes back absolute with the browser-facing host
+  // (e.g. https://nexus.localhost/api/documents/file/foo.pdf). That host is
+  // typically unreachable from inside the server container, so we can't just
+  // fetch it as-is. The file is served by Payload's own HTTP handler in this
+  // same Node process, so rewrite any same-origin URL to
+  // `http://localhost:${PORT}` (loopback = always reachable). URLs whose
+  // origin differs from serverURL are treated as external (e.g. direct
+  // S3/R2/MinIO links when `disablePayloadAccessControl: true`) and fetched
+  // as-is.
   const port = process.env.PORT ?? '3000'
-  const absoluteUrl = isAbsolute ? doc.url : `http://localhost:${port}${doc.url}`
+  const loopbackOrigin = `http://localhost:${port}`
+  const serverURL = req.payload.config.serverURL
+  const parsed = new URL(doc.url, loopbackOrigin)
+  const serverOrigin = serverURL ? new URL(serverURL).origin : null
+  const sameOrigin = !doc.url.startsWith('http') || (serverOrigin !== null && parsed.origin === serverOrigin)
+  const absoluteUrl = sameOrigin ? `${loopbackOrigin}${parsed.pathname}${parsed.search}` : doc.url
   const cookieHeader = req.headers.get('cookie') ?? ''
 
   try {
