@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agentPlugin } from '@zetesis/payload-agents-core'
+import { metricsPlugin } from '@zetesis/payload-agents-metrics'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import type { Payload } from 'payload'
@@ -45,16 +46,21 @@ export default buildConfig({
   graphQL: {
     schemaOutputFile: path.resolve(dirname, 'generated-schema.graphql')
   },
-  plugins: [
-    typesensePlugin,
-    agentPlugin({
-      runtimeUrl: process.env.AGENT_RUNTIME_URL || 'http://agent-runtime:8000',
-      runtimeSecret: process.env.INTERNAL_SECRET,
-      getDailyLimit,
-      encryptionKey: process.env.PAYLOAD_SECRET,
-      basePath: '/chat',
-      mediaCollectionSlug: 'media',
-      taxonomyCollectionSlug: 'taxonomy'
-    })
-  ]
+  plugins: (() => {
+    const metrics = metricsPlugin({ multiTenant: false, basePath: '/metrics' })
+    return [
+      typesensePlugin,
+      agentPlugin({
+        runtimeUrl: process.env.AGENT_RUNTIME_URL || 'http://agent-runtime:8000',
+        runtimeSecret: process.env.INTERNAL_SECRET,
+        getDailyLimit,
+        encryptionKey: process.env.PAYLOAD_SECRET,
+        basePath: '/chat',
+        mediaCollectionSlug: 'media',
+        taxonomyCollectionSlug: 'taxonomy',
+        onRunCompleted: metrics.onRunCompleted
+      }),
+      metrics
+    ]
+  })()
 })

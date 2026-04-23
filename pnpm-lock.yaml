@@ -66,6 +66,9 @@ importers:
       '@zetesis/payload-agents-core':
         specifier: workspace:*
         version: link:../../packages/payload-agents-core
+      '@zetesis/payload-agents-metrics':
+        specifier: workspace:*
+        version: link:../../packages/payload-agents-metrics
       '@zetesis/payload-indexer':
         specifier: workspace:*
         version: link:../../packages/payload-indexer
