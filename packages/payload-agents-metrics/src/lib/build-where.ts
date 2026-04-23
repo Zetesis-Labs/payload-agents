@@ -20,8 +20,13 @@ export function buildWhere(filters: BaseFilters): unknown {
 
   if (filters.tenantIds && filters.tenantIds.length > 0) {
     const ids = filters.tenantIds.map(id => Number(id)).filter(n => Number.isFinite(n))
-    if (ids.length > 0) clauses.push(sql`tenant_id = ANY(${ids})`)
-    else clauses.push(sql`false`)
+    if (ids.length > 0) {
+      const placeholders = sql.join(
+        ids.map(id => sql`${id}`),
+        sql`, `
+      )
+      clauses.push(sql`tenant_id IN (${placeholders})`)
+    } else clauses.push(sql`false`)
   } else if (filters.tenantId !== undefined) {
     clauses.push(sql`tenant_id = ${Number(filters.tenantId)}`)
   }
