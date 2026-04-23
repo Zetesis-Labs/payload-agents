@@ -125,7 +125,14 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
     return true
   }
 
-  const getRuntimeHeaders = ({ user, req }: { user: TypedUser; payload: Payload; req: PayloadRequest }): Record<string, string> => {
+  const getRuntimeHeaders = ({
+    user,
+    req
+  }: {
+    user: TypedUser
+    payload: Payload
+    req: PayloadRequest
+  }): Record<string, string> => {
     const tenantId = options.extractTenantId(user, req)
     if (isBlank(tenantId)) return {}
     return { 'X-Tenant-Id': String(tenantId) }

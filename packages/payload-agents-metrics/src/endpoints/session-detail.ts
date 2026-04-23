@@ -43,7 +43,9 @@ function getToonDecode(): Promise<((s: string) => unknown) | null> {
   return toonDecodePromise
 }
 
-async function extractSources(result: unknown): Promise<Array<{ id: string; title: string; slug: string; type: string }>> {
+async function extractSources(
+  result: unknown
+): Promise<Array<{ id: string; title: string; slug: string; type: string }>> {
   if (typeof result !== 'string') return []
   const decode = await getToonDecode()
   if (!decode) return []
@@ -145,10 +147,7 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
       const ownsConversation = await payload.count({
         collection: config.collectionSlug,
         where: {
-          and: [
-            { conversationId: { equals: conversationId } },
-            { tenant: { in: access.tenantIds } }
-          ]
+          and: [{ conversationId: { equals: conversationId } }, { tenant: { in: access.tenantIds } }]
         },
         overrideAccess: true
       })
