@@ -168,12 +168,20 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
     const row = result.rows[0]
     if (!row?.runs) return Response.json({ messages: [] })
 
-    const runs = (typeof row.runs === 'string' ? JSON.parse(row.runs) : row.runs) as Array<{
-      messages?: AgnoMessage[]
-    }>
+    let runs: Array<{ messages?: AgnoMessage[] }> | unknown
+    if (typeof row.runs === 'string') {
+      try {
+        runs = JSON.parse(row.runs)
+      } catch {
+        return Response.json({ messages: [] })
+      }
+    } else {
+      runs = row.runs
+    }
+    if (!Array.isArray(runs)) return Response.json({ messages: [] })
 
     const allMessages: AgnoMessage[] = []
-    for (const run of runs) {
+    for (const run of runs as Array<{ messages?: AgnoMessage[] }>) {
       if (run.messages) allMessages.push(...run.messages)
     }
 
