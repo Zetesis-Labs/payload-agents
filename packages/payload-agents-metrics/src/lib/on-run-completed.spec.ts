@@ -1,10 +1,13 @@
 import type { Payload } from 'payload'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createOnRunCompleted } from './on-run-completed'
 import type { ResolvedMetricsConfig } from '../types'
+import { createOnRunCompleted } from './on-run-completed'
 
 function makePayload() {
-  const create = vi.fn<(args: { collection: string; overrideAccess: boolean; data: Record<string, unknown> }) => Promise<{ id: number }>>()
+  const create =
+    vi.fn<
+      (args: { collection: string; overrideAccess: boolean; data: Record<string, unknown> }) => Promise<{ id: number }>
+    >()
   create.mockResolvedValue({ id: 1 })
   const payload = { create } as unknown as Payload
   return { payload, create }
@@ -97,7 +100,11 @@ describe('onRunCompleted — tokens', () => {
         metrics: {
           input_tokens: 999,
           output_tokens: 999,
-          details: { model: [{ id: 'gpt-4o-mini', provider: 'openai', input_tokens: 100, output_tokens: 50, cache_read_tokens: 20 }] }
+          details: {
+            model: [
+              { id: 'gpt-4o-mini', provider: 'openai', input_tokens: 100, output_tokens: 50, cache_read_tokens: 20 }
+            ]
+          }
         }
       },
       payload
@@ -139,10 +146,7 @@ describe('onRunCompleted — tokens', () => {
   it('derives total_tokens from input+output when not provided', async () => {
     const hook = createOnRunCompleted(baseConfig())
     const { payload, create } = makePayload()
-    await hook(
-      { ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { input_tokens: 10, output_tokens: 5 } },
-      payload
-    )
+    await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { input_tokens: 10, output_tokens: 5 } }, payload)
     const data = create.mock.calls[0]?.[0]?.data
     expect(data?.totalTokens).toBe(15)
   })
@@ -193,14 +197,9 @@ describe('onRunCompleted — latency & cost', () => {
   })
 
   it('honours extraPricing for custom models', async () => {
-    const hook = createOnRunCompleted(
-      baseConfig({ extraPricing: { 'gpt-4o-mini': { input: 1, output: 2 } } })
-    )
+    const hook = createOnRunCompleted(baseConfig({ extraPricing: { 'gpt-4o-mini': { input: 1, output: 2 } } }))
     const { payload, create } = makePayload()
-    await hook(
-      { ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { input_tokens: 1, output_tokens: 1 } },
-      payload
-    )
+    await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { input_tokens: 1, output_tokens: 1 } }, payload)
     const data = create.mock.calls[0]?.[0]?.data
     expect(data?.costUsd).toBe(3)
   })
@@ -218,9 +217,7 @@ describe('onRunCompleted — tenant resolution', () => {
   })
 
   it('includes the resolved tenant in the persisted event when multiTenant is true', async () => {
-    const hook = createOnRunCompleted(
-      baseConfig({ multiTenant: true, resolveTenantId: async () => 7 })
-    )
+    const hook = createOnRunCompleted(baseConfig({ multiTenant: true, resolveTenantId: async () => 7 }))
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
     const data = create.mock.calls[0]?.[0]?.data
@@ -229,9 +226,7 @@ describe('onRunCompleted — tenant resolution', () => {
 
   it('skips persistence when the tenant cannot be resolved in multi-tenant mode', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const hook = createOnRunCompleted(
-      baseConfig({ multiTenant: true, resolveTenantId: async () => null })
-    )
+    const hook = createOnRunCompleted(baseConfig({ multiTenant: true, resolveTenantId: async () => null }))
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
     expect(create).not.toHaveBeenCalled()
@@ -288,9 +283,11 @@ describe('onRunCompleted — error handling', () => {
 
   it('does not propagate when payload.create throws', async () => {
     const hook = createOnRunCompleted(baseConfig())
-    const payload = { create: vi.fn(async () => { throw new Error('db down') }) } as unknown as Payload
-    await expect(
-      hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
-    ).resolves.toBeUndefined()
+    const payload = {
+      create: vi.fn(async () => {
+        throw new Error('db down')
+      })
+    } as unknown as Payload
+    await expect(hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)).resolves.toBeUndefined()
   })
 })

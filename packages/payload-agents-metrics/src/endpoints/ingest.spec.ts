@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { createIngestHandler } from './ingest'
 import type { ResolvedMetricsConfig } from '../types'
+import { createIngestHandler } from './ingest'
 
 function baseConfig(overrides: Partial<ResolvedMetricsConfig> = {}): ResolvedMetricsConfig {
   return {
@@ -26,12 +26,22 @@ function makeReq(options: { secret?: string; body: unknown; badJson?: boolean },
   if (options.secret !== undefined) headers.set('x-internal-secret', options.secret)
   return {
     headers,
-    json: options.badJson ? async () => { throw new SyntaxError('bad json') } : async () => options.body,
+    json: options.badJson
+      ? async () => {
+          throw new SyntaxError('bad json')
+        }
+      : async () => options.body,
     payload: payloadMock
   } as unknown as PayloadRequest
 }
 
-function makePayload(createImpl: (args: { collection: string; overrideAccess: boolean; data: Record<string, unknown> }) => Promise<{ id: number | string }>) {
+function makePayload(
+  createImpl: (args: {
+    collection: string
+    overrideAccess: boolean
+    data: Record<string, unknown>
+  }) => Promise<{ id: number | string }>
+) {
   const create = vi.fn(createImpl)
   return { payload: { create }, create }
 }
@@ -201,7 +211,9 @@ describe('createIngestHandler — batch events', () => {
   })
 
   it('surfaces partial failures in the response without dropping successful ids', async () => {
-    const handler = createIngestHandler(baseConfig({ multiTenant: true, resolveTenantId: async (_, uid) => (uid === 2 ? null : 1) }))
+    const handler = createIngestHandler(
+      baseConfig({ multiTenant: true, resolveTenantId: async (_, uid) => (uid === 2 ? null : 1) })
+    )
     let next = 0
     const { payload } = makePayload(async () => ({ id: ++next }))
     const body = [

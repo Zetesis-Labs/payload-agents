@@ -1,22 +1,17 @@
 import type { BasePayload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  decorateBuckets,
-  getBuckets,
-  getSeries,
-  getTopBuckets,
-  getTotals,
-  type BucketRow
-} from './aggregate-query'
 import type { ResolvedMetricsConfig } from '../types'
+import { type BucketRow, decorateBuckets, getBuckets, getSeries, getTopBuckets, getTotals } from './aggregate-query'
 
-function makePayload(options: {
-  /** Rows returned by every execute() call. Ignored when `executeRowsSequence` is set. */
-  executeRows?: Record<string, unknown>[]
-  /** One array per successive execute() call, in order. */
-  executeRowsSequence?: Array<Record<string, unknown>[]>
-  findDocs?: Record<string, unknown>[]
-} = {}) {
+function makePayload(
+  options: {
+    /** Rows returned by every execute() call. Ignored when `executeRowsSequence` is set. */
+    executeRows?: Record<string, unknown>[]
+    /** One array per successive execute() call, in order. */
+    executeRowsSequence?: Array<Record<string, unknown>[]>
+    findDocs?: Record<string, unknown>[]
+  } = {}
+) {
   const execute = vi.fn<(q: unknown) => Promise<{ rows: Record<string, unknown>[] }>>()
   if (options.executeRowsSequence) {
     for (const rows of options.executeRowsSequence) {
@@ -53,9 +48,7 @@ function baseConfig(overrides: Partial<ResolvedMetricsConfig> = {}): ResolvedMet
 describe('getTotals', () => {
   it('maps snake_case DB columns into camelCase totals', async () => {
     const { payload } = makePayload({
-      executeRows: [
-        { total_tokens: '150', input_tokens: '100', output_tokens: '50', cost_usd: '0.42', events: '7' }
-      ]
+      executeRows: [{ total_tokens: '150', input_tokens: '100', output_tokens: '50', cost_usd: '0.42', events: '7' }]
     })
     const totals = await getTotals(payload, baseConfig(), {})
     expect(totals).toEqual({
@@ -230,21 +223,13 @@ describe('decorateBuckets', () => {
 
   it('prefers user.name, then user.email, then id for user labels', async () => {
     const { payload } = makePayload({
-      findDocs: [
-        { id: 1, name: 'Alice', email: 'a@x' },
-        { id: 2, email: 'b@x' },
-        { id: 3 }
-      ]
+      findDocs: [{ id: 1, name: 'Alice', email: 'a@x' }, { id: 2, email: 'b@x' }, { id: 3 }]
     })
     const out = await decorateBuckets(
       payload,
       baseConfig(),
       ['user'],
-      [
-        bucket({ keys: { user: '1' } }),
-        bucket({ keys: { user: '2' } }),
-        bucket({ keys: { user: '3' } })
-      ]
+      [bucket({ keys: { user: '1' } }), bucket({ keys: { user: '2' } }), bucket({ keys: { user: '3' } })]
     )
     expect(out[0]?.labels.user).toBe('Alice')
     expect(out[1]?.labels.user).toBe('b@x')

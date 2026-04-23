@@ -1,13 +1,15 @@
 import type { BasePayload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { getSessions } from './sessions-query'
 import type { ResolvedMetricsConfig } from '../types'
+import { getSessions } from './sessions-query'
 
-function makePayload(options: {
-  /** One array per successive db.execute call, in order. */
-  executes?: Array<Record<string, unknown>[]>
-  findDocs?: Record<string, unknown>[]
-} = {}) {
+function makePayload(
+  options: {
+    /** One array per successive db.execute call, in order. */
+    executes?: Array<Record<string, unknown>[]>
+    findDocs?: Record<string, unknown>[]
+  } = {}
+) {
   const execute = vi.fn<(q: unknown) => Promise<{ rows: Record<string, unknown>[] }>>()
   for (const rows of options.executes ?? []) {
     execute.mockResolvedValueOnce({ rows })
@@ -147,20 +149,12 @@ describe('getSessions — session row mapping', () => {
 describe('getSessions — label resolution', () => {
   it('resolves userLabel from name → email → id', async () => {
     const { payload } = makePayload({
-      executes: plan(
-        3,
-        {},
-        [
-          { conversation_id: 'a', user_id: 1, tenant_id: 0, first_run_at: null, last_run_at: null },
-          { conversation_id: 'b', user_id: 2, tenant_id: 0, first_run_at: null, last_run_at: null },
-          { conversation_id: 'c', user_id: 3, tenant_id: 0, first_run_at: null, last_run_at: null }
-        ]
-      ),
-      findDocs: [
-        { id: 1, name: 'Alice', email: 'a@x' },
-        { id: 2, email: 'b@x' },
-        { id: 3 }
-      ]
+      executes: plan(3, {}, [
+        { conversation_id: 'a', user_id: 1, tenant_id: 0, first_run_at: null, last_run_at: null },
+        { conversation_id: 'b', user_id: 2, tenant_id: 0, first_run_at: null, last_run_at: null },
+        { conversation_id: 'c', user_id: 3, tenant_id: 0, first_run_at: null, last_run_at: null }
+      ]),
+      findDocs: [{ id: 1, name: 'Alice', email: 'a@x' }, { id: 2, email: 'b@x' }, { id: 3 }]
     })
     const result = await getSessions(payload, baseConfig(), {}, 1)
     expect(result.sessions[0]?.userLabel).toBe('Alice')
@@ -170,14 +164,10 @@ describe('getSessions — label resolution', () => {
 
   it('resolves tenantLabel from name, falling back to id', async () => {
     const { payload } = makePayload({
-      executes: plan(
-        2,
-        {},
-        [
-          { conversation_id: 'a', user_id: 0, tenant_id: 7, first_run_at: null, last_run_at: null },
-          { conversation_id: 'b', user_id: 0, tenant_id: 8, first_run_at: null, last_run_at: null }
-        ]
-      ),
+      executes: plan(2, {}, [
+        { conversation_id: 'a', user_id: 0, tenant_id: 7, first_run_at: null, last_run_at: null },
+        { conversation_id: 'b', user_id: 0, tenant_id: 8, first_run_at: null, last_run_at: null }
+      ]),
       findDocs: [{ id: 7, name: 'Acme' }]
       // tenant 8 is not returned → falls back to '8'
     })
