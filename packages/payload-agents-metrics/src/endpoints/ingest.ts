@@ -126,11 +126,14 @@ async function persistEvent(
   }
   if (tenantId !== undefined) data.tenant = tenantId
 
-  const doc = await payload.create({
-    collection: config.collectionSlug,
-    overrideAccess: true,
-    data
-  })
-
-  return { ok: true, id: doc.id as number | string }
+  try {
+    const doc = await payload.create({
+      collection: config.collectionSlug,
+      overrideAccess: true,
+      data
+    })
+    return { ok: true, id: doc.id as number | string }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
