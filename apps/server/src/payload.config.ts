@@ -52,7 +52,9 @@ export default buildConfig({
       runtimeSecret: process.env.INTERNAL_SECRET,
       getDailyLimit,
       encryptionKey: process.env.PAYLOAD_SECRET,
-      basePath: '/chat'
+      basePath: '/chat',
+      mediaCollectionSlug: 'media',
+      taxonomyCollectionSlug: 'taxonomy'
     })
   ]
 })

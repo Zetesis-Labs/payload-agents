@@ -258,6 +258,10 @@ export interface Agent {
    */
   apiKey: string;
   /**
+   * Last 4 characters of the API key (auto-computed)
+   */
+  apiKeyFingerprint?: string | null;
+  /**
    * System prompt that defines the agent personality and constraints
    */
   systemPrompt: string;
@@ -484,6 +488,7 @@ export interface AgentsSelect<T extends boolean = true> {
   isActive?: T;
   llmModel?: T;
   apiKey?: T;
+  apiKeyFingerprint?: T;
   systemPrompt?: T;
   toolCallLimit?: T;
   searchCollections?: T;
