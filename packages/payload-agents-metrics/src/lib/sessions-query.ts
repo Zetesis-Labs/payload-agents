@@ -63,7 +63,6 @@ export async function getSessions(
   const db = getDrizzle(payload)
   const where = buildWhere(filters)
   const table = getTable(config)
-  const offset = (page - 1) * PAGE_SIZE
 
   const countResult = await db.execute(sql`
     SELECT COUNT(DISTINCT conversation_id)::bigint AS total
@@ -72,6 +71,9 @@ export async function getSessions(
   `)
   const totalSessions = Number(countResult.rows[0]?.total ?? 0)
   const totalPages = Math.max(1, Math.ceil(totalSessions / PAGE_SIZE))
+  const requestedPage = Number.isFinite(page) ? page : 1
+  const safePage = Math.min(Math.max(1, requestedPage), totalPages)
+  const offset = (safePage - 1) * PAGE_SIZE
 
   const totalsResult = await db.execute(sql`
     SELECT
@@ -139,7 +141,9 @@ export async function getSessions(
   }
 
   // First messages from Agno
-  const conversationIds = rawSessions.map(r => String(r.conversation_id)).filter(Boolean)
+  const conversationIds = rawSessions
+    .filter(r => r.conversation_id != null && r.conversation_id !== '')
+    .map(r => String(r.conversation_id))
   const firstMessages = await batchFetchFirstMessages(db, conversationIds)
 
   const sessions: SessionRow[] = rawSessions.map(r => {
@@ -178,7 +182,7 @@ export async function getSessions(
       costUsd: Number(totalsRow.cost_usd ?? 0),
       totalTokens: Number(totalsRow.total_tokens ?? 0)
     },
-    page,
+    page: safePage,
     totalPages
   }
 }
@@ -200,9 +204,16 @@ async function batchFetchFirstMessages(db: DrizzleLike, conversationIds: string[
 
   for (const row of rows.rows) {
     const sessionId = String(row.session_id)
-    const runs = (typeof row.runs === 'string' ? JSON.parse(row.runs) : row.runs) as Array<{
-      messages?: Array<{ role: string; content: unknown }>
-    }> | null
+    let runs: Array<{ messages?: Array<{ role: string; content: unknown }> }> | null
+    if (typeof row.runs === 'string') {
+      try {
+        runs = JSON.parse(row.runs)
+      } catch {
+        continue
+      }
+    } else {
+      runs = row.runs as Array<{ messages?: Array<{ role: string; content: unknown }> }> | null
+    }
 
     if (!runs) continue
     for (const run of runs) {
