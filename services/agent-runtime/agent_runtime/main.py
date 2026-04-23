@@ -38,7 +38,11 @@ from agent_runtime.exceptions import (
 )
 from agent_runtime.health import router as health_router
 from agent_runtime.logging import configure_logging, get_logger
-from agent_runtime.middleware import InternalAuthMiddleware, RequestIdMiddleware, SessionMetadataMiddleware
+from agent_runtime.middleware import (
+    InternalAuthMiddleware,
+    RequestIdMiddleware,
+    SessionMetadataMiddleware,
+)
 from agent_runtime.registry import AgentRegistry
 from agent_runtime.reload_listener import run_reload_listener
 from agent_runtime.schemas import ErrorResponse, ReloadResponse
