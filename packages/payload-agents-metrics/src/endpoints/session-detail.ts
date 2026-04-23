@@ -38,7 +38,10 @@ function getToonDecode(): Promise<((s: string) => unknown) | null> {
   if (!toonDecodePromise) {
     toonDecodePromise = import('@toon-format/toon')
       .then(mod => (mod as { decode: (s: string) => unknown }).decode)
-      .catch(() => null)
+      .catch(err => {
+        console.warn('[metrics] @toon-format/toon failed to load; tool-call sources disabled:', err)
+        return null
+      })
   }
   return toonDecodePromise
 }
@@ -64,7 +67,8 @@ async function extractSources(
           type: (it.collection || 'posts_chunk').replace(/_chunk$/, '')
         }
       })
-  } catch {
+  } catch (err) {
+    console.warn('[metrics] Failed to extract tool-call sources:', err instanceof Error ? err.message : err)
     return []
   }
 }
@@ -158,7 +162,7 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
 
     const db = getDrizzle(payload)
     const result = await db.execute(sql`
-      SELECT runs FROM agno.agno_sessions WHERE session_id = ${conversationId} LIMIT 1
+      SELECT runs FROM ${sql.raw(config.agnoSessionsTable)} WHERE session_id = ${conversationId} LIMIT 1
     `)
 
     const row = result.rows[0]

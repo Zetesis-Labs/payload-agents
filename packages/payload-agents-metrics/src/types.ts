@@ -59,6 +59,13 @@ export interface MetricsPluginConfig {
 
   /** Extra model pricing (merged with built-in table). `{ input, output }` in USD per token. */
   extraPricing?: Record<string, { input: number; output: number }>
+
+  /**
+   * Fully-qualified Agno sessions table used to resolve conversation detail and
+   * first-message previews. Default: `'agno.agno_sessions'`. Override if your
+   * Agno deployment uses a different schema or table name.
+   */
+  agnoSessionsTable?: string
 }
 
 /** Internal resolved config with all defaults applied. */
@@ -74,4 +81,5 @@ export interface ResolvedMetricsConfig {
   agentsSlug: string
   collectionOverrides: MetricsPluginConfig['collectionOverrides']
   extraPricing: Record<string, { input: number; output: number }>
+  agnoSessionsTable: string
 }

@@ -26,7 +26,8 @@ function resolveConfig(userConfig: MetricsPluginConfig): ResolvedMetricsConfig {
     tenantsSlug: userConfig.tenantsSlug ?? 'tenants',
     agentsSlug: userConfig.agentsSlug ?? 'agents',
     collectionOverrides: userConfig.collectionOverrides,
-    extraPricing: userConfig.extraPricing ?? {}
+    extraPricing: userConfig.extraPricing ?? {},
+    agnoSessionsTable: userConfig.agnoSessionsTable ?? 'agno.agno_sessions'
   }
 }
 

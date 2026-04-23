@@ -144,7 +144,7 @@ export async function getSessions(
   const conversationIds = rawSessions
     .filter(r => r.conversation_id != null && r.conversation_id !== '')
     .map(r => String(r.conversation_id))
-  const firstMessages = await batchFetchFirstMessages(db, conversationIds)
+  const firstMessages = await batchFetchFirstMessages(db, conversationIds, config.agnoSessionsTable)
 
   const sessions: SessionRow[] = rawSessions.map(r => {
     const convId = String(r.conversation_id ?? '')
@@ -187,7 +187,11 @@ export async function getSessions(
   }
 }
 
-async function batchFetchFirstMessages(db: DrizzleLike, conversationIds: string[]): Promise<Map<string, string>> {
+async function batchFetchFirstMessages(
+  db: DrizzleLike,
+  conversationIds: string[],
+  agnoSessionsTable: string
+): Promise<Map<string, string>> {
   const result = new Map<string, string>()
   if (conversationIds.length === 0) return result
 
@@ -198,7 +202,7 @@ async function batchFetchFirstMessages(db: DrizzleLike, conversationIds: string[
 
   const rows = await db.execute(sql`
     SELECT session_id, runs
-    FROM agno.agno_sessions
+    FROM ${sql.raw(agnoSessionsTable)}
     WHERE ${inClause}
   `)
 
