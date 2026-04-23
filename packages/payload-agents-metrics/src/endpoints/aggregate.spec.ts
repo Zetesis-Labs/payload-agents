@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { createAggregateHandler } from './aggregate'
 import type { ResolvedMetricsConfig } from '../types'
+import { createAggregateHandler } from './aggregate'
 
 function baseConfig(overrides: Partial<ResolvedMetricsConfig> = {}): ResolvedMetricsConfig {
   return {

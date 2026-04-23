@@ -65,7 +65,6 @@ describe('getSessions — single-tenant mode', () => {
     expect(result.sessions[0]?.tenantLabel).toBe('')
   })
 
-
   it('does not mention tenant_id in the sessions SQL when multiTenant is false', async () => {
     const { payload, execute } = makePayload({ executes: plan(0, {}, []) })
     await getSessions(payload, baseConfig({ multiTenant: false }), {}, 1)
