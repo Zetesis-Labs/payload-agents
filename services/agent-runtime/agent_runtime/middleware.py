@@ -128,7 +128,7 @@ class SessionMetadataMiddleware:
 def _header(scope: Scope, name: bytes) -> str:
     for key, value in scope.get("headers", []):
         if key == name:
-            return value.decode()
+            return bytes(value).decode()
     return ""
 
 
