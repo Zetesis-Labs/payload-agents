@@ -1,7 +1,11 @@
+import type { SQL } from 'drizzle-orm'
+import { PgDialect } from 'drizzle-orm/pg-core'
 import type { BasePayload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { ResolvedMetricsConfig } from '../types'
 import { getSessions } from './sessions-query'
+
+const dialect = new PgDialect()
 
 function makePayload(
   options: {
@@ -51,6 +55,25 @@ function plan(
 ) {
   return [[{ total: String(countTotal) }], [totals], sessions, agnoRows]
 }
+
+describe('getSessions — single-tenant mode', () => {
+  it('does not mention tenant_id in the sessions SQL when multiTenant is false', async () => {
+    const { payload, execute } = makePayload({ executes: plan(0, {}, []) })
+    await getSessions(payload, baseConfig({ multiTenant: false }), {}, 1)
+    // Query index 2 is the main sessions SELECT/GROUP BY.
+    const sessionsQuery = execute.mock.calls[2]?.[0]
+    const { sql } = dialect.sqlToQuery(sessionsQuery as SQL<unknown>)
+    expect(sql).not.toContain('tenant_id')
+  })
+
+  it('keeps tenant_id in the SQL when multiTenant is true', async () => {
+    const { payload, execute } = makePayload({ executes: plan(0, {}, []) })
+    await getSessions(payload, baseConfig({ multiTenant: true }), {}, 1)
+    const sessionsQuery = execute.mock.calls[2]?.[0]
+    const { sql } = dialect.sqlToQuery(sessionsQuery as SQL<unknown>)
+    expect(sql).toContain('tenant_id')
+  })
+})
 
 describe('getSessions — totals', () => {
   it('maps the totals row into camelCase', async () => {

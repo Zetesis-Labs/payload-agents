@@ -86,9 +86,15 @@ export async function getSessions(
   `)
   const totalsRow = totalsResult.rows[0] || {}
 
+  // When multiTenant is false the collection has no `tenant` field, so the
+  // column does not exist in the table. Skip it in the SELECT/GROUP BY instead
+  // of crashing the query.
+  const tenantSelect = config.multiTenant ? sql`tenant_id,` : sql``
+  const tenantGroup = config.multiTenant ? sql`, tenant_id` : sql``
+
   const sessionsResult = await db.execute(sql`
     SELECT
-      conversation_id, agent_slug, model, user_id, tenant_id,
+      conversation_id, agent_slug, model, user_id, ${tenantSelect}
       COUNT(*)::bigint AS runs,
       COALESCE(SUM(total_tokens), 0)::bigint AS total_tokens,
       COALESCE(SUM(input_tokens), 0)::bigint AS input_tokens,
@@ -100,7 +106,7 @@ export async function getSessions(
       COUNT(*) FILTER (WHERE status = 'error')::bigint AS errors
     FROM ${sql.raw(`"${table}"`)}
     WHERE ${where}
-    GROUP BY conversation_id, agent_slug, model, user_id, tenant_id
+    GROUP BY conversation_id, agent_slug, model, user_id${tenantGroup}
     ORDER BY MAX(completed_at) DESC NULLS LAST
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
   `)

@@ -20,10 +20,14 @@ const VALID_GROUP_BY = new Set<GroupBy>([
   'day'
 ])
 
-function parseGroupBy(value: string | null): GroupBy[] {
-  if (!value) return ['tenant']
+function parseGroupBy(value: string | null, multiTenant: boolean): GroupBy[] {
+  const defaultGroup: GroupBy = multiTenant ? 'tenant' : 'agent'
+  if (!value) return [defaultGroup]
   const parts = value.split(',').filter((v): v is GroupBy => VALID_GROUP_BY.has(v as GroupBy))
-  return parts.length > 0 ? parts : ['tenant']
+  // When multiTenant is false the `tenant` column does not exist in the table;
+  // silently drop the dimension instead of crashing the query.
+  const scoped = multiTenant ? parts : parts.filter(g => g !== 'tenant')
+  return scoped.length > 0 ? scoped : [defaultGroup]
 }
 
 export function createAggregateHandler(config: ResolvedMetricsConfig): PayloadHandler {
@@ -35,7 +39,7 @@ export function createAggregateHandler(config: ResolvedMetricsConfig): PayloadHa
     if (!access) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
     const url = new URL(req.url || '', 'http://localhost')
-    const groupBy = parseGroupBy(url.searchParams.get('groupBy'))
+    const groupBy = parseGroupBy(url.searchParams.get('groupBy'), config.multiTenant)
     const from = url.searchParams.get('from') ?? undefined
     const to = url.searchParams.get('to') ?? undefined
     const tenantIdParam = url.searchParams.get('tenantId')
