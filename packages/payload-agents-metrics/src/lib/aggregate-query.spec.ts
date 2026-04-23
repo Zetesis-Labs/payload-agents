@@ -11,16 +11,19 @@ import {
 import type { ResolvedMetricsConfig } from '../types'
 
 function makePayload(options: {
-  executeRows?: Record<string, unknown>[] | Array<Record<string, unknown>[]>
+  /** Rows returned by every execute() call. Ignored when `executeRowsSequence` is set. */
+  executeRows?: Record<string, unknown>[]
+  /** One array per successive execute() call, in order. */
+  executeRowsSequence?: Array<Record<string, unknown>[]>
   findDocs?: Record<string, unknown>[]
 } = {}) {
   const execute = vi.fn<(q: unknown) => Promise<{ rows: Record<string, unknown>[] }>>()
-  if (Array.isArray(options.executeRows) && Array.isArray(options.executeRows[0])) {
-    for (const rows of options.executeRows as Array<Record<string, unknown>[]>) {
+  if (options.executeRowsSequence) {
+    for (const rows of options.executeRowsSequence) {
       execute.mockResolvedValueOnce({ rows })
     }
   } else {
-    execute.mockResolvedValue({ rows: (options.executeRows as Record<string, unknown>[]) ?? [] })
+    execute.mockResolvedValue({ rows: options.executeRows ?? [] })
   }
   const find = vi.fn(async () => ({ docs: options.findDocs ?? [] }))
   const payload = {
@@ -130,7 +133,7 @@ describe('getBuckets — pagination', () => {
 
   it('reports totalBuckets/totalPages from the count query', async () => {
     const { payload } = makePayload({
-      executeRows: [[{ total: '120' }], []] // count=120, main=empty
+      executeRowsSequence: [[{ total: '120' }], []] // count=120, main=empty
     })
     const result = await getBuckets(payload, baseConfig(), ['agent'], {})
     expect(result.totalBuckets).toBe(120)
@@ -139,7 +142,7 @@ describe('getBuckets — pagination', () => {
 
   it('clamps a page above totalPages to the last page', async () => {
     const { payload } = makePayload({
-      executeRows: [[{ total: '25' }], []] // count=25 → 1 page
+      executeRowsSequence: [[{ total: '25' }], []] // count=25 → 1 page
     })
     const result = await getBuckets(payload, baseConfig(), ['agent'], {}, 999)
     expect(result.page).toBe(1)
@@ -147,7 +150,7 @@ describe('getBuckets — pagination', () => {
 
   it('clamps a page below 1 to page 1', async () => {
     const { payload } = makePayload({
-      executeRows: [[{ total: '25' }], []]
+      executeRowsSequence: [[{ total: '25' }], []]
     })
     const result = await getBuckets(payload, baseConfig(), ['agent'], {}, 0)
     expect(result.page).toBe(1)
@@ -155,7 +158,7 @@ describe('getBuckets — pagination', () => {
 
   it('issues exactly two queries: count and main', async () => {
     const { payload, execute } = makePayload({
-      executeRows: [[{ total: '0' }], []]
+      executeRowsSequence: [[{ total: '0' }], []]
     })
     await getBuckets(payload, baseConfig(), ['agent'], {})
     expect(execute).toHaveBeenCalledTimes(2)

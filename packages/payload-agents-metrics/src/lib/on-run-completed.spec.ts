@@ -4,7 +4,8 @@ import { createOnRunCompleted } from './on-run-completed'
 import type { ResolvedMetricsConfig } from '../types'
 
 function makePayload() {
-  const create = vi.fn(async () => ({ id: 1 }))
+  const create = vi.fn<(args: { collection: string; overrideAccess: boolean; data: Record<string, unknown> }) => Promise<{ id: number }>>()
+  create.mockResolvedValue({ id: 1 })
   const payload = { create } as unknown as Payload
   return { payload, create }
 }
@@ -39,9 +40,9 @@ describe('onRunCompleted — provider & model resolution', () => {
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o', metrics: {} }, payload)
     expect(create).toHaveBeenCalledOnce()
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.provider).toBe('openai')
-    expect(data.data.model).toBe('gpt-4o')
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.provider).toBe('openai')
+    expect(data?.model).toBe('gpt-4o')
   })
 
   it('falls back to metrics.details.model[0] when ctx.llmModel is not prefixed', async () => {
@@ -55,9 +56,9 @@ describe('onRunCompleted — provider & model resolution', () => {
       },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.provider).toBe('openai')
-    expect(data.data.model).toBe('gpt-4o')
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.provider).toBe('openai')
+    expect(data?.model).toBe('gpt-4o')
   })
 
   it('uses metrics.details.model[0] entirely when ctx.llmModel is absent', async () => {
@@ -70,9 +71,9 @@ describe('onRunCompleted — provider & model resolution', () => {
       },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.provider).toBe('anthropic')
-    expect(data.data.model).toBe('claude-sonnet-4-6')
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.provider).toBe('anthropic')
+    expect(data?.model).toBe('claude-sonnet-4-6')
   })
 
   it('skips persistence when the provider cannot be normalised', async () => {
@@ -101,10 +102,10 @@ describe('onRunCompleted — tokens', () => {
       },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.inputTokens).toBe(100)
-    expect(data.data.outputTokens).toBe(50)
-    expect(data.data.cachedInputTokens).toBe(20)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.inputTokens).toBe(100)
+    expect(data?.outputTokens).toBe(50)
+    expect(data?.cachedInputTokens).toBe(20)
   })
 
   it('falls back to metrics-level token counts when the detail has none', async () => {
@@ -114,10 +115,10 @@ describe('onRunCompleted — tokens', () => {
       { ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { input_tokens: 70, output_tokens: 30 } },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.inputTokens).toBe(70)
-    expect(data.data.outputTokens).toBe(30)
-    expect(data.data.cachedInputTokens).toBe(0)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.inputTokens).toBe(70)
+    expect(data?.outputTokens).toBe(30)
+    expect(data?.cachedInputTokens).toBe(0)
   })
 
   it('uses explicit metrics.total_tokens when provided', async () => {
@@ -131,8 +132,8 @@ describe('onRunCompleted — tokens', () => {
       },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.totalTokens).toBe(123)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.totalTokens).toBe(123)
   })
 
   it('derives total_tokens from input+output when not provided', async () => {
@@ -142,19 +143,19 @@ describe('onRunCompleted — tokens', () => {
       { ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { input_tokens: 10, output_tokens: 5 } },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.totalTokens).toBe(15)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.totalTokens).toBe(15)
   })
 
   it('defaults every token count to 0 when metrics are empty', async () => {
     const hook = createOnRunCompleted(baseConfig())
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.inputTokens).toBe(0)
-    expect(data.data.outputTokens).toBe(0)
-    expect(data.data.cachedInputTokens).toBe(0)
-    expect(data.data.totalTokens).toBe(0)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.inputTokens).toBe(0)
+    expect(data?.outputTokens).toBe(0)
+    expect(data?.cachedInputTokens).toBe(0)
+    expect(data?.totalTokens).toBe(0)
   })
 })
 
@@ -163,16 +164,16 @@ describe('onRunCompleted — latency & cost', () => {
     const hook = createOnRunCompleted(baseConfig())
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { duration: 1.2345 } }, payload)
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.latencyMs).toBe(1235)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.latencyMs).toBe(1235)
   })
 
   it('leaves latencyMs undefined when duration is missing', async () => {
     const hook = createOnRunCompleted(baseConfig())
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.latencyMs).toBeUndefined()
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.latencyMs).toBeUndefined()
   })
 
   it('computes costUsd from provider/model + token counts', async () => {
@@ -187,8 +188,8 @@ describe('onRunCompleted — latency & cost', () => {
       },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.costUsd).toBeCloseTo(0.75, 6)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.costUsd).toBeCloseTo(0.75, 6)
   })
 
   it('honours extraPricing for custom models', async () => {
@@ -200,8 +201,8 @@ describe('onRunCompleted — latency & cost', () => {
       { ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: { input_tokens: 1, output_tokens: 1 } },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.costUsd).toBe(3)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.costUsd).toBe(3)
   })
 })
 
@@ -212,8 +213,8 @@ describe('onRunCompleted — tenant resolution', () => {
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
     expect(resolveTenantId).not.toHaveBeenCalled()
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.tenant).toBeUndefined()
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.tenant).toBeUndefined()
   })
 
   it('includes the resolved tenant in the persisted event when multiTenant is true', async () => {
@@ -222,8 +223,8 @@ describe('onRunCompleted — tenant resolution', () => {
     )
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.tenant).toBe(7)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.tenant).toBe(7)
   })
 
   it('skips persistence when the tenant cannot be resolved in multi-tenant mode', async () => {
@@ -243,9 +244,9 @@ describe('onRunCompleted — persistence shape', () => {
     const hook = createOnRunCompleted(baseConfig({ collectionSlug: 'custom-events' }))
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
-    const call = create.mock.calls[0]?.[0] as { collection: string; overrideAccess: boolean }
-    expect(call.collection).toBe('custom-events')
-    expect(call.overrideAccess).toBe(true)
+    const call = create.mock.calls[0]?.[0]
+    expect(call?.collection).toBe('custom-events')
+    expect(call?.overrideAccess).toBe(true)
   })
 
   it('carries ctx fields (user, agentSlug, conversationId, runId, apiKeyFingerprint)', async () => {
@@ -261,22 +262,22 @@ describe('onRunCompleted — persistence shape', () => {
       },
       payload
     )
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.user).toBe(42)
-    expect(data.data.agentSlug).toBe('bastos')
-    expect(data.data.conversationId).toBe('session-abc')
-    expect(data.data.runId).toBe('run-123')
-    expect(data.data.apiKeyFingerprint).toBe('ABCD')
-    expect(data.data.status).toBe('success')
-    expect(data.data.apiKeySource).toBe('agent')
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.user).toBe(42)
+    expect(data?.agentSlug).toBe('bastos')
+    expect(data?.conversationId).toBe('session-abc')
+    expect(data?.runId).toBe('run-123')
+    expect(data?.apiKeyFingerprint).toBe('ABCD')
+    expect(data?.status).toBe('success')
+    expect(data?.apiKeySource).toBe('agent')
   })
 
   it('stamps completedAt as an ISO string', async () => {
     const hook = createOnRunCompleted(baseConfig())
     const { payload, create } = makePayload()
     await hook({ ...baseCtx, llmModel: 'openai/gpt-4o-mini', metrics: {} }, payload)
-    const data = create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(data.data.completedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data?.completedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
   })
 })
 
