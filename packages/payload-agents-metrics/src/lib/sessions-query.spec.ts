@@ -57,6 +57,15 @@ function plan(
 }
 
 describe('getSessions — single-tenant mode', () => {
+  it('exposes tenantId=0 and empty tenantLabel when the row has no tenant_id', async () => {
+    const rowNoTenant = { conversation_id: 'a', user_id: 1, first_run_at: null, last_run_at: null }
+    const { payload } = makePayload({ executes: plan(1, {}, [rowNoTenant]) })
+    const result = await getSessions(payload, baseConfig({ multiTenant: false }), {}, 1)
+    expect(result.sessions[0]?.tenantId).toBe(0)
+    expect(result.sessions[0]?.tenantLabel).toBe('')
+  })
+
+
   it('does not mention tenant_id in the sessions SQL when multiTenant is false', async () => {
     const { payload, execute } = makePayload({ executes: plan(0, {}, []) })
     await getSessions(payload, baseConfig({ multiTenant: false }), {}, 1)
