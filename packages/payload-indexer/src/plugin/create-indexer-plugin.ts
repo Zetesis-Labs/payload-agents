@@ -173,7 +173,11 @@ function injectSyncStatusField(
     const tableConfigs = indexedCollections[collection.slug]
     if (!tableConfigs) return collection
 
-    const defaultColumns = syncConfig?.defaultColumns ?? collection.admin?.defaultColumns
+    // Per-collection `admin.defaultColumns` wins over the global sync default
+    // — the global is a fallback for collections that haven't picked their
+    // own admin columns. Inverting this would silently override every
+    // collection's bespoke list (filename/parse_status for documents, etc).
+    const defaultColumns = collection.admin?.defaultColumns ?? syncConfig?.defaultColumns
 
     return {
       ...collection,
