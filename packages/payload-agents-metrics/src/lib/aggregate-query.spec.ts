@@ -41,6 +41,7 @@ function baseConfig(overrides: Partial<ResolvedMetricsConfig> = {}): ResolvedMet
     agentsSlug: 'agents',
     collectionOverrides: undefined,
     extraPricing: {},
+    agnoSessionsTable: 'agno.agno_sessions',
     ...overrides
   }
 }
