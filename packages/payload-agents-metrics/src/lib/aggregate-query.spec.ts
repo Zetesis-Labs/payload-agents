@@ -150,6 +150,14 @@ describe('getBuckets — pagination', () => {
     expect(result.page).toBe(1)
   })
 
+  it('clamps NaN page to page 1 (avoids OFFSET NaN in SQL)', async () => {
+    const { payload } = makePayload({
+      executeRowsSequence: [[{ total: '25' }], []]
+    })
+    const result = await getBuckets(payload, baseConfig(), ['agent'], {}, Number.NaN)
+    expect(result.page).toBe(1)
+  })
+
   it('issues exactly two queries: count and main', async () => {
     const { payload, execute } = makePayload({
       executeRowsSequence: [[{ total: '0' }], []]

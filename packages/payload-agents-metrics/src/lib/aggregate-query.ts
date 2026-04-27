@@ -171,7 +171,8 @@ export async function getBuckets(
   `)
   const totalBuckets = Number(countResult.rows[0]?.total ?? 0)
   const totalPages = Math.max(1, Math.ceil(totalBuckets / BUCKETS_PAGE_SIZE))
-  const safePage = Math.min(Math.max(1, page), totalPages)
+  const requestedPage = Number.isFinite(page) ? page : 1
+  const safePage = Math.min(Math.max(1, requestedPage), totalPages)
   const offset = (safePage - 1) * BUCKETS_PAGE_SIZE
 
   const result = await db.execute(sql`
