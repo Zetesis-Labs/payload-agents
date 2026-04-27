@@ -1,5 +1,13 @@
 # @zetesis/payload-indexer
 
+## 0.2.3
+
+### Patch Changes
+
+- [#28](https://github.com/Zetesis-Labs/PayloadAgents/pull/28) [`c67fece`](https://github.com/Zetesis-Labs/PayloadAgents/commit/c67fecedd3ecd05e500fdbeada5a938bf10be191) Thanks [@Fiser12](https://github.com/Fiser12)! - Fix `defaultColumns` precedence so the per-collection `admin.defaultColumns` wins over the global `syncConfig.defaultColumns` (the global is now a fallback for collections that haven't picked their own list).
+
+  Previously the global default silently overrode every indexed collection — e.g. `@zetesis/payload-documents` ships `['filename', 'parse_status', 'parsed_at']` but the host's global `['title', '_syncStatus', 'slug', 'categorias']` was applied instead, leaving only `_syncStatus` rendered (the other columns don't exist on the documents schema).
+
 ## 0.2.2
 
 ### Patch Changes
