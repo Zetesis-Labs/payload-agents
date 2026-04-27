@@ -9,11 +9,22 @@
 import type { PayloadHandler, Where } from 'payload'
 import type { ResolvedPluginConfig } from '../types'
 
+function pickStringField(record: object, field: string): string | undefined {
+  if (!(field in record)) return undefined
+  const value = (record as Record<string, unknown>)[field]
+  return typeof value === 'string' ? value : undefined
+}
+
 function extractAvatarUrl(avatar: unknown): string | undefined {
   if (!avatar || typeof avatar !== 'object') return undefined
-  const media = avatar as Record<string, unknown>
-  const sizes = media.sizes as Record<string, { url?: string }> | undefined
-  return sizes?.avatar?.url ?? (media.url as string | undefined) ?? undefined
+  if ('sizes' in avatar && avatar.sizes && typeof avatar.sizes === 'object') {
+    const sizes = avatar.sizes as Record<string, unknown>
+    if (sizes.avatar && typeof sizes.avatar === 'object') {
+      const url = pickStringField(sizes.avatar, 'url')
+      if (url) return url
+    }
+  }
+  return pickStringField(avatar, 'url')
 }
 
 export function createAgentsListHandler(config: ResolvedPluginConfig): PayloadHandler {

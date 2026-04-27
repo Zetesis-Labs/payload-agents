@@ -49,12 +49,14 @@ async function extractSources(
   if (!decode) return []
   try {
     const data = decode(result)
-    const hits = Array.isArray(data)
-      ? data
-      : data && typeof data === 'object' && Array.isArray((data as { hits?: unknown }).hits)
-        ? (data as { hits: unknown[] }).hits
-        : null
-    if (!hits) return []
+    let hits: unknown[]
+    if (Array.isArray(data)) {
+      hits = data
+    } else if (data && typeof data === 'object' && 'hits' in data && Array.isArray(data.hits)) {
+      hits = data.hits
+    } else {
+      return []
+    }
     const sources: Array<{ id: string; title: string; slug: string; type: string }> = []
     for (const h of hits) {
       if (!h || typeof h !== 'object' || !('chunk_id' in h)) continue

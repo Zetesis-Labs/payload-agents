@@ -51,6 +51,44 @@ export const AgnoSessionDetailSchema = z.object({
   updated_at: z.string().optional()
 })
 
+// ── SSE event shapes (Agno streaming wire format) ─────────────────────────
+//
+// Internal — the SSE translator reads these fields off arbitrary JSON
+// frames. We keep them as TS interfaces (no Zod) because the SSE pipe is
+// hot-path and the field-by-field guards in the translator already protect
+// against malformed inputs. Declaring the shapes here avoids the
+// `parsed.tool as Record<string, unknown>` cast at every call site.
+
+export interface AgnoSseTool {
+  tool_call_id?: string
+  tool_name?: string
+  tool_args?: unknown
+  result?: unknown
+}
+
+export interface AgnoSseMetrics {
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_tokens?: number
+  total_tokens?: number
+  duration?: number
+  reasoning_tokens?: number
+  /**
+   * Index signature so consumers (e.g. `RunCompletedContext.metrics`) keep
+   * generic field access without the package having to enumerate every
+   * Agno metric. Known fields are typed; unknown ones are `unknown`.
+   */
+  [key: string]: unknown
+}
+
+export interface AgnoSseFrame {
+  event?: string
+  content?: string
+  run_id?: string
+  tool?: AgnoSseTool
+  metrics?: AgnoSseMetrics
+}
+
 // ── Inferred types — keep schema and type in lockstep ─────────────────────
 
 export type AgnoToolCall = z.infer<typeof AgnoToolCallSchema>

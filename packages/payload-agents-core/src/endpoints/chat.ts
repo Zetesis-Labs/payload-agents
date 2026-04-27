@@ -26,8 +26,23 @@ const ChatRequestSchema = z.object({
 
 const SERVICE_UNAVAILABLE = { error: 'AI service temporarily unavailable' }
 
+/**
+ * Subset of an Agent document that core needs to read at runtime.
+ *
+ * Each consumer's Agent collection has a different shape (custom fields,
+ * tenant relations, etc.) and the package can't reference the consumer's
+ * generated types. This interface declares what *core* depends on; the
+ * `payload.find` boundary cast lives at one site.
+ */
+interface AgentDoc {
+  slug: string
+  isActive?: boolean
+  llmModel?: string
+  apiKeyFingerprint?: string
+}
+
 interface RunCallbackContext {
-  agent: Record<string, unknown>
+  agent: AgentDoc
   userId: string | number
   agentSlug: string
   sessionId: string
@@ -40,8 +55,7 @@ function buildOnRunCompleted(
 ): OnStreamRunCompleted | undefined {
   if (!config.onRunCompleted) return undefined
   const cb = config.onRunCompleted
-  const llmModel = (ctx.agent.llmModel as string) || undefined
-  const apiKeyFingerprint = (ctx.agent.apiKeyFingerprint as string) || undefined
+  const { llmModel, apiKeyFingerprint } = ctx.agent
   return data => {
     Promise.resolve(
       cb(
@@ -134,8 +148,10 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
       req
     })
 
-    const agent = agents[0] as Record<string, unknown> | undefined
-    if (!agent) {
+    // The package can't reference the consumer's typed Agent doc, so we
+    // narrow once here to the subset core actually reads. See AgentDoc.
+    const agent = agents[0] as unknown as AgentDoc | undefined
+    if (!agent || typeof agent.slug !== 'string') {
       return Response.json({ error: 'Agent not found' }, { status: 404 })
     }
 
@@ -161,7 +177,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Session ID ──────────────────────────────────────────────────────
-    const agentSlugValue = agent.slug as string
+    const agentSlugValue = agent.slug
     if (chatId) {
       const ok = await config.validateSessionOwnership(chatId, { user, payload, req })
       if (!ok) return Response.json({ error: 'Forbidden' }, { status: 403 })
