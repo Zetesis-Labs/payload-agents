@@ -71,7 +71,7 @@ export interface MetricsPluginConfig {
 /** Internal resolved config with all defaults applied. */
 export interface ResolvedMetricsConfig {
   multiTenant: boolean
-  checkAccess: (payload: Payload, user: Record<string, unknown>) => Promise<AccessResult> | AccessResult
+  checkAccess: (payload: Payload, user: TypedUser) => Promise<AccessResult> | AccessResult
   resolveTenantId: (payload: Payload, userId: string | number) => Promise<number | string | null>
   basePath: string
   ingestSecret: string

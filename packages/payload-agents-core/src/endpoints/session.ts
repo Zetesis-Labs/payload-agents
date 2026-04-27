@@ -8,32 +8,13 @@
  */
 
 import type { PayloadHandler, TypedUser } from 'payload'
+import { type AgnoMessage, extractMessagesFromRuns, parseAgnoRuns, parseAgnoSession } from '../lib/agno-schema'
 import { runtimeFetch } from '../lib/runtime-client'
 import { dedupSources, extractSources } from '../lib/sources'
 import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig, Source } from '../types'
 
-// ── Agno types ──────────────────────────────────────────────────────────
-
-interface AgnoMessage {
-  role: string
-  content?: string | null
-  tool_name?: string
-  tool_call_id?: string
-  tool_calls?: Array<{
-    id: string
-    function: { name: string; arguments: string }
-  }>
-}
-
-interface AgnoSessionDetail {
-  session_id: string
-  session_name: string
-  agent_id?: string
-  chat_history?: AgnoMessage[]
-  created_at?: string
-  updated_at?: string
-}
+// ── Local view types (mapped output, not Agno's wire shape) ───────────────
 
 interface ToolCallOut {
   id: string
@@ -132,16 +113,6 @@ function mapMessages(history: AgnoMessage[]): MappedMessage[] {
   return result
 }
 
-function extractMessagesFromRuns(runs: Array<{ messages?: AgnoMessage[] }>): AgnoMessage[] {
-  const all: AgnoMessage[] = []
-  for (const run of runs) {
-    if (run.messages) {
-      all.push(...run.messages)
-    }
-  }
-  return all
-}
-
 /** Fetch session detail + runs and return a formatted response body. */
 async function fetchSessionDetail(
   runtimeUrl: string,
@@ -161,8 +132,12 @@ async function fetchSessionDetail(
   ])
   if (!sessionRes.ok) return null
 
-  const session = (await sessionRes.json()) as AgnoSessionDetail
-  const allMessages = runsRes.ok ? extractMessagesFromRuns(await runsRes.json()) : session.chat_history || []
+  const session = parseAgnoSession(await sessionRes.json())
+  if (!session) return null
+
+  const allMessages: AgnoMessage[] = runsRes.ok
+    ? extractMessagesFromRuns(parseAgnoRuns(await runsRes.json()))
+    : (session.chat_history ?? [])
   return {
     conversation_id: session.session_id,
     title: session.session_name,

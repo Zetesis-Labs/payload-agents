@@ -10,6 +10,7 @@
  */
 
 import type { PayloadHandler, Where } from 'payload'
+import { z } from 'zod'
 import { runtimeFetch } from '../lib/runtime-client'
 import type { OnStreamRunCompleted } from '../lib/sse-translator'
 import { translateAgnoStream } from '../lib/sse-translator'
@@ -17,11 +18,11 @@ import { getTokenUsage } from '../lib/token-usage'
 import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig } from '../types'
 
-interface ChatRequest {
-  message: string
-  chatId?: string
-  agentSlug?: string
-}
+const ChatRequestSchema = z.object({
+  message: z.string().min(1, 'Message is required'),
+  chatId: z.string().optional(),
+  agentSlug: z.string().optional()
+})
 
 const SERVICE_UNAVAILABLE = { error: 'AI service temporarily unavailable' }
 
@@ -84,6 +85,28 @@ async function callRuntimeOnce(callRuntime: () => Promise<Response>): Promise<Re
   }
 }
 
+type ChatBodyParseResult = { ok: true; data: z.infer<typeof ChatRequestSchema> } | { ok: false; response: Response }
+
+async function parseChatBody(req: Parameters<PayloadHandler>[0]): Promise<ChatBodyParseResult> {
+  let raw: unknown
+  try {
+    raw = await req.json?.()
+  } catch {
+    return { ok: false, response: Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
+  }
+  const parsed = ChatRequestSchema.safeParse(raw)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      response: Response.json({ error: 'Invalid payload', details: parsed.error.flatten() }, { status: 422 })
+    }
+  }
+  if (!parsed.data.message.trim()) {
+    return { ok: false, response: Response.json({ error: 'Message is required' }, { status: 400 }) }
+  }
+  return { ok: true, data: parsed.data }
+}
+
 export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler {
   return async req => {
     const { user, payload } = req
@@ -92,16 +115,9 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Parse body ──────────────────────────────────────────────────────
-    let body: ChatRequest
-    try {
-      body = (await req.json?.()) as ChatRequest
-    } catch {
-      return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
-    }
-    const { message, agentSlug, chatId } = body
-    if (!message?.trim()) {
-      return Response.json({ error: 'Message is required' }, { status: 400 })
-    }
+    const body = await parseChatBody(req)
+    if (!body.ok) return body.response
+    const { message, agentSlug, chatId } = body.data
 
     // ── Load agent from Payload ─────────────────────────────────────────
     const where: Where = { isActive: { equals: true } }

@@ -1,15 +1,8 @@
+import { type AgnoMessage, extractMessagesFromRuns, parseAgnoRuns } from '@zetesis/payload-agents-core'
 import { sql } from 'drizzle-orm'
 import type { PayloadHandler } from 'payload'
 import { getDrizzle } from '../lib/db'
 import type { ResolvedMetricsConfig } from '../types'
-
-interface AgnoMessage {
-  role: string
-  content?: string | null
-  tool_name?: string
-  tool_call_id?: string
-  tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>
-}
 
 interface ToolCallOut {
   id: string
@@ -145,7 +138,7 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
     const { user, payload } = req
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const access = await config.checkAccess(payload, user as unknown as Record<string, unknown>)
+    const access = await config.checkAccess(payload, user)
     if (!access) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
     const url = new URL(req.url || '', 'http://localhost')
@@ -175,25 +168,18 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
     const row = result.rows[0]
     if (!row?.runs) return Response.json({ messages: [] })
 
-    let runs: unknown
+    let rawRuns: unknown
     if (typeof row.runs === 'string') {
       try {
-        runs = JSON.parse(row.runs)
+        rawRuns = JSON.parse(row.runs)
       } catch {
         return Response.json({ messages: [] })
       }
     } else {
-      runs = row.runs
-    }
-    if (!Array.isArray(runs)) return Response.json({ messages: [] })
-
-    const allMessages: AgnoMessage[] = []
-    for (const run of runs) {
-      if (!run || typeof run !== 'object') continue
-      const messages = (run as { messages?: unknown }).messages
-      if (Array.isArray(messages)) allMessages.push(...(messages as AgnoMessage[]))
+      rawRuns = row.runs
     }
 
+    const allMessages: AgnoMessage[] = extractMessagesFromRuns(parseAgnoRuns(rawRuns))
     return Response.json({ messages: await mapMessages(allMessages) })
   }
 }

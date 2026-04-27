@@ -1,5 +1,15 @@
 // Plugin
 
+export type { AgnoMessage, AgnoRun, AgnoSessionDetail, AgnoToolCall } from './lib/agno-schema'
+export {
+  AgnoMessageSchema,
+  AgnoRunSchema,
+  AgnoSessionDetailSchema,
+  AgnoToolCallSchema,
+  extractMessagesFromRuns,
+  parseAgnoRuns,
+  parseAgnoSession
+} from './lib/agno-schema'
 export type { RunMetrics } from './lib/cost-calculator'
 // Utilities (for advanced consumers)
 export { costBreakdown, effectiveTokens, estimateRunCost } from './lib/cost-calculator'

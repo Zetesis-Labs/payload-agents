@@ -35,7 +35,7 @@ export function createAggregateHandler(config: ResolvedMetricsConfig): PayloadHa
     const { user, payload } = req
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const access = await config.checkAccess(payload, user as unknown as Record<string, unknown>)
+    const access = await config.checkAccess(payload, user)
     if (!access) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
     const url = new URL(req.url || '', 'http://localhost')

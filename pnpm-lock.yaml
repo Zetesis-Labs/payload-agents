@@ -237,6 +237,9 @@ importers:
       drizzle-orm:
         specifier: '>=0.36'
         version: 0.44.7(@types/pg@8.10.2)(bun-types@1.3.11)(pg@8.16.3)
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.5.4
@@ -284,6 +287,9 @@ importers:
       '@zetesis/chat-agent':
         specifier: workspace:*
         version: link:../chat-agent
+      '@zetesis/payload-agents-core':
+        specifier: workspace:*
+        version: link:../payload-agents-core
       framer-motion:
         specifier: ^12.0.0
         version: 12.35.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

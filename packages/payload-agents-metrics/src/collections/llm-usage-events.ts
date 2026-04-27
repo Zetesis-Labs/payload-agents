@@ -97,7 +97,7 @@ export function createLlmUsageEventsCollection(config: ResolvedMetricsConfig): C
     access: {
       read: async ({ req }) => {
         if (!req.user) return false
-        const result = await config.checkAccess(req.payload, req.user as unknown as Record<string, unknown>)
+        const result = await config.checkAccess(req.payload, req.user)
         if (!result) return false
         if ('allTenants' in result) return true
         if (!config.multiTenant) return true
