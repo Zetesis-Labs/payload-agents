@@ -14,7 +14,7 @@ import { runtimeFetch } from '../lib/runtime-client'
 import type { OnStreamRunCompleted } from '../lib/sse-translator'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
-import { getUserId, getUserRecord } from '../lib/user'
+import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig } from '../types'
 
 interface ChatRequest {
@@ -104,7 +104,6 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Load agent from Payload ─────────────────────────────────────────
-    const userRecord = getUserRecord(user)
     const where: Where = { isActive: { equals: true } }
     if (agentSlug) {
       where.slug = { equals: agentSlug }
@@ -148,11 +147,11 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     // ── Session ID ──────────────────────────────────────────────────────
     const agentSlugValue = agent.slug as string
     if (chatId) {
-      const ok = await config.validateSessionOwnership(chatId, { user: userRecord, payload, req })
+      const ok = await config.validateSessionOwnership(chatId, { user, payload, req })
       if (!ok) return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
     const sessionId = await config.buildSessionId({
-      user: userRecord,
+      user,
       agentSlug: agentSlugValue,
       chatId,
       payload,

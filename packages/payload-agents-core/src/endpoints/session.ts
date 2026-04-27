@@ -7,10 +7,10 @@
  *   - DELETE {basePath}/session
  */
 
-import type { PayloadHandler } from 'payload'
+import type { PayloadHandler, TypedUser } from 'payload'
 import { runtimeFetch } from '../lib/runtime-client'
 import { dedupSources, extractSources } from '../lib/sources'
-import { getUserId, getUserRecord } from '../lib/user'
+import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig, Source } from '../types'
 
 // ── Agno types ──────────────────────────────────────────────────────────
@@ -181,7 +181,6 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = getUserRecord(user)
     const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
@@ -189,14 +188,14 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
 
     try {
       if (conversationId) {
-        const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+        const ok = await config.validateSessionOwnership(conversationId, { user, payload, req })
         if (!ok) return Response.json({ error: 'Forbidden' }, { status: 403 })
         const detail = await fetchSessionDetail(config.runtimeUrl, config.runtimeSecret, conversationId, userId)
         return detail ? Response.json(detail) : Response.json(null, { status: 404 })
       }
 
       if (isActive) {
-        return await handleActiveSession(config, userRecord, userId, req)
+        return await handleActiveSession(config, user, userId, req)
       }
 
       return Response.json(null, { status: 400 })
@@ -209,7 +208,7 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
 
 async function handleActiveSession(
   config: ResolvedPluginConfig,
-  userRecord: Record<string, unknown>,
+  user: TypedUser,
   userId: string | number,
   req: import('payload').PayloadRequest
 ): Promise<Response> {
@@ -230,7 +229,7 @@ async function handleActiveSession(
   let match: { session_id: string } | undefined
   for (const candidate of candidates) {
     const ok = await config.validateSessionOwnership(candidate.session_id, {
-      user: userRecord,
+      user,
       payload: req.payload,
       req
     })
@@ -254,14 +253,13 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = getUserRecord(user)
     const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
     }
-    const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+    const ok = await config.validateSessionOwnership(conversationId, { user: user, payload, req })
     if (!ok) {
       return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -308,14 +306,13 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = getUserRecord(user)
     const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
     }
-    const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+    const ok = await config.validateSessionOwnership(conversationId, { user, payload, req })
     if (!ok) {
       return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
