@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { BasePayload } from 'payload'
 import type { ResolvedMetricsConfig } from '../types'
 import { type BaseFilters, buildWhere } from './build-where'
+import { getDrizzle } from './db'
 
 export type GroupBy = 'tenant' | 'agent' | 'user' | 'model' | 'apiKeySource' | 'apiKeyFingerprint' | 'day'
 
@@ -43,10 +44,6 @@ export interface Totals {
   events: number
 }
 
-interface DrizzleLike {
-  execute: (q: unknown) => Promise<{ rows: Record<string, unknown>[] }>
-}
-
 const GROUP_COLUMN: Record<GroupBy, string> = {
   tenant: 'tenant_id',
   agent: 'agent_slug',
@@ -55,10 +52,6 @@ const GROUP_COLUMN: Record<GroupBy, string> = {
   apiKeySource: 'api_key_source',
   apiKeyFingerprint: 'api_key_fingerprint',
   day: "to_char(date_trunc('day', completed_at), 'YYYY-MM-DD')"
-}
-
-function getDrizzle(payload: BasePayload): DrizzleLike {
-  return (payload.db as unknown as { drizzle: DrizzleLike }).drizzle
 }
 
 function getTable(config: ResolvedMetricsConfig): string {

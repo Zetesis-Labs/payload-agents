@@ -14,6 +14,7 @@ import { runtimeFetch } from '../lib/runtime-client'
 import type { OnStreamRunCompleted } from '../lib/sse-translator'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
+import { getUserId, getUserRecord } from '../lib/user'
 import type { ResolvedPluginConfig } from '../types'
 
 interface ChatRequest {
@@ -103,7 +104,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Load agent from Payload ─────────────────────────────────────────
-    const userRecord = user as unknown as Record<string, unknown>
+    const userRecord = getUserRecord(user)
     const where: Where = { isActive: { equals: true } }
     if (agentSlug) {
       where.slug = { equals: agentSlug }
@@ -124,7 +125,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Token budget ────────────────────────────────────────────────────
-    const userId = (user as unknown as { id: string | number }).id
+    const userId = getUserId(user)
     const usage = await getTokenUsage(payload, userId, config.getDailyLimit)
     // Conservative estimate: user message tokens + fixed overhead for
     // system prompt, RAG context, tool calls, and model output.

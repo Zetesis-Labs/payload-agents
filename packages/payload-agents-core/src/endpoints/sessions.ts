@@ -6,6 +6,7 @@
 
 import type { PayloadHandler } from 'payload'
 import { runtimeFetch } from '../lib/runtime-client'
+import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig } from '../types'
 
 export function createSessionsListHandler(config: ResolvedPluginConfig): PayloadHandler {
@@ -15,7 +16,7 @@ export function createSessionsListHandler(config: ResolvedPluginConfig): Payload
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userId = (user as unknown as { id: string | number }).id
+    const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const agentSlug = url.searchParams.get('agentSlug')
 

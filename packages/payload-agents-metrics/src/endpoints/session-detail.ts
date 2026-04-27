@@ -1,14 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { PayloadHandler } from 'payload'
+import { getDrizzle } from '../lib/db'
 import type { ResolvedMetricsConfig } from '../types'
-
-interface DrizzleLike {
-  execute: (q: unknown) => Promise<{ rows: Record<string, unknown>[] }>
-}
-
-function getDrizzle(payload: { db: unknown }): DrizzleLike {
-  return (payload.db as unknown as { drizzle: DrizzleLike }).drizzle
-}
 
 interface AgnoMessage {
   role: string
@@ -46,6 +39,15 @@ function getToonDecode(): Promise<((s: string) => unknown) | null> {
   return toonDecodePromise
 }
 
+function pickString(record: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = record[k]
+    if (typeof v === 'string' && v.length > 0) return v
+    if (typeof v === 'number') return String(v)
+  }
+  return ''
+}
+
 async function extractSources(
   result: unknown
 ): Promise<Array<{ id: string; title: string; slug: string; type: string }>> {
@@ -53,20 +55,25 @@ async function extractSources(
   const decode = await getToonDecode()
   if (!decode) return []
   try {
-    const data = decode(result) as Record<string, unknown>
-    const hits = Array.isArray(data) ? data : (data.hits as unknown[])
-    if (!Array.isArray(hits)) return []
-    return hits
-      .filter(h => h && typeof h === 'object' && 'chunk_id' in h)
-      .map(h => {
-        const it = h as Record<string, string>
-        return {
-          id: it.chunk_id || '',
-          title: it.title || it.document_title || '',
-          slug: it.slug || it.document_slug || '',
-          type: (it.collection || 'posts_chunk').replace(/_chunk$/, '')
-        }
+    const data = decode(result)
+    const hits = Array.isArray(data)
+      ? data
+      : data && typeof data === 'object' && Array.isArray((data as { hits?: unknown }).hits)
+        ? (data as { hits: unknown[] }).hits
+        : null
+    if (!hits) return []
+    const sources: Array<{ id: string; title: string; slug: string; type: string }> = []
+    for (const h of hits) {
+      if (!h || typeof h !== 'object' || !('chunk_id' in h)) continue
+      const it = h as Record<string, unknown>
+      sources.push({
+        id: pickString(it, 'chunk_id'),
+        title: pickString(it, 'title', 'document_title'),
+        slug: pickString(it, 'slug', 'document_slug'),
+        type: (pickString(it, 'collection') || 'posts_chunk').replace(/_chunk$/, '')
       })
+    }
+    return sources
   } catch (err) {
     console.warn('[metrics] Failed to extract tool-call sources:', err instanceof Error ? err.message : err)
     return []
@@ -168,7 +175,7 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
     const row = result.rows[0]
     if (!row?.runs) return Response.json({ messages: [] })
 
-    let runs: Array<{ messages?: AgnoMessage[] }> | unknown
+    let runs: unknown
     if (typeof row.runs === 'string') {
       try {
         runs = JSON.parse(row.runs)
@@ -181,8 +188,10 @@ export function createSessionDetailHandler(config: ResolvedMetricsConfig): Paylo
     if (!Array.isArray(runs)) return Response.json({ messages: [] })
 
     const allMessages: AgnoMessage[] = []
-    for (const run of runs as Array<{ messages?: AgnoMessage[] }>) {
-      if (run.messages) allMessages.push(...run.messages)
+    for (const run of runs) {
+      if (!run || typeof run !== 'object') continue
+      const messages = (run as { messages?: unknown }).messages
+      if (Array.isArray(messages)) allMessages.push(...(messages as AgnoMessage[]))
     }
 
     return Response.json({ messages: await mapMessages(allMessages) })

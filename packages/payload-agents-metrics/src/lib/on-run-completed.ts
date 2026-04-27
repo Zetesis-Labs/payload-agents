@@ -23,6 +23,13 @@ interface RunCompletedContext {
 interface ModelDetail {
   id?: string
   provider?: string
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_tokens?: number
+}
+
+function num(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined
 }
 
 function extractModelDetail(metrics: Record<string, unknown>): ModelDetail | null {
@@ -60,20 +67,11 @@ export function createOnRunCompleted(config: ResolvedMetricsConfig) {
     }
 
     const model = resolveModel(ctx, detail)
-    const inputTokens =
-      ((detail as Record<string, unknown> | null)?.input_tokens as number | undefined) ??
-      (metrics.input_tokens as number | undefined) ??
-      0
-    const outputTokens =
-      ((detail as Record<string, unknown> | null)?.output_tokens as number | undefined) ??
-      (metrics.output_tokens as number | undefined) ??
-      0
-    const cachedInputTokens =
-      ((detail as Record<string, unknown> | null)?.cache_read_tokens as number | undefined) ??
-      (metrics.cache_read_tokens as number | undefined) ??
-      0
-    const totalTokens = (metrics.total_tokens as number | undefined) ?? inputTokens + outputTokens
-    const duration = metrics.duration as number | undefined
+    const inputTokens = num(detail?.input_tokens) ?? num(metrics.input_tokens) ?? 0
+    const outputTokens = num(detail?.output_tokens) ?? num(metrics.output_tokens) ?? 0
+    const cachedInputTokens = num(detail?.cache_read_tokens) ?? num(metrics.cache_read_tokens) ?? 0
+    const totalTokens = num(metrics.total_tokens) ?? inputTokens + outputTokens
+    const duration = num(metrics.duration)
     const latencyMs = duration !== undefined ? Math.round(duration * 1000) : undefined
     const costUsd = calculateLlmCost(provider, model, { input: inputTokens, output: outputTokens }, config.extraPricing)
 

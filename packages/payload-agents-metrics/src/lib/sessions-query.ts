@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { BasePayload } from 'payload'
 import type { ResolvedMetricsConfig } from '../types'
 import { type BaseFilters, buildWhere } from './build-where'
+import { type DrizzleLike, getDrizzle } from './db'
 
 const PAGE_SIZE = 50
 
@@ -40,14 +41,6 @@ export interface SessionsResult {
   totals: SessionTotals
   page: number
   totalPages: number
-}
-
-interface DrizzleLike {
-  execute: (q: unknown) => Promise<{ rows: Record<string, unknown>[] }>
-}
-
-function getDrizzle(payload: BasePayload): DrizzleLike {
-  return (payload.db as unknown as { drizzle: DrizzleLike }).drizzle
 }
 
 function getTable(config: ResolvedMetricsConfig): string {

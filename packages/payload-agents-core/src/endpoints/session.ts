@@ -10,6 +10,7 @@
 import type { PayloadHandler } from 'payload'
 import { runtimeFetch } from '../lib/runtime-client'
 import { dedupSources, extractSources } from '../lib/sources'
+import { getUserId, getUserRecord } from '../lib/user'
 import type { ResolvedPluginConfig, Source } from '../types'
 
 // ── Agno types ──────────────────────────────────────────────────────────
@@ -180,8 +181,8 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = user as unknown as Record<string, unknown>
-    const userId = (user as unknown as { id: string | number }).id
+    const userRecord = getUserRecord(user)
+    const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     const isActive = url.searchParams.get('active') === 'true'
@@ -253,8 +254,8 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = user as unknown as Record<string, unknown>
-    const userId = (user as unknown as { id: string | number }).id
+    const userRecord = getUserRecord(user)
+    const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
@@ -307,8 +308,8 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = user as unknown as Record<string, unknown>
-    const userId = (user as unknown as { id: string | number }).id
+    const userRecord = getUserRecord(user)
+    const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {

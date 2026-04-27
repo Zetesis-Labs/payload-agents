@@ -336,7 +336,10 @@ function SessionsList(props: {
     setError(null)
     fetch(`/api${props.basePath}/sessions?${queryString}`, { credentials: 'include' })
       .then(async res => {
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
+        if (!res.ok) {
+          const errBody = (await res.json().catch(() => null)) as { error?: string } | null
+          throw new Error(errBody?.error || `HTTP ${res.status}`)
+        }
         return res.json() as Promise<SessionsResponse>
       })
       .then(json => {
@@ -696,7 +699,10 @@ function OverviewTab(props: {
     setError(null)
     fetch(`/api${props.basePath}/aggregate?${queryString}`, { credentials: 'include' })
       .then(async res => {
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
+        if (!res.ok) {
+          const errBody = (await res.json().catch(() => null)) as { error?: string } | null
+          throw new Error(errBody?.error || `HTTP ${res.status}`)
+        }
         return res.json() as Promise<AggregateResponse>
       })
       .then(json => {

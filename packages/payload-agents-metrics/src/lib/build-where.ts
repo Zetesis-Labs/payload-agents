@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { sql, type SQL } from 'drizzle-orm'
 
 export interface BaseFilters {
   from?: string
@@ -12,8 +12,8 @@ export interface BaseFilters {
   apiKeyFingerprint?: string
 }
 
-export function buildWhere(filters: BaseFilters): unknown {
-  const clauses: unknown[] = [sql`1=1`]
+export function buildWhere(filters: BaseFilters): SQL {
+  const clauses: SQL[] = [sql`1=1`]
 
   if (filters.from) clauses.push(sql`completed_at >= ${filters.from}::timestamptz`)
   if (filters.to) clauses.push(sql`completed_at < ${filters.to}::timestamptz`)
@@ -47,7 +47,7 @@ export function buildWhere(filters: BaseFilters): unknown {
   if (filters.model) clauses.push(sql`model = ${filters.model}`)
   if (filters.apiKeyFingerprint) clauses.push(sql`api_key_fingerprint = ${filters.apiKeyFingerprint}`)
 
-  let combined = clauses[0]
+  let combined: SQL = clauses[0]
   for (let i = 1; i < clauses.length; i++) {
     combined = sql`${combined} AND ${clauses[i]}`
   }
