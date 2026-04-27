@@ -18,7 +18,11 @@ import { getTokenUsage } from '../lib/token-usage'
 import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig } from '../types'
 
-const ChatRequestSchema = z.object({
+/**
+ * Schema + helper exported for spec coverage. Not re-exported from the
+ * package index — consumers should not depend on these symbols.
+ */
+export const ChatRequestSchema = z.object({
   message: z.string().min(1, 'Message is required'),
   chatId: z.string().optional(),
   agentSlug: z.string().optional()
@@ -99,9 +103,11 @@ async function callRuntimeOnce(callRuntime: () => Promise<Response>): Promise<Re
   }
 }
 
-type ChatBodyParseResult = { ok: true; data: z.infer<typeof ChatRequestSchema> } | { ok: false; response: Response }
+export type ChatBodyParseResult =
+  | { ok: true; data: z.infer<typeof ChatRequestSchema> }
+  | { ok: false; response: Response }
 
-async function parseChatBody(req: Parameters<PayloadHandler>[0]): Promise<ChatBodyParseResult> {
+export async function parseChatBody(req: Parameters<PayloadHandler>[0]): Promise<ChatBodyParseResult> {
   let raw: unknown
   try {
     raw = await req.json?.()
