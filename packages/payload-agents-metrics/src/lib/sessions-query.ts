@@ -194,15 +194,13 @@ async function batchFetchFirstMessages(
   const result = new Map<string, string>()
   if (conversationIds.length === 0) return result
 
-  let inClause = sql`session_id = ${conversationIds[0]}`
-  for (let i = 1; i < conversationIds.length; i++) {
-    inClause = sql`${inClause} OR session_id = ${conversationIds[i]}`
-  }
-
+  // session_id = ANY($1::text[]) is parameter-bound and uses the index on
+  // session_id — beats a chained OR list, which the planner expands into N
+  // separate predicates and degrades as PAGE_SIZE grows.
   const rows = await db.execute(sql`
     SELECT session_id, runs
     FROM ${sql.raw(agnoSessionsTable)}
-    WHERE ${inClause}
+    WHERE session_id = ANY(${conversationIds}::text[])
   `)
 
   for (const row of rows.rows) {

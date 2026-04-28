@@ -9,33 +9,17 @@ import type { CollectionConfig, Payload, TypedUser } from 'payload'
  */
 export type AccessResult = { allTenants: true } | { tenantIds: Array<number | string> } | null
 
-/**
- * Plugin configuration for `metricsPlugin()`.
- */
-export interface MetricsPluginConfig {
-  /**
-   * Enable multi-tenant scoping. Default: `true`.
-   *
-   * When `false`, the collection has no `tenant` field, endpoints don't
-   * filter by tenant, and `checkAccess` / `resolveTenantId` are ignored.
-   * Access defaults to any authenticated user.
-   */
-  multiTenant?: boolean
+/** Resolves what the current user can see. */
+export type CheckAccessFn = (payload: Payload, user: TypedUser) => Promise<AccessResult> | AccessResult
 
-  /**
-   * Determine what the current user can see.
-   * Called on every read endpoint (aggregate, sessions, session detail).
-   * **Required when `multiTenant` is `true`.**
-   */
-  checkAccess?: (payload: Payload, user: TypedUser) => Promise<AccessResult> | AccessResult
+/** Resolves the tenant ID for a given user when persisting usage events. */
+export type ResolveTenantIdFn = (
+  payload: Payload,
+  userId: string | number
+) => Promise<number | string | null>
 
-  /**
-   * Resolve the tenant ID for a given user when persisting usage events.
-   * Called by the `onRunCompleted` callback.
-   * **Required when `multiTenant` is `true`.**
-   */
-  resolveTenantId?: (payload: Payload, userId: string | number) => Promise<number | string | null>
-
+/** Shared between the multi-tenant and single-tenant variants. */
+interface MetricsPluginConfigBase {
   /** Base path for all endpoints. Default: `'/metrics'`. */
   basePath?: string
 
@@ -68,18 +52,43 @@ export interface MetricsPluginConfig {
   agnoSessionsTable?: string
 }
 
+/**
+ * Plugin configuration for `metricsPlugin()`.
+ *
+ * Discriminated union on `multiTenant`. When `multiTenant: true`, both
+ * `checkAccess` and `resolveTenantId` are required at the type level —
+ * a previous default of `() => null` paired with `multiTenant: true`
+ * silently dropped every event.
+ *
+ * Omitting `multiTenant` (or passing `false`) is single-tenant mode:
+ * no tenant column, no tenant filter, no callbacks needed.
+ */
+export type MetricsPluginConfig =
+  | (MetricsPluginConfigBase & {
+      multiTenant: true
+      /** Called on every read endpoint to determine what the user can see. */
+      checkAccess: CheckAccessFn
+      /** Called by `onRunCompleted` to resolve the tenant for a usage event. */
+      resolveTenantId: ResolveTenantIdFn
+    })
+  | (MetricsPluginConfigBase & {
+      multiTenant?: false
+      checkAccess?: never
+      resolveTenantId?: never
+    })
+
 /** Internal resolved config with all defaults applied. */
 export interface ResolvedMetricsConfig {
   multiTenant: boolean
-  checkAccess: (payload: Payload, user: TypedUser) => Promise<AccessResult> | AccessResult
-  resolveTenantId: (payload: Payload, userId: string | number) => Promise<number | string | null>
+  checkAccess: CheckAccessFn
+  resolveTenantId: ResolveTenantIdFn
   basePath: string
   ingestSecret: string
   collectionSlug: string
   usersSlug: string
   tenantsSlug: string
   agentsSlug: string
-  collectionOverrides: MetricsPluginConfig['collectionOverrides']
+  collectionOverrides: ((current: CollectionConfig) => CollectionConfig) | undefined
   extraPricing: Record<string, { input: number; output: number }>
   agnoSessionsTable: string
 }

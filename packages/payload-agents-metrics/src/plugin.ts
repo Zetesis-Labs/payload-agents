@@ -7,14 +7,24 @@ import { createSessionsHandler } from './endpoints/sessions'
 import { createOnRunCompleted } from './lib/on-run-completed'
 import type { MetricsPluginConfig, ResolvedMetricsConfig } from './types'
 
-/** Default access: any authenticated user can read all data. */
+/**
+ * Default access in single-tenant mode: any authenticated user reads everything.
+ * Only used when `multiTenant` is `false` (or omitted) — the discriminated
+ * union forces real callbacks when `multiTenant: true`.
+ */
 const defaultCheckAccess = async (): Promise<{ allTenants: true }> => ({ allTenants: true })
 
-/** Default tenant resolver: returns null (no tenant). */
+/**
+ * Default tenant resolver in single-tenant mode: returns null (no tenant).
+ * Safe because in single-tenant mode the `tenant` field is not added to the
+ * collection and the ingest path skips tenant resolution entirely.
+ */
 const defaultResolveTenantId = async (): Promise<null> => null
 
 function resolveConfig(userConfig: MetricsPluginConfig): ResolvedMetricsConfig {
-  const multiTenant = userConfig.multiTenant ?? true
+  // Default to single-tenant mode. Multi-tenant is opt-in via `multiTenant: true`,
+  // which the discriminated union pairs with required `checkAccess` + `resolveTenantId`.
+  const multiTenant = userConfig.multiTenant === true
   return {
     multiTenant,
     checkAccess: userConfig.checkAccess ?? defaultCheckAccess,
