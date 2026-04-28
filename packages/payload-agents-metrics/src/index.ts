@@ -6,7 +6,7 @@ export type { AggregateFilters, BucketRow, GroupBy, SeriesRow, Totals } from './
 export { calculateLlmCost, type LlmProvider, normalizeProvider } from './lib/cost-calculator'
 export { createOnRunCompleted } from './lib/on-run-completed'
 export type { SessionFilters, SessionRow, SessionsResult, SessionTotals } from './lib/sessions-query'
-export { metricsPlugin } from './plugin'
+export { type MetricsPluginResult, metricsPlugin } from './plugin'
 // Types
 export type {
   AccessResult,

@@ -41,7 +41,11 @@ function resolveConfig(userConfig: MetricsPluginConfig): ResolvedMetricsConfig {
   }
 }
 
-interface MetricsPluginResult extends Plugin {
+/**
+ * Return type of `metricsPlugin()`. Exported so downstream packages that
+ * re-export the wrapped plugin can name it; otherwise TS bails with TS4023.
+ */
+export interface MetricsPluginResult extends Plugin {
   /** Callback for `agentPlugin({ onRunCompleted })`. */
   onRunCompleted: ReturnType<typeof createOnRunCompleted>
 }
