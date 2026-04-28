@@ -24,12 +24,14 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
     getDailyLimit: userConfig.getDailyLimit,
     buildSessionId: userConfig.buildSessionId ?? defaultBuildSessionId,
     validateSessionOwnership: userConfig.validateSessionOwnership ?? defaultValidateSessionOwnership,
+    getRuntimeHeaders: userConfig.getRuntimeHeaders,
     collectionSlug: userConfig.collectionSlug ?? 'agents',
     basePath: userConfig.basePath ?? '/agents',
     encryptionKey: userConfig.encryptionKey,
     mediaCollectionSlug: userConfig.mediaCollectionSlug,
     taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug,
-    collectionOverrides: userConfig.collectionOverrides
+    collectionOverrides: userConfig.collectionOverrides,
+    onRunCompleted: userConfig.onRunCompleted
   }
 }
 

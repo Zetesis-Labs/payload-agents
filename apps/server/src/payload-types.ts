@@ -72,6 +72,7 @@ export interface Config {
     posts: Post;
     taxonomy: Taxonomy;
     agents: Agent;
+    'llm-usage-events': LlmUsageEvent;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -84,6 +85,7 @@ export interface Config {
     posts: PostsSelect<false> | PostsSelect<true>;
     taxonomy: TaxonomySelect<false> | TaxonomySelect<true>;
     agents: AgentsSelect<false> | AgentsSelect<true>;
+    'llm-usage-events': LlmUsageEventsSelect<false> | LlmUsageEventsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -258,6 +260,10 @@ export interface Agent {
    */
   apiKey: string;
   /**
+   * Last 4 characters of the API key (auto-computed)
+   */
+  apiKeyFingerprint?: string | null;
+  /**
    * System prompt that defines the agent personality and constraints
    */
   systemPrompt: string;
@@ -322,6 +328,52 @@ export interface Agent {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "llm-usage-events".
+ */
+export interface LlmUsageEvent {
+  id: number;
+  /**
+   * User who triggered the run
+   */
+  user: number | User;
+  /**
+   * Agent FK (may be null if agent was deleted)
+   */
+  agent?: (number | null) | Agent;
+  /**
+   * Persisted independently so records survive agent deletion
+   */
+  agentSlug?: string | null;
+  /**
+   * Agno session_id — groups messages into a conversation
+   */
+  conversationId?: string | null;
+  /**
+   * Agno run_id — unique per event
+   */
+  runId?: string | null;
+  provider: 'anthropic' | 'openai' | 'google';
+  model: string;
+  apiKeySource: 'agent' | 'user';
+  /**
+   * Last 4 chars of the API key used. Never store the raw key.
+   */
+  apiKeyFingerprint?: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens?: number | null;
+  totalTokens: number;
+  costUsd: number;
+  startedAt?: string | null;
+  completedAt: string;
+  latencyMs?: number | null;
+  status: 'success' | 'error';
+  errorCode?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -363,6 +415,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'agents';
         value: number | Agent;
+      } | null)
+    | ({
+        relationTo: 'llm-usage-events';
+        value: number | LlmUsageEvent;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -484,6 +540,7 @@ export interface AgentsSelect<T extends boolean = true> {
   isActive?: T;
   llmModel?: T;
   apiKey?: T;
+  apiKeyFingerprint?: T;
   systemPrompt?: T;
   toolCallLimit?: T;
   searchCollections?: T;
@@ -502,6 +559,33 @@ export interface AgentsSelect<T extends boolean = true> {
         description?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "llm-usage-events_select".
+ */
+export interface LlmUsageEventsSelect<T extends boolean = true> {
+  user?: T;
+  agent?: T;
+  agentSlug?: T;
+  conversationId?: T;
+  runId?: T;
+  provider?: T;
+  model?: T;
+  apiKeySource?: T;
+  apiKeyFingerprint?: T;
+  inputTokens?: T;
+  outputTokens?: T;
+  cachedInputTokens?: T;
+  totalTokens?: T;
+  costUsd?: T;
+  startedAt?: T;
+  completedAt?: T;
+  latencyMs?: T;
+  status?: T;
+  errorCode?: T;
   updatedAt?: T;
   createdAt?: T;
 }

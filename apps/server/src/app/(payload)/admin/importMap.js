@@ -25,6 +25,7 @@ import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0
 import { SyncStatusCell as SyncStatusCell_4a514ff607eb05ca6255fb0fd04affc3 } from '@zetesis/payload-indexer/client'
 import { SyncStatusField as SyncStatusField_4a514ff607eb05ca6255fb0fd04affc3 } from '@zetesis/payload-indexer/client'
 import { default as default_2b626bed1026074d9f37e7a587a41216 } from '@/modules/payload-admin/sync-typesense-button'
+import { default as default_b239c58bd1b8e1388209632203a98c7d } from '../../../views/LlmUsageView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 export const importMap = {
@@ -55,5 +56,6 @@ export const importMap = {
   "@zetesis/payload-indexer/client#SyncStatusCell": SyncStatusCell_4a514ff607eb05ca6255fb0fd04affc3,
   "@zetesis/payload-indexer/client#SyncStatusField": SyncStatusField_4a514ff607eb05ca6255fb0fd04affc3,
   "@/modules/payload-admin/sync-typesense-button#default": default_2b626bed1026074d9f37e7a587a41216,
+  "/views/LlmUsageView#default": default_b239c58bd1b8e1388209632203a98c7d,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

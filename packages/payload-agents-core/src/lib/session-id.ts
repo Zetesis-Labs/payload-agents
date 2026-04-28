@@ -11,12 +11,12 @@ import type { BuildSessionId, ValidateSessionOwnership } from '../types'
 
 export const defaultBuildSessionId: BuildSessionId = ({ user, agentSlug, chatId }) => {
   if (chatId) return chatId
-  const userId = String((user as { id?: string | number }).id ?? 'anonymous')
+  const userId = String(user.id ?? 'anonymous')
   return `${agentSlug}:${userId}:${crypto.randomUUID()}`
 }
 
 export const defaultValidateSessionOwnership: ValidateSessionOwnership = (sessionId, { user }) => {
-  const userId = String((user as { id?: string | number }).id ?? '')
+  const userId = String(user.id ?? '')
   if (!userId) return false
   return sessionId.includes(`:${userId}:`)
 }

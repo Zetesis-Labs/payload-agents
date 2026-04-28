@@ -12,14 +12,12 @@ import type { ResolvedPluginConfig } from '../../types'
 
 export function createEncryptBeforeChangeHook(config: ResolvedPluginConfig): CollectionBeforeChangeHook {
   return async ({ data }) => {
-    if (!config.encryptionKey) return data
-
-    if (data.apiKey) {
-      if (!isEncrypted(data.apiKey)) {
+    if (data.apiKey && !isEncrypted(data.apiKey)) {
+      data.apiKeyFingerprint = data.apiKey.slice(-4)
+      if (config.encryptionKey) {
         data.apiKey = encrypt(data.apiKey, config.encryptionKey)
       }
     }
-
     return data
   }
 }

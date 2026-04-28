@@ -12,6 +12,7 @@
  *   - `ToolCallCompleted` → `{ type: "tool_call", data: { …, result, sources } }`
  */
 
+import type { AgnoSseFrame, AgnoSseMetrics, AgnoSseTool } from './agno-schema'
 import { extractSources } from './sources'
 import { effectiveTokensFromMetrics } from './token-usage'
 
@@ -22,10 +23,15 @@ interface UsageSnapshot {
   reset_at: string
 }
 
+/** Callback fired (fire-and-forget) when the RunCompleted SSE event arrives. */
+export type OnStreamRunCompleted = (data: { metrics: Record<string, unknown>; runId?: string }) => void
+
 interface TranslatorState {
   accumulatedText: string
   completed: boolean
   sources: Array<{ id: string; title: string; slug: string; type: string }>
+  /** Captured from RunCompleted; fired after the stream ends. */
+  runCompletedData?: { metrics: Record<string, unknown>; runId?: string }
 }
 
 const _encoder = new TextEncoder()
@@ -34,7 +40,7 @@ function formatLegacyEvent(event: unknown): Uint8Array {
   return _encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
 }
 
-function parseSseFrame(frame: string): Record<string, unknown> | null {
+function parseSseFrame(frame: string): AgnoSseFrame | null {
   let eventName: string | null = null
   let dataLine: string | null = null
   for (const raw of frame.split('\n')) {
@@ -43,7 +49,7 @@ function parseSseFrame(frame: string): Record<string, unknown> | null {
   }
   if (!dataLine) return null
   try {
-    const parsed = JSON.parse(dataLine) as Record<string, unknown>
+    const parsed = JSON.parse(dataLine) as AgnoSseFrame
     if (eventName && !parsed.event) parsed.event = eventName
     return parsed
   } catch {
@@ -53,12 +59,12 @@ function parseSseFrame(frame: string): Record<string, unknown> | null {
 
 /** Handle a single parsed Agno event and emit the corresponding legacy event(s). */
 function handleAgnoEvent(
-  parsed: Record<string, unknown>,
+  parsed: AgnoSseFrame,
   state: TranslatorState,
   usage: UsageSnapshot,
   emit: (event: unknown) => void
 ): void {
-  switch (parsed.event as string) {
+  switch (parsed.event) {
     case 'RunContent': {
       const content = typeof parsed.content === 'string' ? parsed.content : ''
       if (content) {
@@ -68,10 +74,10 @@ function handleAgnoEvent(
       break
     }
     case 'ToolCallStarted':
-      emitToolCallStarted(parsed, emit)
+      if (parsed.tool) emitToolCallStarted(parsed.tool, emit)
       break
     case 'ToolCallCompleted':
-      emitToolCallCompleted(parsed, state, emit)
+      if (parsed.tool) emitToolCallCompleted(parsed.tool, state, emit)
       break
     case 'RunError': {
       const err = typeof parsed.content === 'string' ? parsed.content : 'Run error'
@@ -85,9 +91,7 @@ function handleAgnoEvent(
   }
 }
 
-function emitToolCallStarted(parsed: Record<string, unknown>, emit: (event: unknown) => void): void {
-  const tool = parsed.tool as Record<string, unknown> | undefined
-  if (!tool) return
+function emitToolCallStarted(tool: AgnoSseTool, emit: (event: unknown) => void): void {
   emit({
     type: 'tool_call',
     data: {
@@ -98,13 +102,7 @@ function emitToolCallStarted(parsed: Record<string, unknown>, emit: (event: unkn
   })
 }
 
-function emitToolCallCompleted(
-  parsed: Record<string, unknown>,
-  state: TranslatorState,
-  emit: (event: unknown) => void
-): void {
-  const tool = parsed.tool as Record<string, unknown> | undefined
-  if (!tool) return
+function emitToolCallCompleted(tool: AgnoSseTool, state: TranslatorState, emit: (event: unknown) => void): void {
   const toolSources = extractSources(tool.result)
   state.sources.push(...toolSources)
   emit({
@@ -119,8 +117,20 @@ function emitToolCallCompleted(
   })
 }
 
+function metricsToTokens(metrics: AgnoSseMetrics | undefined, fallbackChars: number): number {
+  if (typeof metrics?.input_tokens === 'number' && typeof metrics?.output_tokens === 'number') {
+    return effectiveTokensFromMetrics({
+      input_tokens: metrics.input_tokens,
+      output_tokens: metrics.output_tokens,
+      cache_read_tokens: typeof metrics.cache_read_tokens === 'number' ? metrics.cache_read_tokens : 0
+    })
+  }
+  // Fall back to a 4-chars-per-token estimate when Agno doesn't report metrics.
+  return Math.ceil(fallbackChars / 4)
+}
+
 function emitRunCompleted(
-  parsed: Record<string, unknown>,
+  parsed: AgnoSseFrame,
   state: TranslatorState,
   usage: UsageSnapshot,
   emit: (event: unknown) => void
@@ -128,18 +138,10 @@ function emitRunCompleted(
   if (state.sources.length > 0) {
     emit({ type: 'sources', data: state.sources })
   }
-  const metrics = parsed.metrics as Record<string, unknown> | undefined
   // Use the same effective-token formula as `getCurrentDailyUsage()` so
   // the running daily total stays in the same unit as the baseline
   // consumed by `getTokenUsage()`.
-  const runTokens =
-    typeof metrics?.input_tokens === 'number' && typeof metrics?.output_tokens === 'number'
-      ? effectiveTokensFromMetrics({
-          input_tokens: metrics.input_tokens as number,
-          output_tokens: metrics.output_tokens as number,
-          cache_read_tokens: typeof metrics.cache_read_tokens === 'number' ? (metrics.cache_read_tokens as number) : 0
-        })
-      : Math.ceil(state.accumulatedText.length / 4)
+  const runTokens = metricsToTokens(parsed.metrics, state.accumulatedText.length)
   emit({
     type: 'usage',
     data: {
@@ -151,57 +153,81 @@ function emitRunCompleted(
   })
   emit({ type: 'done' })
   state.completed = true
+
+  if (parsed.metrics) {
+    state.runCompletedData = {
+      metrics: parsed.metrics,
+      runId: typeof parsed.run_id === 'string' ? parsed.run_id : undefined
+    }
+  }
+}
+
+async function pipeStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  sessionId: string,
+  usage: UsageSnapshot,
+  onRunCompleted?: OnStreamRunCompleted
+): Promise<void> {
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const state: TranslatorState = { accumulatedText: '', completed: false, sources: [] }
+  const emit = (event: unknown) => controller.enqueue(formatLegacyEvent(event))
+
+  try {
+    emit({ type: 'conversation_id', data: sessionId })
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      buffer = processBuffer(buffer, state, usage, emit)
+    }
+
+    if (buffer.trim()) {
+      const parsed = parseSseFrame(buffer)
+      if (parsed?.event === 'RunContent' && typeof parsed.content === 'string') {
+        emit({ type: 'token', data: parsed.content })
+      }
+    }
+
+    if (!state.completed) emit({ type: 'done' })
+    controller.close()
+  } catch (err) {
+    console.error('[chat] translator error:', err)
+    try {
+      emit({ type: 'error', data: { error: err instanceof Error ? err.message : 'Stream error' } })
+    } catch {
+      /* controller may already be closed */
+    }
+    try {
+      controller.close()
+    } catch {
+      /* already closed */
+    }
+  } finally {
+    if (onRunCompleted && state.runCompletedData) {
+      try {
+        onRunCompleted(state.runCompletedData)
+      } catch {
+        /* fire-and-forget */
+      }
+    }
+  }
 }
 
 export function translateAgnoStream(
   upstreamBody: ReadableStream<Uint8Array>,
   sessionId: string,
-  usage: UsageSnapshot
+  usage: UsageSnapshot,
+  onRunCompleted?: OnStreamRunCompleted
 ): ReadableStream<Uint8Array> {
-  const decoder = new TextDecoder()
   const reader = upstreamBody.getReader()
 
   return new ReadableStream<Uint8Array>({
-    async start(controller) {
-      let buffer = ''
-      const state: TranslatorState = { accumulatedText: '', completed: false, sources: [] }
-      const emit = (event: unknown) => controller.enqueue(formatLegacyEvent(event))
-
-      try {
-        emit({ type: 'conversation_id', data: sessionId })
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          buffer = processBuffer(buffer, state, usage, emit)
-        }
-
-        // Flush remaining
-        if (buffer.trim()) {
-          const parsed = parseSseFrame(buffer)
-          if (parsed?.event === 'RunContent' && typeof parsed.content === 'string') {
-            emit({ type: 'token', data: parsed.content })
-          }
-        }
-
-        if (!state.completed) {
-          emit({ type: 'done' })
-        }
-        controller.close()
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Stream error'
-        console.error('[chat] translator error:', err)
-        try {
-          emit({ type: 'error', data: { error: msg } })
-        } catch {
-          /* controller may already be closed */
-        }
-        controller.close()
-      }
+    start(controller) {
+      return pipeStream(reader, controller, sessionId, usage, onRunCompleted)
     },
-
     async cancel(reason) {
       try {
         await reader.cancel(reason)

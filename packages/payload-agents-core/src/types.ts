@@ -1,4 +1,4 @@
-import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, Payload, PayloadRequest, TypedUser } from 'payload'
 
 /**
  * Context passed to `buildSessionId` when a new chat starts.
@@ -8,7 +8,7 @@ import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
  * string is later fed back to `validateSessionOwnership`.
  */
 export interface BuildSessionIdContext {
-  user: Record<string, unknown>
+  user: TypedUser
   agentSlug: string
   /** Present when the client is trying to continue an existing chat. */
   chatId?: string
@@ -21,7 +21,7 @@ export interface BuildSessionIdContext {
  * receives a session id from the client.
  */
 export interface ValidateSessionOwnershipContext {
-  user: Record<string, unknown>
+  user: TypedUser
   payload: Payload
   req: PayloadRequest
 }
@@ -87,6 +87,19 @@ export interface AgentPluginConfig {
   validateSessionOwnership?: ValidateSessionOwnership
 
   /**
+   * Extra headers forwarded to the agent-runtime on each chat request.
+   * Typically used to carry tenant/user metadata that the runtime
+   * persists into the Agno session's `metadata` JSONB.
+   *
+   * Keys must be valid HTTP header names. Values are coerced to strings.
+   */
+  getRuntimeHeaders?: (ctx: {
+    user: TypedUser
+    payload: Payload
+    req: PayloadRequest
+  }) => Record<string, string> | Promise<Record<string, string>>
+
+  /**
    * Override the Payload collection slug. Default: `'agents'`.
    */
   collectionSlug?: string
@@ -143,7 +156,45 @@ export interface AgentPluginConfig {
    * ```
    */
   collectionOverrides?: CollectionOverrides
+
+  /**
+   * Called after every streaming run completes with the full Agno metrics.
+   *
+   * Use this to persist token usage to an external ledger, emit billing
+   * events, or update quota counters. The callback is fire-and-forget —
+   * errors are logged but never block the response stream.
+   */
+  onRunCompleted?: OnRunCompleted
 }
+
+// ── Run completed callback ────────────────────────────────────────────────
+
+/**
+ * Context passed to `onRunCompleted` after a streaming run finishes.
+ *
+ * Contains everything needed to persist a usage ledger entry:
+ * user, agent, session, and raw Agno metrics (tokens, model details, duration).
+ */
+export interface RunCompletedContext {
+  userId: string | number
+  agentSlug: string
+  sessionId: string
+  /** Raw Agno `RunMetrics` as serialised in the SSE frame. */
+  metrics: Record<string, unknown>
+  runId?: string
+  /** LLM model identifier from the agent config (e.g. `"openai/o4-mini"`). */
+  llmModel?: string
+  /** Last 4 characters of the API key used, for cost attribution. */
+  apiKeyFingerprint?: string
+}
+
+/**
+ * Fired after every successful streaming run completes.
+ *
+ * The callback is invoked fire-and-forget — errors are logged but never
+ * block the response stream.
+ */
+export type OnRunCompleted = (ctx: RunCompletedContext, payload: Payload) => void | Promise<void>
 
 // ── Source types ───────────────────────────────────────────────────────────
 
@@ -186,10 +237,18 @@ export interface ResolvedPluginConfig {
   getDailyLimit: (payload: Payload, userId: string | number) => Promise<number>
   buildSessionId: BuildSessionId
   validateSessionOwnership: ValidateSessionOwnership
+  getRuntimeHeaders:
+    | ((ctx: {
+        user: TypedUser
+        payload: Payload
+        req: PayloadRequest
+      }) => Record<string, string> | Promise<Record<string, string>>)
+    | undefined
   collectionSlug: string
   basePath: string
   encryptionKey: string | undefined
   mediaCollectionSlug: string
   taxonomyCollectionSlug: string
   collectionOverrides: CollectionOverrides | undefined
+  onRunCompleted: OnRunCompleted | undefined
 }

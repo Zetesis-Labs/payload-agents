@@ -10,18 +10,74 @@
  */
 
 import type { PayloadHandler, Where } from 'payload'
+import { z } from 'zod'
 import { runtimeFetch } from '../lib/runtime-client'
+import type { OnStreamRunCompleted } from '../lib/sse-translator'
 import { translateAgnoStream } from '../lib/sse-translator'
 import { getTokenUsage } from '../lib/token-usage'
+import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig } from '../types'
 
-interface ChatRequest {
-  message: string
-  chatId?: string
-  agentSlug?: string
-}
+/**
+ * Schema + helper exported for spec coverage. Not re-exported from the
+ * package index — consumers should not depend on these symbols.
+ */
+export const ChatRequestSchema = z.object({
+  message: z.string().min(1, 'Message is required'),
+  chatId: z.string().optional(),
+  agentSlug: z.string().optional()
+})
 
 const SERVICE_UNAVAILABLE = { error: 'AI service temporarily unavailable' }
+
+/**
+ * Subset of an Agent document that core needs to read at runtime.
+ *
+ * Each consumer's Agent collection has a different shape (custom fields,
+ * tenant relations, etc.) and the package can't reference the consumer's
+ * generated types. This interface declares what *core* depends on; the
+ * `payload.find` boundary cast lives at one site.
+ */
+interface AgentDoc {
+  slug: string
+  isActive?: boolean
+  llmModel?: string
+  apiKeyFingerprint?: string
+}
+
+interface RunCallbackContext {
+  agent: AgentDoc
+  userId: string | number
+  agentSlug: string
+  sessionId: string
+}
+
+function buildOnRunCompleted(
+  config: ResolvedPluginConfig,
+  ctx: RunCallbackContext,
+  payload: unknown
+): OnStreamRunCompleted | undefined {
+  if (!config.onRunCompleted) return undefined
+  const cb = config.onRunCompleted
+  const { llmModel, apiKeyFingerprint } = ctx.agent
+  return data => {
+    Promise.resolve(
+      cb(
+        {
+          ...data,
+          userId: ctx.userId,
+          agentSlug: ctx.agentSlug,
+          sessionId: ctx.sessionId,
+          llmModel,
+          apiKeyFingerprint
+        },
+        payload as import('payload').Payload
+      )
+    ).catch(err => {
+      console.error('[chat] onRunCompleted callback failed:', err)
+    })
+  }
+}
 
 /**
  * Call the runtime once and surface failures directly.
@@ -47,6 +103,30 @@ async function callRuntimeOnce(callRuntime: () => Promise<Response>): Promise<Re
   }
 }
 
+export type ChatBodyParseResult =
+  | { ok: true; data: z.infer<typeof ChatRequestSchema> }
+  | { ok: false; response: Response }
+
+export async function parseChatBody(req: Parameters<PayloadHandler>[0]): Promise<ChatBodyParseResult> {
+  let raw: unknown
+  try {
+    raw = await req.json?.()
+  } catch {
+    return { ok: false, response: Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
+  }
+  const parsed = ChatRequestSchema.safeParse(raw)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      response: Response.json({ error: 'Invalid payload', details: parsed.error.flatten() }, { status: 422 })
+    }
+  }
+  if (!parsed.data.message.trim()) {
+    return { ok: false, response: Response.json({ error: 'Message is required' }, { status: 400 }) }
+  }
+  return { ok: true, data: parsed.data }
+}
+
 export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler {
   return async req => {
     const { user, payload } = req
@@ -55,19 +135,11 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Parse body ──────────────────────────────────────────────────────
-    let body: ChatRequest
-    try {
-      body = (await req.json?.()) as ChatRequest
-    } catch {
-      return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
-    }
-    const { message, agentSlug, chatId } = body
-    if (!message?.trim()) {
-      return Response.json({ error: 'Message is required' }, { status: 400 })
-    }
+    const body = await parseChatBody(req)
+    if (!body.ok) return body.response
+    const { message, agentSlug, chatId } = body.data
 
     // ── Load agent from Payload ─────────────────────────────────────────
-    const userRecord = user as unknown as Record<string, unknown>
     const where: Where = { isActive: { equals: true } }
     if (agentSlug) {
       where.slug = { equals: agentSlug }
@@ -82,13 +154,15 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
       req
     })
 
-    const agent = agents[0] as Record<string, unknown> | undefined
-    if (!agent) {
+    // The package can't reference the consumer's typed Agent doc, so we
+    // narrow once here to the subset core actually reads. See AgentDoc.
+    const agent = agents[0] as unknown as AgentDoc | undefined
+    if (!agent || typeof agent.slug !== 'string') {
       return Response.json({ error: 'Agent not found' }, { status: 404 })
     }
 
     // ── Token budget ────────────────────────────────────────────────────
-    const userId = (user as unknown as { id: string | number }).id
+    const userId = getUserId(user)
     const usage = await getTokenUsage(payload, userId, config.getDailyLimit)
     // Conservative estimate: user message tokens + fixed overhead for
     // system prompt, RAG context, tool calls, and model output.
@@ -109,13 +183,13 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     }
 
     // ── Session ID ──────────────────────────────────────────────────────
-    const agentSlugValue = agent.slug as string
+    const agentSlugValue = agent.slug
     if (chatId) {
-      const ok = await config.validateSessionOwnership(chatId, { user: userRecord, payload, req })
+      const ok = await config.validateSessionOwnership(chatId, { user, payload, req })
       if (!ok) return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
     const sessionId = await config.buildSessionId({
-      user: userRecord,
+      user,
       agentSlug: agentSlugValue,
       chatId,
       payload,
@@ -123,10 +197,22 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     })
     const upstreamUrl = `${config.runtimeUrl}/agents/${encodeURIComponent(agentSlugValue)}/runs`
 
+    let extraHeaders: Record<string, string> = {}
+    if (config.getRuntimeHeaders) {
+      try {
+        extraHeaders = await config.getRuntimeHeaders({ user, payload, req })
+      } catch (err) {
+        payload.logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          '[agent-plugin] getRuntimeHeaders threw — proceeding without extra headers'
+        )
+      }
+    }
+
     const callRuntime = () =>
       runtimeFetch(upstreamUrl, config.runtimeSecret, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...extraHeaders },
         body: new URLSearchParams({
           message,
           user_id: String(userId),
@@ -141,7 +227,8 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
       return Response.json(SERVICE_UNAVAILABLE, { status: 503 })
     }
 
-    const stream = translateAgnoStream(upstream.body, sessionId, usage)
+    const onRunCompleted = buildOnRunCompleted(config, { agent, userId, agentSlug: agentSlugValue, sessionId }, payload)
+    const stream = translateAgnoStream(upstream.body, sessionId, usage, onRunCompleted)
 
     return new Response(stream, {
       headers: {

@@ -1,101 +1,142 @@
-import type { Payload, PayloadRequest } from 'payload'
-import { describe, expect, it } from 'vitest'
+import type { Payload, PayloadRequest, TypedUser } from 'payload'
+import { describe, expect, it, vi } from 'vitest'
 import { multiTenantSessionStrategy } from './multi-tenant'
 
-/** Minimal stub of PayloadRequest — the strategy only reads whatever the
- *  consumer's `extractTenantId` looks at, so we can stay small. */
-function makeReq(cookieTenantId: number | string | null, payloadDb?: Partial<Payload['db']>): PayloadRequest {
-  const headers = new Headers()
-  if (cookieTenantId !== null) headers.set('cookie', `payload-tenant=${cookieTenantId}`)
-  return {
-    headers,
-    payload: { db: { defaultIDType: 'number', ...payloadDb } }
-  } as unknown as PayloadRequest
+/** Minimal request stub — the strategy only forwards it to `extractTenantId`. */
+function makeReq(): PayloadRequest {
+  return { headers: new Headers() } as unknown as PayloadRequest
 }
 
-/** Re-implements the consumer's extractor (apps/server/src/payload.config.ts):
- *  read the `payload-tenant` cookie, fall back to `user.tenants[0]`. */
-function extractTenantLikeConsumer(user: Record<string, unknown>, req: PayloadRequest): string | number | undefined {
-  const cookie = req.headers.get('cookie') ?? ''
-  const match = cookie.match(/payload-tenant=(\d+)/)
-  if (match?.[1]) return Number(match[1])
-  const tenants = user.tenants as Array<{ tenant: number | { id: number } }> | undefined | null
-  if (!tenants?.[0]) return undefined
-  const t = tenants[0].tenant
-  return typeof t === 'object' && t !== null ? t.id : t
+/** Build a fake Payload whose drizzle.execute returns the rows the test wants. */
+function makePayload(rows: Record<string, unknown>[] = []) {
+  const execute = vi.fn(async () => ({ rows }))
+  const warn = vi.fn()
+  const payload = {
+    db: { drizzle: { execute } },
+    logger: { warn }
+  } as unknown as Payload
+  return { payload, execute, warn }
 }
 
-const strategy = multiTenantSessionStrategy({ extractTenantId: extractTenantLikeConsumer })
+const alice = { id: 42, collection: 'users' } as unknown as TypedUser
 
-const alice = { id: 42, tenants: [{ tenant: 1 }, { tenant: 2 }] }
-
-describe('multiTenantSessionStrategy — tenant-aware session ids', () => {
-  it('buildSessionId embeds the tenant from the cookie, not tenants[0]', async () => {
-    const req = makeReq(2)
-    const sessionId = await strategy.buildSessionId({
-      user: alice,
-      agentSlug: 'bastos',
-      payload: {} as Payload,
-      req
-    })
-    expect(sessionId.startsWith('bastos:2:42:')).toBe(true)
+describe('multiTenantSessionStrategy — buildSessionId', () => {
+  const strategy = multiTenantSessionStrategy({
+    extractTenantId: () => 1
   })
 
-  it('buildSessionId falls back to tenants[0] when no cookie is present', async () => {
-    const req = makeReq(null)
-    const sessionId = await strategy.buildSessionId({
-      user: alice,
-      agentSlug: 'bastos',
-      payload: {} as Payload,
-      req
-    })
-    expect(sessionId.startsWith('bastos:1:42:')).toBe(true)
+  it('returns a fresh opaque UUID when no chatId is provided', async () => {
+    const { payload } = makePayload()
+    const id1 = await strategy.buildSessionId({ user: alice, agentSlug: 'bastos', payload, req: makeReq() })
+    const id2 = await strategy.buildSessionId({ user: alice, agentSlug: 'bastos', payload, req: makeReq() })
+    expect(id1).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(id1).not.toBe(id2)
   })
 
-  it('buildSessionId passes through an existing chatId unchanged', async () => {
+  it('passes through an existing chatId unchanged', async () => {
+    const { payload } = makePayload()
     const sessionId = await strategy.buildSessionId({
       user: alice,
       agentSlug: 'bastos',
       chatId: 'continuing-chat-abc',
-      payload: {} as Payload,
-      req: makeReq(2)
+      payload,
+      req: makeReq()
     })
     expect(sessionId).toBe('continuing-chat-abc')
   })
+})
 
-  it('validateSessionOwnership accepts sessions whose tenant matches the active cookie', async () => {
-    const ok = await strategy.validateSessionOwnership('bastos:2:42:some-uuid', {
-      user: alice,
-      payload: {} as Payload,
-      req: makeReq(2)
+describe('multiTenantSessionStrategy — validateSessionOwnership', () => {
+  it('returns true when canBypass short-circuits (no DB query)', async () => {
+    const strategy = multiTenantSessionStrategy({
+      extractTenantId: () => 1,
+      canBypass: () => true
     })
+    const { payload, execute } = makePayload()
+    const ok = await strategy.validateSessionOwnership('any-session', { user: alice, payload, req: makeReq() })
+    expect(ok).toBe(true)
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('returns false when the user has no id', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
+    const { payload, execute } = makePayload()
+    const ok = await strategy.validateSessionOwnership('s', {
+      user: { collection: 'users' } as unknown as TypedUser,
+      payload,
+      req: makeReq()
+    })
+    expect(ok).toBe(false)
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('returns false when extractTenantId returns null', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => null })
+    const { payload, execute } = makePayload()
+    const ok = await strategy.validateSessionOwnership('s', { user: alice, payload, req: makeReq() })
+    expect(ok).toBe(false)
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('returns false when the session is not found in agno_sessions', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
+    const { payload, warn } = makePayload([])
+    const ok = await strategy.validateSessionOwnership('missing-session', {
+      user: alice,
+      payload,
+      req: makeReq()
+    })
+    expect(ok).toBe(false)
+    expect(warn).toHaveBeenCalledOnce()
+  })
+
+  it('returns true when stored user_id and tenant_id both match', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
+    const { payload } = makePayload([{ user_id: '42', tenant_id: '1' }])
+    const ok = await strategy.validateSessionOwnership('s', { user: alice, payload, req: makeReq() })
     expect(ok).toBe(true)
   })
 
-  it('validateSessionOwnership rejects sessions tagged with a different tenant than the active one', async () => {
-    const ok = await strategy.validateSessionOwnership('bastos:1:42:some-uuid', {
-      user: alice,
-      payload: {} as Payload,
-      req: makeReq(2)
-    })
+  it('returns false when stored user_id differs', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
+    const { payload, warn } = makePayload([{ user_id: '99', tenant_id: '1' }])
+    const ok = await strategy.validateSessionOwnership('s', { user: alice, payload, req: makeReq() })
     expect(ok).toBe(false)
+    expect(warn).toHaveBeenCalledOnce()
   })
 
-  it('validateSessionOwnership rejects sessions for a different user even if the tenant matches', async () => {
-    const ok = await strategy.validateSessionOwnership('bastos:2:99:some-uuid', {
-      user: alice,
-      payload: {} as Payload,
-      req: makeReq(2)
-    })
+  it('returns false when stored tenant_id differs', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
+    const { payload, warn } = makePayload([{ user_id: '42', tenant_id: '2' }])
+    const ok = await strategy.validateSessionOwnership('s', { user: alice, payload, req: makeReq() })
     expect(ok).toBe(false)
+    expect(warn).toHaveBeenCalledOnce()
   })
 
-  it('validateSessionOwnership rejects when the user has no id', async () => {
-    const ok = await strategy.validateSessionOwnership('bastos:2:42:some-uuid', {
-      user: { tenants: alice.tenants },
-      payload: {} as Payload,
-      req: makeReq(2)
-    })
+  it('returns false when metadata.tenant_id is missing (runtime not forwarding X-Tenant-Id)', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
+    const { payload, warn } = makePayload([{ user_id: '42', tenant_id: null }])
+    const ok = await strategy.validateSessionOwnership('s', { user: alice, payload, req: makeReq() })
     expect(ok).toBe(false)
+    expect(warn).toHaveBeenCalledOnce()
+    // First arg is the log object; second is the message
+    const message = warn.mock.calls[0]?.[1] as string | undefined
+    expect(message).toContain('metadata.tenant_id missing')
+  })
+})
+
+describe('multiTenantSessionStrategy — getRuntimeHeaders', () => {
+  it('forwards the tenant id as X-Tenant-Id when present', () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 7 })
+    const { payload } = makePayload()
+    const headers = strategy.getRuntimeHeaders({ user: alice, payload, req: makeReq() })
+    expect(headers).toEqual({ 'X-Tenant-Id': '7' })
+  })
+
+  it('returns an empty object when no tenant is resolved', () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => null })
+    const { payload } = makePayload()
+    const headers = strategy.getRuntimeHeaders({ user: alice, payload, req: makeReq() })
+    expect(headers).toEqual({})
   })
 })

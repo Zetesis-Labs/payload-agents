@@ -7,32 +7,14 @@
  *   - DELETE {basePath}/session
  */
 
-import type { PayloadHandler } from 'payload'
+import type { PayloadHandler, TypedUser } from 'payload'
+import { type AgnoMessage, extractMessagesFromRuns, parseAgnoRuns, parseAgnoSession } from '../lib/agno-schema'
 import { runtimeFetch } from '../lib/runtime-client'
 import { dedupSources, extractSources } from '../lib/sources'
+import { getUserId } from '../lib/user'
 import type { ResolvedPluginConfig, Source } from '../types'
 
-// ── Agno types ──────────────────────────────────────────────────────────
-
-interface AgnoMessage {
-  role: string
-  content?: string | null
-  tool_name?: string
-  tool_call_id?: string
-  tool_calls?: Array<{
-    id: string
-    function: { name: string; arguments: string }
-  }>
-}
-
-interface AgnoSessionDetail {
-  session_id: string
-  session_name: string
-  agent_id?: string
-  chat_history?: AgnoMessage[]
-  created_at?: string
-  updated_at?: string
-}
+// ── Local view types (mapped output, not Agno's wire shape) ───────────────
 
 interface ToolCallOut {
   id: string
@@ -131,16 +113,6 @@ function mapMessages(history: AgnoMessage[]): MappedMessage[] {
   return result
 }
 
-function extractMessagesFromRuns(runs: Array<{ messages?: AgnoMessage[] }>): AgnoMessage[] {
-  const all: AgnoMessage[] = []
-  for (const run of runs) {
-    if (run.messages) {
-      all.push(...run.messages)
-    }
-  }
-  return all
-}
-
 /** Fetch session detail + runs and return a formatted response body. */
 async function fetchSessionDetail(
   runtimeUrl: string,
@@ -160,8 +132,12 @@ async function fetchSessionDetail(
   ])
   if (!sessionRes.ok) return null
 
-  const session = (await sessionRes.json()) as AgnoSessionDetail
-  const allMessages = runsRes.ok ? extractMessagesFromRuns(await runsRes.json()) : session.chat_history || []
+  const session = parseAgnoSession(await sessionRes.json())
+  if (!session) return null
+
+  const allMessages: AgnoMessage[] = runsRes.ok
+    ? extractMessagesFromRuns(parseAgnoRuns(await runsRes.json()))
+    : (session.chat_history ?? [])
   return {
     conversation_id: session.session_id,
     title: session.session_name,
@@ -180,22 +156,21 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = user as unknown as Record<string, unknown>
-    const userId = (user as unknown as { id: string | number }).id
+    const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     const isActive = url.searchParams.get('active') === 'true'
 
     try {
       if (conversationId) {
-        const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+        const ok = await config.validateSessionOwnership(conversationId, { user, payload, req })
         if (!ok) return Response.json({ error: 'Forbidden' }, { status: 403 })
         const detail = await fetchSessionDetail(config.runtimeUrl, config.runtimeSecret, conversationId, userId)
         return detail ? Response.json(detail) : Response.json(null, { status: 404 })
       }
 
       if (isActive) {
-        return await handleActiveSession(config, userRecord, userId, req)
+        return await handleActiveSession(config, user, userId, req)
       }
 
       return Response.json(null, { status: 400 })
@@ -208,7 +183,7 @@ export function createSessionGetHandler(config: ResolvedPluginConfig): PayloadHa
 
 async function handleActiveSession(
   config: ResolvedPluginConfig,
-  userRecord: Record<string, unknown>,
+  user: TypedUser,
   userId: string | number,
   req: import('payload').PayloadRequest
 ): Promise<Response> {
@@ -229,7 +204,7 @@ async function handleActiveSession(
   let match: { session_id: string } | undefined
   for (const candidate of candidates) {
     const ok = await config.validateSessionOwnership(candidate.session_id, {
-      user: userRecord,
+      user,
       payload: req.payload,
       req
     })
@@ -253,14 +228,13 @@ export function createSessionPatchHandler(config: ResolvedPluginConfig): Payload
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = user as unknown as Record<string, unknown>
-    const userId = (user as unknown as { id: string | number }).id
+    const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
     }
-    const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+    const ok = await config.validateSessionOwnership(conversationId, { user: user, payload, req })
     if (!ok) {
       return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -307,14 +281,13 @@ export function createSessionDeleteHandler(config: ResolvedPluginConfig): Payloa
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRecord = user as unknown as Record<string, unknown>
-    const userId = (user as unknown as { id: string | number }).id
+    const userId = getUserId(user)
     const url = new URL(req.url || '', 'http://localhost')
     const conversationId = url.searchParams.get('conversationId')
     if (!conversationId) {
       return Response.json({ error: 'Missing conversationId' }, { status: 400 })
     }
-    const ok = await config.validateSessionOwnership(conversationId, { user: userRecord, payload, req })
+    const ok = await config.validateSessionOwnership(conversationId, { user, payload, req })
     if (!ok) {
       return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
