@@ -1,5 +1,11 @@
 # @zetesis/payload-agents-metrics
 
+## 0.1.2
+
+### Patch Changes
+
+- [#32](https://github.com/Zetesis-Labs/PayloadAgents/pull/32) [`419c5c7`](https://github.com/Zetesis-Labs/PayloadAgents/commit/419c5c77a4e8c2145cebd9cb41564a43678d9b94) Thanks [@Fiser12](https://github.com/Fiser12)! - Re-export `MetricsPluginResult` (the inferred return type of `metricsPlugin()`) from the package root. Without it, downstream packages that re-export `metricsPlugin(...)` fail with TS4023 ("Exported variable has or is using name from external module but cannot be named"). Same fix that landed in `76a92c1` and was lost in a rebase before the 0.1.0 release.
+
 ## 0.1.1
 
 ### Patch Changes
