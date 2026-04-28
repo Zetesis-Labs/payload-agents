@@ -8,6 +8,7 @@ import {
   getTopBuckets,
   getTotals
 } from '../lib/aggregate-query'
+import { applyTenantScope } from '../lib/apply-tenant-scope'
 import type { ResolvedMetricsConfig } from '../types'
 
 const VALID_GROUP_BY = new Set<GroupBy>([
@@ -52,16 +53,7 @@ export function createAggregateHandler(config: ResolvedMetricsConfig): PayloadHa
     const bucketsPage = Math.max(1, Number(url.searchParams.get('bucketsPage') ?? 1))
 
     const filters: AggregateFilters = { from, to, agentSlug, userId, apiKeySource, model, apiKeyFingerprint }
-
-    if ('allTenants' in access) {
-      if (tenantIdParam) filters.tenantId = tenantIdParam
-    } else {
-      if (tenantIdParam && access.tenantIds.includes(Number(tenantIdParam))) {
-        filters.tenantId = tenantIdParam
-      } else {
-        filters.tenantIds = access.tenantIds
-      }
-    }
+    applyTenantScope(filters, config, access, tenantIdParam)
 
     const [totals, bucketsPageResult, rawTopBuckets, series] = await Promise.all([
       getTotals(payload, config, filters),

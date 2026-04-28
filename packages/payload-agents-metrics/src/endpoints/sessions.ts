@@ -1,4 +1,5 @@
 import type { PayloadHandler } from 'payload'
+import { applyTenantScope } from '../lib/apply-tenant-scope'
 import { getSessions, type SessionFilters } from '../lib/sessions-query'
 import type { ResolvedMetricsConfig } from '../types'
 
@@ -20,16 +21,7 @@ export function createSessionsHandler(config: ResolvedMetricsConfig): PayloadHan
     const page = Math.max(1, Number(url.searchParams.get('page') ?? 1))
 
     const filters: SessionFilters = { from, to, agentSlug, userId, model }
-
-    if ('allTenants' in access) {
-      if (tenantIdParam) filters.tenantId = tenantIdParam
-    } else {
-      if (tenantIdParam && access.tenantIds.includes(Number(tenantIdParam))) {
-        filters.tenantId = tenantIdParam
-      } else {
-        filters.tenantIds = access.tenantIds
-      }
-    }
+    applyTenantScope(filters, config, access, tenantIdParam)
 
     const result = await getSessions(payload, config, filters, page)
     return Response.json(result)
