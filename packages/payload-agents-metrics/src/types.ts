@@ -13,10 +13,7 @@ export type AccessResult = { allTenants: true } | { tenantIds: Array<number | st
 export type CheckAccessFn = (payload: Payload, user: TypedUser) => Promise<AccessResult> | AccessResult
 
 /** Resolves the tenant ID for a given user when persisting usage events. */
-export type ResolveTenantIdFn = (
-  payload: Payload,
-  userId: string | number
-) => Promise<number | string | null>
+export type ResolveTenantIdFn = (payload: Payload, userId: string | number) => Promise<number | string | null>
 
 /** Shared between the multi-tenant and single-tenant variants. */
 interface MetricsPluginConfigBase {
