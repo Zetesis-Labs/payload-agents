@@ -54,13 +54,14 @@ export default buildConfig({
     return [
       typesensePlugin,
       agentPlugin({
-        runtimeUrl: process.env.AGENT_RUNTIME_URL || 'http://agent-runtime:8000',
+        runtimeUrl: process.env.AGENT_RUNTIME_URL || 'http://localhost:8000',
         runtimeSecret: process.env.INTERNAL_SECRET,
         getDailyLimit,
         encryptionKey: process.env.PAYLOAD_SECRET,
         basePath: '/chat',
         mediaCollectionSlug: 'media',
         taxonomyCollectionSlug: 'taxonomy',
+        searchCollectionOptions: [{ label: 'Posts', value: 'posts_chunk' }],
         onRunCompleted: metrics.onRunCompleted
       }),
       metrics
