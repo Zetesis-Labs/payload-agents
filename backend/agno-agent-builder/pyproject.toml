@@ -38,3 +38,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agno_agent_builder"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"agno_agent_builder/py.typed" = "agno_agent_builder/py.typed"
