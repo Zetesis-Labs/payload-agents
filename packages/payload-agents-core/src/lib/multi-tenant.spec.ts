@@ -113,15 +113,23 @@ describe('multiTenantSessionStrategy — validateSessionOwnership', () => {
     expect(warn).toHaveBeenCalledOnce()
   })
 
-  it('returns false when metadata.tenant_id is missing (runtime not forwarding X-Tenant-Id)', async () => {
+  it('back-fills tenant_id and returns true when stored tenant_id is null but user_id matches', async () => {
     const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
-    const { payload, warn } = makePayload([{ user_id: '42', tenant_id: null }])
+    const { payload, execute, warn } = makePayload([{ user_id: '42', tenant_id: null }])
+    const ok = await strategy.validateSessionOwnership('s', { user: alice, payload, req: makeReq() })
+    expect(ok).toBe(true)
+    expect(warn).not.toHaveBeenCalled()
+    // Two queries: SELECT to read the row, UPDATE to back-fill metadata.tenant_id.
+    expect(execute).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not back-fill and returns false when stored tenant_id is null but user_id differs', async () => {
+    const strategy = multiTenantSessionStrategy({ extractTenantId: () => 1 })
+    const { payload, execute, warn } = makePayload([{ user_id: '99', tenant_id: null }])
     const ok = await strategy.validateSessionOwnership('s', { user: alice, payload, req: makeReq() })
     expect(ok).toBe(false)
     expect(warn).toHaveBeenCalledOnce()
-    // First arg is the log object; second is the message
-    const message = warn.mock.calls[0]?.[1] as string | undefined
-    expect(message).toContain('metadata.tenant_id missing')
+    expect(execute).toHaveBeenCalledOnce()
   })
 })
 
