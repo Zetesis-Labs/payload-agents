@@ -4,12 +4,16 @@
  * - `buildSessionId` returns an opaque UUID. The id carries no ownership data.
  * - `validateSessionOwnership` queries `agno.agno_sessions` to verify the
  *   current user owns the session. Ownership lives in Agno's session row —
- *   `user_id` (native column) and `metadata->>'tenant_id'` (the agent-runtime
- *   is expected to populate this on session create).
+ *   `user_id` (native column) and `metadata->>'tenant_id'` (back-filled by
+ *   this strategy on the first validate; see below).
  *
- * The `agent-runtime` must write `{tenant_id, user_id}` into the session
- * `metadata` JSONB when it creates a session. An expression index on
- * `(metadata->>'tenant_id')` is recommended for query performance.
+ * Tenant back-fill: Agno (>=2.5) only writes the agent's static `metadata`
+ * to the session row, ignoring the per-run `metadata=` kwarg the runtime
+ * forwards from `X-Tenant-Id`. To keep `metadata.tenant_id` accurate without
+ * patching Agno, `validateSessionOwnership` updates the column the first
+ * time it sees a row with `metadata.tenant_id IS NULL` and a matching
+ * `user_id`. An expression index on `(metadata->>'tenant_id')` is
+ * recommended for query performance.
  */
 
 import { sql } from 'drizzle-orm'
@@ -107,21 +111,41 @@ export function multiTenantSessionStrategy(options: MultiTenantSessionStrategyOp
     }
     const storedUserId = row.user_id as string | null
     const storedTenantId = row.tenant_id as string | null
-    if (storedUserId !== String(userId) || storedTenantId !== String(tenantId)) {
+
+    if (storedUserId !== String(userId)) {
       payload.logger.warn(
-        {
-          sessionId,
-          expectedUserId: String(userId),
-          expectedTenantId: String(tenantId),
-          storedUserId,
-          storedTenantId
-        },
-        storedTenantId === null
-          ? '[multi-tenant] session ownership denied: metadata.tenant_id missing — runtime may not be forwarding X-Tenant-Id'
-          : '[multi-tenant] session ownership denied: tenant/user mismatch'
+        { sessionId, expectedUserId: String(userId), storedUserId },
+        '[multi-tenant] session ownership denied: user mismatch'
       )
       return false
     }
+
+    if (storedTenantId === null) {
+      // Two pitfalls in this UPDATE:
+      //   1. pg can't infer the type of jsonb_build_object's anyelement arg, so
+      //      the parameter needs an explicit ::text cast (else 42P18).
+      //   2. Postgres's `||` on non-object operands wraps both into an array
+      //      (e.g. 'null'::jsonb || {} → [null, {}]). COALESCE only catches SQL
+      //      NULL, not JSONB null/scalars/arrays — so we normalize via
+      //      jsonb_typeof before merging.
+      await db.execute(sql`
+        UPDATE agno.agno_sessions
+        SET metadata = (
+          CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END
+        ) || jsonb_build_object('tenant_id', ${String(tenantId)}::text)
+        WHERE session_id = ${sessionId}
+      `)
+      return true
+    }
+
+    if (storedTenantId !== String(tenantId)) {
+      payload.logger.warn(
+        { sessionId, expectedTenantId: String(tenantId), storedTenantId },
+        '[multi-tenant] session ownership denied: tenant mismatch'
+      )
+      return false
+    }
+
     return true
   }
 
