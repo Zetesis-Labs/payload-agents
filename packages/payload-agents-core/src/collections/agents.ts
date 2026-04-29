@@ -112,11 +112,8 @@ export function createAgentsCollection(config: ResolvedPluginConfig): Collection
                     name: 'searchCollections',
                     type: 'select',
                     hasMany: true,
-                    defaultValue: ['posts_chunk', 'books_chunk'],
-                    options: [
-                      { label: 'Posts', value: 'posts_chunk' },
-                      { label: 'Books', value: 'books_chunk' }
-                    ],
+                    defaultValue: config.searchCollectionOptions.map(opt => opt.value),
+                    options: config.searchCollectionOptions.map(opt => ({ label: opt.label, value: opt.value })),
                     admin: { description: 'Collections to search for RAG context' }
                   },
                   {

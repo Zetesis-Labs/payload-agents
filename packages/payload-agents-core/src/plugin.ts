@@ -18,6 +18,11 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
   if (!runtimeSecret) {
     console.warn('[agent-plugin] runtimeSecret is empty — all runtime requests will be unauthenticated')
   }
+  if (userConfig.searchCollectionOptions.length === 0) {
+    throw new Error(
+      '[agent-plugin] searchCollectionOptions cannot be empty — pass at least one chunked collection your agents are allowed to query'
+    )
+  }
   return {
     runtimeUrl: userConfig.runtimeUrl,
     runtimeSecret,
@@ -30,6 +35,7 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
     encryptionKey: userConfig.encryptionKey,
     mediaCollectionSlug: userConfig.mediaCollectionSlug,
     taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug,
+    searchCollectionOptions: userConfig.searchCollectionOptions,
     collectionOverrides: userConfig.collectionOverrides,
     onRunCompleted: userConfig.onRunCompleted
   }

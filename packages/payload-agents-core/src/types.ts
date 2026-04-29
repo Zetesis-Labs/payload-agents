@@ -137,6 +137,9 @@ export interface AgentPluginConfig {
    */
   taxonomyCollectionSlug: string
 
+  /** Options for the agent's `searchCollections` field. Empty arrays are rejected at boot. */
+  searchCollectionOptions: ReadonlyArray<{ label: string; value: string }>
+
   /**
    * Transform the Agents collection config before it is registered.
    *
@@ -249,6 +252,7 @@ export interface ResolvedPluginConfig {
   encryptionKey: string | undefined
   mediaCollectionSlug: string
   taxonomyCollectionSlug: string
+  searchCollectionOptions: ReadonlyArray<{ label: string; value: string }>
   collectionOverrides: CollectionOverrides | undefined
   onRunCompleted: OnRunCompleted | undefined
 }
