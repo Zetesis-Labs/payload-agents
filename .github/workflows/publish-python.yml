@@ -1,0 +1,52 @@
+name: Publish Python Package
+
+on:
+  push:
+    tags:
+      - "agno-agent-builder-v*"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Workspace package to publish"
+        required: true
+        default: "agno-agent-builder"
+        type: choice
+        options:
+          - agno-agent-builder
+
+jobs:
+  publish:
+    name: Build & publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/agno-agent-builder
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Resolve target package
+        id: target
+        run: |
+          if [ -n "${{ inputs.package }}" ]; then
+            echo "package=${{ inputs.package }}" >> "$GITHUB_OUTPUT"
+          else
+            ref="${GITHUB_REF##refs/tags/}"
+            echo "package=${ref%-v*}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build distribution
+        run: uv build --package "${{ steps.target.outputs.package }}"
+
+      - name: Publish to PyPI (trusted publisher / OIDC)
+        run: uv publish
