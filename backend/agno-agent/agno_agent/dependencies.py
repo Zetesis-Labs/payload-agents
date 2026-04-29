@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from fastapi import Request
 
 if TYPE_CHECKING:
-    from agent_runtime.registry import AgentRegistry
+    from agno_agent.registry import AgentRegistry
 
 
 async def get_registry(request: Request) -> AgentRegistry:

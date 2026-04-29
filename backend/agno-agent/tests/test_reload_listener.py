@@ -1,8 +1,8 @@
-"""Tests for `agent_runtime.reload_listener` helpers."""
+"""Tests for `agno_agent.reload_listener` helpers."""
 
 from __future__ import annotations
 
-from agent_runtime.reload_listener import _psycopg_url
+from agno_agent.reload_listener import _psycopg_url
 
 
 class TestPsycopgUrl:

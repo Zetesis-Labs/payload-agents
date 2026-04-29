@@ -8,7 +8,7 @@ history in the existing Payload Postgres (schema `agno`).
 ## Layout
 
 ```
-agent_runtime/
+agno_agent/
 ├── main.py       # FastAPI app, /agents/{slug}/run SSE, /internal/agents/reload
 ├── registry.py   # Loads Agents from Payload → builds agno.Agent per slug
 ├── config.py     # pydantic-settings env config
@@ -33,7 +33,7 @@ agent_runtime/
 ```bash
 cd payload-agents/services/agent-runtime
 uv sync
-DATABASE_URL=postgres://... uv run uvicorn agent_runtime.main:app --reload
+DATABASE_URL=postgres://... uv run uvicorn agno_agent.main:app --reload
 ```
 
 ## Build image

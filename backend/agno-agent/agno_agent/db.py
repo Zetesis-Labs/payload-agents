@@ -6,8 +6,8 @@ import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from agent_runtime.config import settings
-from agent_runtime.logging import get_logger
+from agno_agent.config import settings
+from agno_agent.logging import get_logger
 
 logger = get_logger(__name__)
 

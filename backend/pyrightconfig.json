@@ -1,7 +1,7 @@
 {
   "pythonVersion": "3.12",
   "typeCheckingMode": "standard",
-  "include": ["agent_runtime", "tests"],
+  "include": ["agno-agent/agno_agent", "agno-agent/tests"],
   "reportMissingImports": true,
   "reportUnusedImport": true,
   "reportUnusedVariable": true

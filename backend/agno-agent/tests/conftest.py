@@ -1,4 +1,4 @@
-"""Test bootstrap — set the required settings env vars *before* agent_runtime.config is imported.
+"""Test bootstrap — set the required settings env vars *before* agno_agent.config is imported.
 
 The Settings class validates `DATABASE_URL` and `INTERNAL_SECRET` at import
 time; without this shim every test module would fail to collect.

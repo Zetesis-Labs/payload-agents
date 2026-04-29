@@ -11,12 +11,12 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from agent_runtime.db import check_db
-from agent_runtime.dependencies import get_registry
-from agent_runtime.schemas import HealthResponse, ReadyResponse
+from agno_agent.db import check_db
+from agno_agent.dependencies import get_registry
+from agno_agent.schemas import HealthResponse, ReadyResponse
 
 if TYPE_CHECKING:
-    from agent_runtime.registry import AgentRegistry
+    from agno_agent.registry import AgentRegistry
 
 router = APIRouter(tags=["health"])
 

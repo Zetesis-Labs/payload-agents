@@ -1,21 +1,20 @@
-"""Tests for `agent_runtime.exceptions` — exception shapes and HTTP handler."""
+"""Tests for `agno_agent.exceptions` — exception shapes and HTTP handler."""
 
 from __future__ import annotations
 
 import json
 
 import pytest
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
-from agent_runtime.exceptions import (
+from agno_agent.exceptions import (
     AgentRuntimeError,
     AuthenticationError,
     InvalidModelError,
     MissingApiKeyError,
     UnsupportedProviderError,
-    agent_runtime_exception_handler,
+    agno_agent_exception_handler,
 )
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 
 class TestExceptionShapes:
@@ -62,7 +61,7 @@ class TestExceptionHandler:
         exc = InvalidModelError(slug="bastos", llm_model="bad")
         request = _make_request()
 
-        response = await agent_runtime_exception_handler(request, exc)
+        response = await agno_agent_exception_handler(request, exc)
 
         assert isinstance(response, JSONResponse)
         assert response.status_code == 422
@@ -78,11 +77,11 @@ class TestExceptionHandler:
     @pytest.mark.asyncio
     async def test_uses_exception_http_status(self) -> None:
         exc = AuthenticationError()
-        response = await agent_runtime_exception_handler(_make_request(), exc)
+        response = await agno_agent_exception_handler(_make_request(), exc)
         assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_default_base_error_is_500(self) -> None:
         exc = AgentRuntimeError("boom")
-        response = await agent_runtime_exception_handler(_make_request(), exc)
+        response = await agno_agent_exception_handler(_make_request(), exc)
         assert response.status_code == 500

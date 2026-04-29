@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
-# Uses ghcr.io/astral-sh/uv:python3.12-bookworm-slim as the base because it
-# bundles Python 3.12 + uv and lets us skip Docker Hub entirely (convenient
-# when upstream registries have flaky TLS through Cloudflare R2).
+# Build context expected at the workspace root (`backend/`). The image
+# targets the `agno-agent` member of the uv workspace; uv resolves and
+# installs the entire workspace from the shared lockfile.
 
 ARG BASE_IMAGE=ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
@@ -15,13 +15,13 @@ ENV UV_LINK_MODE=copy \
 
 WORKDIR /app
 
-# Install dependencies first to maximise layer caching
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock ./
+COPY agno-agent/pyproject.toml ./agno-agent/pyproject.toml
+COPY agno-agent/README.md ./agno-agent/README.md
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --frozen --no-dev --no-install-workspace
 
-# Then copy source and finalise the venv
-COPY agent_runtime ./agent_runtime
+COPY agno-agent/agno_agent ./agno-agent/agno_agent
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -47,4 +47,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD python -c "from urllib.request import urlopen; urlopen('http://localhost:8000/health', timeout=2)"
 
-CMD ["uvicorn", "agent_runtime.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "agno_agent.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

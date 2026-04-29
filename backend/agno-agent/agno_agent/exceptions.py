@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from agent_runtime.logging import get_logger
+from agno_agent.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -84,7 +84,7 @@ class AuthenticationError(AgentRuntimeError):
         )
 
 
-async def agent_runtime_exception_handler(request: Request, exc: AgentRuntimeError) -> JSONResponse:
+async def agno_agent_exception_handler(request: Request, exc: AgentRuntimeError) -> JSONResponse:
     """Global exception handler — consistent JSON error responses."""
     logger.warning(
         "Request error",

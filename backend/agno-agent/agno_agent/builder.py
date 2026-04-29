@@ -12,10 +12,10 @@ from agno.models.openai import OpenAIChat, OpenAIResponses
 from agno.tools.mcp import MCPTools
 from agno.tools.mcp.params import StreamableHTTPClientParams
 
-from agent_runtime.config import settings
-from agent_runtime.exceptions import InvalidModelError, MissingApiKeyError, UnsupportedProviderError
-from agent_runtime.instructions import compose_instructions, extract_taxonomy_slugs
-from agent_runtime.logging import get_logger
+from agno_agent.config import settings
+from agno_agent.exceptions import InvalidModelError, MissingApiKeyError, UnsupportedProviderError
+from agno_agent.instructions import compose_instructions, extract_taxonomy_slugs
+from agno_agent.logging import get_logger
 
 logger = get_logger(__name__)
 

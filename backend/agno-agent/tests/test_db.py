@@ -1,8 +1,8 @@
-"""Tests for `agent_runtime.db`."""
+"""Tests for `agno_agent.db`."""
 
 from __future__ import annotations
 
-from agent_runtime.db import normalize_pg_url
+from agno_agent.db import normalize_pg_url
 
 
 class TestNormalizePgUrl:

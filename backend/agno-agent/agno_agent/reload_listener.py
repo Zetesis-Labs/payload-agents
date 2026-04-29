@@ -15,9 +15,9 @@ from typing import Any
 
 import psycopg
 
-from agent_runtime.config import settings
-from agent_runtime.db import normalize_pg_url
-from agent_runtime.logging import get_logger
+from agno_agent.config import settings
+from agno_agent.db import normalize_pg_url
+from agno_agent.logging import get_logger
 
 logger = get_logger(__name__)
 

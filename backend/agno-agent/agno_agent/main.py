@@ -28,27 +28,27 @@ from agno.agent.remote import RemoteAgent
 from agno.os import AgentOS
 from fastapi import APIRouter, Depends, Header
 
-from agent_runtime.config import settings
-from agent_runtime.db import dispose_shared_engine
-from agent_runtime.dependencies import get_registry
-from agent_runtime.exceptions import (
+from agno_agent.config import settings
+from agno_agent.db import dispose_shared_engine
+from agno_agent.dependencies import get_registry
+from agno_agent.exceptions import (
     AgentRuntimeError,
     AuthenticationError,
-    agent_runtime_exception_handler,
+    agno_agent_exception_handler,
 )
-from agent_runtime.health import router as health_router
-from agent_runtime.logging import configure_logging, get_logger
-from agent_runtime.middleware import (
+from agno_agent.health import router as health_router
+from agno_agent.logging import configure_logging, get_logger
+from agno_agent.middleware import (
     InternalAuthMiddleware,
     RequestIdMiddleware,
     SessionMetadataMiddleware,
 )
-from agent_runtime.registry import AgentRegistry
-from agent_runtime.reload_listener import run_reload_listener
-from agent_runtime.schemas import ErrorResponse, ReloadResponse
+from agno_agent.registry import AgentRegistry
+from agno_agent.reload_listener import run_reload_listener
+from agno_agent.schemas import ErrorResponse, ReloadResponse
 
 configure_logging(settings.log_level)
-logger = get_logger("agent_runtime")
+logger = get_logger("agno_agent")
 
 # ── Registry + AgentOS ─────────────────────────────────────────────────────
 
@@ -151,7 +151,7 @@ app = agent_os.get_app()
 app.add_middleware(SessionMetadataMiddleware)
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(InternalAuthMiddleware, secret=settings.internal_secret)
-app.add_exception_handler(AgentRuntimeError, agent_runtime_exception_handler)  # type: ignore[arg-type]
+app.add_exception_handler(AgentRuntimeError, agno_agent_exception_handler)  # type: ignore[arg-type]
 app.include_router(health_router)
 
 # ── Custom endpoints ───────────────────────────────────────────────────────
