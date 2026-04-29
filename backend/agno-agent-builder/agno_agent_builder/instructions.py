@@ -19,17 +19,25 @@ ARGUMENT SHAPE (read this before every call):
   Example: `["posts_chunk", "books_chunk"]`.
 - `filters` (object): facet filters. Keys are field names, values are
   strings or string arrays. The supported keys are `taxonomy_slugs`,
-  `tenant` and `headers`. Example: `{ "taxonomy_slugs": "bastos" }`.
+  `tenant` and `headers`. Example: `{ "taxonomy_slugs": "<slug>" }`.
 - COMMON MISTAKE: do NOT pass `filters: "posts_chunk"`. That is a
   collection name and belongs in `collections: ["posts_chunk"]`.
+
+TAXONOMY SLUGS:
+- Use ONLY the slugs declared in <RAG_CONFIG> when present.
+- If <RAG_CONFIG> is empty and you need to scope, FIRST call
+  `get_taxonomy_tree` to list the slugs that actually exist; then
+  pick from that list.
+- NEVER invent, guess, or default to a slug that has not appeared
+  in <RAG_CONFIG> or the taxonomy tree response.
 
 TWO-PASS WORKFLOW:
 
 Pass 1 — Discovery:
   Call `search_collections` with 1-2 concept keywords (default settings).
   Returns up to 20 hits truncated to 300 chars.
-  ALWAYS pass the taxonomy_slugs from <RAG_CONFIG> in `filters`
-  (object form, e.g. `{ "taxonomy_slugs": "bastos" }`).
+  Pass the taxonomy_slugs from <RAG_CONFIG> in `filters` (object form),
+  or omit `filters` entirely if no slugs are configured.
 
 Pass 2 — Expand:
   Call `search_collections` again with the SAME query adding:
