@@ -1,12 +1,12 @@
-"""Tests for `agno_agent.builder.build_model` provider/model mapping."""
+"""Tests for `agno_agent_builder.builder.build_model` provider/model mapping."""
 
 from __future__ import annotations
 
 import pytest
 from agno.models.anthropic import Claude
 from agno.models.openai import OpenAIChat, OpenAIResponses
-from agno_agent.builder import build_model
-from agno_agent.exceptions import UnsupportedProviderError
+from agno_agent_builder.builder import build_model
+from agno_agent_builder.exceptions import UnsupportedProviderError
 
 
 class TestBuildModel:

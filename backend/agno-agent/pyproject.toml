@@ -1,19 +1,14 @@
 [project]
 name = "agno-agent"
 version = "0.1.0"
-description = "Zetesis Portal Agent Runtime (Agno-based, shared multi-tenant)"
+description = "Default reference consumer of agno-agent-builder — env-loaded settings + Payload source, runs in the devcontainer."
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Zetesis Labs" }]
 dependencies = [
-    "agno[anthropic,mcp,openai,os,postgres]>=2.5.16",
-    "fastapi>=0.115",
-    "httpx>=0.28",
-    "psycopg[binary]>=3.2",
+    "agno-agent-builder",
     "pydantic-settings>=2.6",
-    "structlog>=24.1",
-    "uvicorn[standard]>=0.34",
 ]
 
 [build-system]

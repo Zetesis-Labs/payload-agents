@@ -47,7 +47,7 @@ def _format_processor(log_level: str) -> Any:
 
 def _add_request_id(_logger: Any, _method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     """Inject correlation ID from the request context if available."""
-    from agno_agent.middleware import request_id_var
+    from agno_agent_builder.middleware import request_id_var
 
     rid = request_id_var.get("")
     if rid:

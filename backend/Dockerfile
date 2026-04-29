@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
 #
-# Build context expected at the workspace root (`backend/`). The image
-# targets the `agno-agent` member of the uv workspace; uv resolves and
-# installs the entire workspace from the shared lockfile.
+# Build context expected at the workspace root (`backend/`). Targets the
+# `agno-agent` member of the uv workspace; that member depends on
+# `agno-agent-builder` (also in the workspace, eventually consumed from
+# PyPI by external repos).
 
 ARG BASE_IMAGE=ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
@@ -16,14 +17,17 @@ ENV UV_LINK_MODE=copy \
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
+COPY agno-agent-builder/pyproject.toml ./agno-agent-builder/pyproject.toml
+COPY agno-agent-builder/README.md ./agno-agent-builder/README.md
 COPY agno-agent/pyproject.toml ./agno-agent/pyproject.toml
 COPY agno-agent/README.md ./agno-agent/README.md
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-workspace
+    uv sync --frozen --no-dev --no-install-workspace --all-packages
 
+COPY agno-agent-builder/agno_agent_builder ./agno-agent-builder/agno_agent_builder
 COPY agno-agent/agno_agent ./agno-agent/agno_agent
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --all-packages
 
 # ── Runtime stage ──────────────────────────────────────────────────────────
 FROM ${BASE_IMAGE} AS runtime

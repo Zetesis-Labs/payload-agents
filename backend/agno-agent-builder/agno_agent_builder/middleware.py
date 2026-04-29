@@ -2,10 +2,9 @@
 
 - ``RequestIdMiddleware``: propagates ``X-Request-ID`` via contextvars.
 - ``InternalAuthMiddleware``: validates ``X-Internal-Secret`` on all
-  routes except health probes and docs.
+  routes except a configurable public allowlist.
 - ``SessionMetadataMiddleware``: reads ``X-Tenant-Id`` on run requests
-  and stashes ``{"tenant_id": ...}`` into ``request.state.metadata`` so
-  Agno persists it into ``agno_sessions.metadata``.
+  and stashes ``{"tenant_id": ...}`` into ``request.state.metadata``.
 """
 
 from __future__ import annotations
@@ -21,11 +20,7 @@ request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
 
 class RequestIdMiddleware:
-    """Extracts or generates X-Request-ID and propagates it via contextvars.
-
-    Implemented as a raw ASGI middleware so streaming responses (SSE) are
-    forwarded frame-by-frame instead of being buffered.
-    """
+    """Extracts or generates X-Request-ID and propagates it via contextvars."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -49,20 +44,13 @@ class RequestIdMiddleware:
         await self.app(scope, receive, send_with_rid)
 
 
-# Paths that must remain unauthenticated (health probes, OpenAPI docs).
-_PUBLIC_PATHS = frozenset({"/health", "/ready", "/docs", "/openapi.json"})
-
-
 class InternalAuthMiddleware:
-    """Reject requests without a valid ``X-Internal-Secret`` header.
+    """Reject requests without a valid ``X-Internal-Secret`` header."""
 
-    Health and docs endpoints are excluded so that Kubernetes probes
-    and Swagger UI keep working without credentials.
-    """
-
-    def __init__(self, app: ASGIApp, *, secret: str) -> None:
+    def __init__(self, app: ASGIApp, *, secret: str, public_paths: tuple[str, ...]) -> None:
         self.app = app
         self._secret = secret
+        self._public_paths = frozenset(public_paths)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -70,7 +58,7 @@ class InternalAuthMiddleware:
             return
 
         path: str = scope.get("path", "")
-        if path in _PUBLIC_PATHS:
+        if path in self._public_paths:
             await self.app(scope, receive, send)
             return
 
@@ -85,22 +73,12 @@ class InternalAuthMiddleware:
 
 
 # Matches `POST /agents/{slug}/runs` — the only AgentOS endpoint that
-# creates or updates an agno session row. Other endpoints don't touch
-# `agno_sessions`, so metadata injection would be noise.
+# creates or updates an agno session row.
 _RUNS_PATH_RE = re.compile(r"^/agents/[^/]+/runs/?$")
 
 
 class SessionMetadataMiddleware:
-    """Forward `X-Tenant-Id` from the portal into `request.state.metadata`.
-
-    AgentOS's agent router lifts `request.state.metadata` and passes it to
-    `agent.arun(metadata=...)`, which Agno persists into the session's
-    `metadata` JSONB column. The portal reads that column back via
-    `metadata->>'tenant_id'` to gate session ownership across tenants.
-
-    Acts only on `POST /agents/{slug}/runs`; other requests are passed
-    through untouched.
-    """
+    """Forward `X-Tenant-Id` from the portal into `request.state.metadata`."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app

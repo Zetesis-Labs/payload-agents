@@ -60,7 +60,7 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Type check (mypy)
-        run: uv run mypy agno-agent/agno_agent
+        run: uv run mypy agno-agent-builder/agno_agent_builder agno-agent/agno_agent
 
       - name: Tests (pytest)
-        run: uv run --package agno-agent pytest agno-agent/tests -q
+        run: uv run --package agno-agent-builder pytest agno-agent-builder/tests -q

@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from agno_agent.logging import get_logger
+from agno_agent_builder.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -84,8 +84,15 @@ class AuthenticationError(AgentRuntimeError):
         )
 
 
-async def agno_agent_exception_handler(request: Request, exc: AgentRuntimeError) -> JSONResponse:
-    """Global exception handler — consistent JSON error responses."""
+async def agno_agent_builder_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Global exception handler — consistent JSON error responses.
+
+    Signature matches Starlette's `add_exception_handler` callback shape
+    (takes `Exception`, not the narrower `AgentRuntimeError`); the runtime
+    type is guaranteed by the registration call but mypy can't see that.
+    """
+    if not isinstance(exc, AgentRuntimeError):
+        raise exc
     logger.warning(
         "Request error",
         code=exc.code,

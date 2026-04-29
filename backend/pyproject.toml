@@ -5,9 +5,10 @@ description = "Workspace root for Zetesis Python services."
 requires-python = ">=3.12"
 
 [tool.uv.workspace]
-members = ["agno-agent"]
+members = ["agno-agent-builder", "agno-agent"]
 
 [tool.uv.sources]
+agno-agent-builder = { workspace = true }
 agno-agent = { workspace = true }
 
 [dependency-groups]

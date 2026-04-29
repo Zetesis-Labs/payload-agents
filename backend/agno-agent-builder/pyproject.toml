@@ -1,0 +1,40 @@
+[project]
+name = "agno-agent-builder"
+version = "0.1.0"
+description = "Parametrizable Agno-based agent runtime — FastAPI factory with pluggable agent sources, multi-tenant headers, and LISTEN/NOTIFY hot reload."
+requires-python = ">=3.12"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Zetesis Labs" }]
+keywords = ["agno", "agent", "fastapi", "llm", "rag", "mcp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "agno[anthropic,mcp,openai,os,postgres]>=2.5.16",
+    "fastapi>=0.115",
+    "httpx>=0.28",
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.9",
+    "structlog>=24.1",
+    "uvicorn[standard]>=0.34",
+]
+
+[project.urls]
+Homepage = "https://github.com/Zetesis-Labs/PayloadAgents"
+Repository = "https://github.com/Zetesis-Labs/PayloadAgents"
+Issues = "https://github.com/Zetesis-Labs/PayloadAgents/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agno_agent_builder"]

@@ -11,6 +11,7 @@ resolution-markers = [
 [manifest]
 members = [
     "agno-agent",
+    "agno-agent-builder",
     "zetesis-backend",
 ]
 
@@ -67,11 +68,26 @@ name = "agno-agent"
 version = "0.1.0"
 source = { editable = "agno-agent" }
 dependencies = [
+    { name = "agno-agent-builder" },
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agno-agent-builder", editable = "agno-agent-builder" },
+    { name = "pydantic-settings", specifier = ">=2.6" },
+]
+
+[[package]]
+name = "agno-agent-builder"
+version = "0.1.0"
+source = { editable = "agno-agent-builder" }
+dependencies = [
     { name = "agno", extra = ["anthropic", "mcp", "openai", "os", "postgres"] },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic-settings" },
+    { name = "pydantic" },
     { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -82,7 +98,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
-    { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "pydantic", specifier = ">=2.9" },
     { name = "structlog", specifier = ">=24.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
 ]
