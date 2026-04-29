@@ -1,5 +1,13 @@
 # @zetesis/payload-agents-metrics
 
+## 0.1.3
+
+### Patch Changes
+
+- [#34](https://github.com/Zetesis-Labs/PayloadAgents/pull/34) [`7636261`](https://github.com/Zetesis-Labs/PayloadAgents/commit/763626164d176eae2603ef2780b110ee949d29f6) Thanks [@Fiser12](https://github.com/Fiser12)! - Fix `/llm-usage/sessions` 500 caused by a malformed `text[]` parameter.
+
+  `batchFetchFirstMessages` was rewritten in 0.1.1 to use `session_id = ANY($1::text[])`. With drizzle-orm + node-postgres the JS array is bound as a single string parameter, so Postgres receives e.g. `"af571d36-..."` and fails the `::text[]` cast with "malformed array literal". Switched to `session_id IN (...)` expanded via `sql.join`, which emits one parameterised placeholder per id and uses the session_id index just as well as the original OR list.
+
 ## 0.1.2
 
 ### Patch Changes
