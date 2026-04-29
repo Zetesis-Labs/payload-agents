@@ -1,5 +1,5 @@
 ---
-'@zetesis/payload-agents-core': minor
+'@zetesis/payload-agents-core': patch
 ---
 
 **BREAKING**: `agentPlugin({...})` now requires `searchCollectionOptions` in its config.
