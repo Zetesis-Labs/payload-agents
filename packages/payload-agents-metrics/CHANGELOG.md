@@ -1,5 +1,12 @@
 # @zetesis/payload-agents-metrics
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`5c8a958`](https://github.com/Zetesis-Labs/PayloadAgents/commit/5c8a958d90237b0a8dcbee03b068e5fd1944e04c)]:
+  - @zetesis/payload-agents-core@0.3.2
+
 ## 0.1.3
 
 ### Patch Changes
