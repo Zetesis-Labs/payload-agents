@@ -1,5 +1,11 @@
 # @zetesis/chat-agent
 
+## 0.2.4
+
+### Patch Changes
+
+- [#39](https://github.com/Zetesis-Labs/PayloadAgents/pull/39) [`e2d24b0`](https://github.com/Zetesis-Labs/PayloadAgents/commit/e2d24b04fb6d79e51d93f36345dc7e6cb7493632) Thanks [@Fiser12](https://github.com/Fiser12)! - Fix hydration error caused by nested `<button>` in the chat history list. Each session row was rendered as a `<button>` with rename/delete/options child buttons inside; the resulting markup is invalid HTML and React aborts hydration. Replaced the outer element with a `<div role="button" tabIndex={0}>` and added an Enter/Space `onKeyDown` handler so keyboard activation still works.
+
 ## 0.2.1
 
 ### Patch Changes
