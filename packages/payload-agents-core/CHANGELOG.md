@@ -1,5 +1,11 @@
 # @zetesis/payload-agents-core
 
+## 0.3.3
+
+### Patch Changes
+
+- [#40](https://github.com/Zetesis-Labs/PayloadAgents/pull/40) [`df9703e`](https://github.com/Zetesis-Labs/PayloadAgents/commit/df9703e8bf42b6abe9e38f76a47ec7dba0892188) Thanks [@Fiser12](https://github.com/Fiser12)! - Self-heal `agno_sessions.metadata.tenant_id` from `validateSessionOwnership`. Agno (>=2.5) only persists the agent's static `metadata` field on the session row and ignores the per-run `metadata=` kwarg, so the runtime's `X-Tenant-Id` forwarding never reached `agno_sessions.metadata` and every continuation/history/rename/delete on a multi-tenant deploy returned `Forbidden`. The strategy now back-fills `metadata.tenant_id` the first time it sees a session whose `user_id` matches but `metadata.tenant_id` is null. The UPDATE casts the bound parameter to `::text` (otherwise pg can't infer `jsonb_build_object`'s anyelement arg type) and normalizes `metadata` via `jsonb_typeof` before merging (otherwise `'null'::jsonb || object` wraps both into an array).
+
 ## 0.3.2
 
 ### Patch Changes
