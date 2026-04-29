@@ -194,13 +194,19 @@ async function batchFetchFirstMessages(
   const result = new Map<string, string>()
   if (conversationIds.length === 0) return result
 
-  // session_id = ANY($1::text[]) is parameter-bound and uses the index on
-  // session_id — beats a chained OR list, which the planner expands into N
-  // separate predicates and degrades as PAGE_SIZE grows.
+  // session_id IN (...) emits one parameterised placeholder per id, which
+  // node-postgres binds correctly. ANY(${array}::text[]) looks cleaner but
+  // drizzle's sql template hands the JS array to pg as a single string
+  // ("uuid"), which Postgres can't cast to text[] (malformed array literal).
+  // sql.join with comma separators expands to ($1, $2, …) and uses the
+  // session_id index just as well as a chained OR list.
   const rows = await db.execute(sql`
     SELECT session_id, runs
     FROM ${sql.raw(agnoSessionsTable)}
-    WHERE session_id = ANY(${conversationIds}::text[])
+    WHERE session_id IN (${sql.join(
+      conversationIds.map(id => sql`${id}`),
+      sql`, `
+    )})
   `)
 
   for (const row of rows.rows) {
