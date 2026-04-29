@@ -274,7 +274,7 @@ export interface Agent {
   /**
    * Collections to search for RAG context
    */
-  searchCollections?: ('posts_chunk' | 'books_chunk')[] | null;
+  searchCollections?: 'posts_chunk'[] | null;
   /**
    * Taxonomies that filter the RAG content. REQUIRED: if empty, agent will not search any content.
    */

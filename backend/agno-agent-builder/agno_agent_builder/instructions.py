@@ -12,13 +12,24 @@ from agno_agent_builder.sources.types import AgentConfig
 DEFAULT_TOOL_PROTOCOL = """\
 You retrieve information using ONLY `search_collections`.
 
+ARGUMENT SHAPE (read this before every call):
+- `query` (string): 1-2 concept keywords. NEVER put author names or
+  meta-words ("opinión", "dice", "piensa", "encuentres") here.
+- `collections` (string[]): chunk-collection names to search across.
+  Example: `["posts_chunk", "books_chunk"]`.
+- `filters` (object): facet filters. Keys are field names, values are
+  strings or string arrays. The supported keys are `taxonomy_slugs`,
+  `tenant` and `headers`. Example: `{ "taxonomy_slugs": "bastos" }`.
+- COMMON MISTAKE: do NOT pass `filters: "posts_chunk"`. That is a
+  collection name and belongs in `collections: ["posts_chunk"]`.
+
 TWO-PASS WORKFLOW:
 
 Pass 1 — Discovery:
   Call `search_collections` with 1-2 concept keywords (default settings).
   Returns up to 20 hits truncated to 300 chars.
-  ALWAYS pass the taxonomy_slugs from <RAG_CONFIG> in `filters`.
-  NEVER put author names or meta-words ("opinión", "dice", "piensa") in the query.
+  ALWAYS pass the taxonomy_slugs from <RAG_CONFIG> in `filters`
+  (object form, e.g. `{ "taxonomy_slugs": "bastos" }`).
 
 Pass 2 — Expand:
   Call `search_collections` again with the SAME query adding:
