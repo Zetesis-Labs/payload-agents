@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@/payload.config'
 import Link from 'next/link'
@@ -17,6 +18,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
   const { page: pageParam } = await searchParams
   const currentPage = Math.max(1, Number(pageParam) || 1)
   const payload = await getPayload({ config })
+  const { user } = await payload.auth({ headers: await headers() })
   const { docs: posts, totalPages } = await payload.find({
     collection: 'posts',
     sort: '-publishedAt',
@@ -39,13 +41,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
         <p className="mt-3 text-lg text-muted-foreground">
           Open-source Payload CMS plugins for search, RAG & AI chat
         </p>
-        <div className="mt-4 flex items-center justify-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/admin"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             Admin Panel
           </Link>
+          {user && (
+            <Link
+              href="/api-tokens"
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-card"
+            >
+              API Tokens
+            </Link>
+          )}
           <a
             href="https://github.com/Zetesis-Labs/PayloadAgents"
             target="_blank"
