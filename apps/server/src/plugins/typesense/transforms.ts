@@ -2,24 +2,29 @@ import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical
 import { transformLexicalToMarkdown } from '@zetesis/payload-indexer'
 import { composeTextTransforms } from './text-transforms'
 
-/**
- * Transform categories relationship to taxonomy slugs array.
- * Extracts the deepest slug from each category via its last breadcrumb.
- */
 export const transformCategories = async (categories?: (number | Record<string, unknown>)[]): Promise<string[]> => {
   if (!categories || categories.length === 0) return []
 
   const slugs: string[] = []
 
   for (const cat of categories) {
-    if (!cat || typeof cat !== 'object' || !Array.isArray((cat as Record<string, unknown>).breadcrumbs)) continue
-    const breadcrumbs = (cat as Record<string, unknown>).breadcrumbs as { url?: string }[]
-    const lastBreadcrumb = [...breadcrumbs]
-      .reverse()
-      .find(b => b && typeof b === 'object' && 'url' in b && typeof b.url === 'string')
-    if (!lastBreadcrumb || typeof lastBreadcrumb.url !== 'string') continue
-    const parts = lastBreadcrumb.url.split('/').filter(Boolean)
-    slugs.push(...parts)
+    if (!cat || typeof cat !== 'object') continue
+    const record = cat as Record<string, unknown>
+
+    if (Array.isArray(record.breadcrumbs)) {
+      const breadcrumbs = record.breadcrumbs as { url?: string }[]
+      const lastBreadcrumb = [...breadcrumbs]
+        .reverse()
+        .find(b => b && typeof b === 'object' && 'url' in b && typeof b.url === 'string')
+      if (lastBreadcrumb && typeof lastBreadcrumb.url === 'string') {
+        slugs.push(...lastBreadcrumb.url.split('/').filter(Boolean))
+        continue
+      }
+    }
+
+    if (typeof record.slug === 'string' && record.slug.length > 0) {
+      slugs.push(record.slug)
+    }
   }
 
   return [...new Set(slugs)]

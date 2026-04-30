@@ -112,10 +112,10 @@ describe('DocumentSyncer', () => {
   })
 
   describe('syncDocument — content hash', () => {
-    it('skips re-embedding on update if content unchanged', async () => {
+    it('skips re-embedding on update if content unchanged (when opted in)', async () => {
       const doc = createMockDocument()
       const config = createMockTableConfig({
-        embedding: { fields: ['content'] }
+        embedding: { fields: ['content'], reuseEmbeddingsWhenContentUnchanged: true }
       })
 
       vi.mocked(
@@ -127,6 +127,22 @@ describe('DocumentSyncer', () => {
 
       expect(adapter.updateDocument).toHaveBeenCalledOnce()
       expect(adapter.upsertDocument).not.toHaveBeenCalled()
+    })
+
+    it('full re-syncs on update by default (no optimization opt-in)', async () => {
+      const doc = createMockDocument()
+      const config = createMockTableConfig({
+        embedding: { fields: ['content'] }
+      })
+
+      vi.mocked(
+        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
+      ).mockResolvedValue([{ content_hash: 'abc123hash' }])
+
+      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, embeddingService)
+
+      expect(adapter.upsertDocument).toHaveBeenCalledOnce()
+      expect(adapter.updateDocument).not.toHaveBeenCalled()
     })
 
     it('re-embeds on update if content changed', async () => {
