@@ -176,8 +176,13 @@ export class DocumentSyncer {
     const sourceText = this.config.embedding?.fields ? await this.extractSourceText(doc) : ''
     const contentHash = sourceText ? computeContentHash(sourceText) : undefined
 
-    // 3. Check if content is unchanged on update — skip re-embedding
-    if (contentHash && operation === 'update' && !this.options?.forceReindex) {
+    // 3. Check if content is unchanged on update — skip re-embedding (opt-in)
+    if (
+      contentHash &&
+      operation === 'update' &&
+      !this.options?.forceReindex &&
+      this.config.embedding?.reuseEmbeddingsWhenContentUnchanged
+    ) {
       const unchanged = await this.isContentUnchanged(contentHash, String(doc.id))
       if (unchanged) {
         const updated = await this.updateMetadataOnly(doc, contentHash)
@@ -220,7 +225,11 @@ export class DocumentSyncer {
     // 2. Compute content hash and check for changes
     const contentHash = computeContentHash(sourceText)
 
-    if (operation === 'update' && !this.options?.forceReindex) {
+    if (
+      operation === 'update' &&
+      !this.options?.forceReindex &&
+      this.config.embedding?.reuseEmbeddingsWhenContentUnchanged
+    ) {
       const unchanged = await this.isContentUnchanged(contentHash, String(doc.id))
       if (unchanged) {
         const updated = await this.updateMetadataOnly(doc, contentHash)

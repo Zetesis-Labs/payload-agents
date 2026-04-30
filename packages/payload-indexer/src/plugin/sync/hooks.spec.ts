@@ -153,6 +153,87 @@ describe('sync hooks', () => {
         })
       ).rejects.toThrow('sync failed')
     })
+
+    describe('syncDepth', () => {
+      it('does not refetch when no table config sets syncDepth', async () => {
+        const findByID = vi.fn()
+        const hook = getAfterChangeHook([createMockTableConfig()])
+
+        await hook?.({
+          doc: createMockDocument(),
+          operation: 'update',
+          req: { payload: { findByID } }
+        })
+
+        expect(findByID).not.toHaveBeenCalled()
+        expect(mockSyncDocumentToIndex).toHaveBeenCalledWith(
+          expect.anything(),
+          'posts',
+          expect.objectContaining({ id: 'doc-1' }),
+          'update',
+          expect.anything(),
+          undefined,
+          expect.anything()
+        )
+      })
+
+      it('refetches with the highest syncDepth and forwards the populated doc', async () => {
+        const populatedDoc = createMockDocument({ title: 'populated' })
+        const findByID = vi.fn().mockResolvedValue(populatedDoc)
+        const hook = getAfterChangeHook([
+          createMockTableConfig({ syncDepth: 1 }),
+          createMockTableConfig({ syncDepth: 2 })
+        ])
+
+        await hook?.({
+          doc: createMockDocument({ title: 'stale' }),
+          operation: 'update',
+          req: { payload: { findByID } }
+        })
+
+        expect(findByID).toHaveBeenCalledTimes(1)
+        expect(findByID).toHaveBeenCalledWith(
+          expect.objectContaining({
+            collection: 'posts',
+            id: 'doc-1',
+            depth: 2,
+            overrideAccess: true,
+            req: expect.anything()
+          })
+        )
+        expect(mockSyncDocumentToIndex).toHaveBeenCalledWith(
+          expect.anything(),
+          'posts',
+          expect.objectContaining({ title: 'populated' }),
+          'update',
+          expect.anything(),
+          undefined,
+          expect.anything()
+        )
+      })
+
+      it('falls back to the original doc when refetch throws', async () => {
+        const findByID = vi.fn().mockRejectedValue(new Error('not found'))
+        const hook = getAfterChangeHook([createMockTableConfig({ syncDepth: 1 })])
+
+        await hook?.({
+          doc: createMockDocument({ title: 'stale' }),
+          operation: 'update',
+          req: { payload: { findByID } }
+        })
+
+        expect(findByID).toHaveBeenCalledTimes(1)
+        expect(mockSyncDocumentToIndex).toHaveBeenCalledWith(
+          expect.anything(),
+          'posts',
+          expect.objectContaining({ title: 'stale' }),
+          'update',
+          expect.anything(),
+          undefined,
+          expect.anything()
+        )
+      })
+    })
   })
 
   describe('processTableConfigAfterChange', () => {

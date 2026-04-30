@@ -9,6 +9,7 @@ export const collections: IndexableCollectionConfig<TypesenseFieldMapping> = {
       enabled: true,
       tableName: 'posts_chunk',
       displayName: 'Posts (Chunked)',
+      syncDepth: 1,
       embedding: {
         fields: [{ field: 'content', transform: createDynamicContentTransform() }],
         chunking: { strategy: 'markdown', size: 2000, overlap: 300 }
@@ -31,6 +32,7 @@ export const collections: IndexableCollectionConfig<TypesenseFieldMapping> = {
       enabled: true,
       tableName: 'posts',
       displayName: 'Posts',
+      syncDepth: 1,
       fields: [
         { name: 'title', type: 'string' },
         { name: 'slug', type: 'string', index: true },

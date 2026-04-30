@@ -126,6 +126,22 @@ export interface EmbeddingTableConfig {
    * @default 'skip-chunk'
    */
   onEmbeddingFailure?: EmbeddingFailureBehavior
+
+  /**
+   * When true, on `update` operations the indexer compares the content hash
+   * against the stored one and, if unchanged, performs a partial metadata
+   * update instead of re-chunking and re-embedding. This saves embedding
+   * cost but its partial-update path can leave non-content fields stale in
+   * subtle ways (e.g. when a localized field is edited or when an updateable
+   * field's mapping changes).
+   *
+   * Default `false` — every update re-runs the full sync (re-chunk + re-embed).
+   * Opt in only when you have validated that all your mapped fields propagate
+   * correctly through the partial-update path for your adapter.
+   *
+   * @default false
+   */
+  reuseEmbeddingsWhenContentUnchanged?: boolean
 }
 
 /**
@@ -163,6 +179,18 @@ interface BaseTableConfig<TFieldMapping extends FieldMapping = FieldMapping> {
    * @returns boolean | Promise<boolean> - true to index, false to skip
    */
   shouldIndex?: (doc: Record<string, unknown>) => boolean | Promise<boolean>
+
+  /**
+   * Population depth for the document before running field transforms in the
+   * `afterChange` hook. Payload calls `afterChange` with depth=0 by default,
+   * so relationship fields arrive as IDs. Set this to >=1 when a transform
+   * needs access to populated relations (e.g. a slug from the related doc).
+   *
+   * Defaults to 0 (no refetch — preserves prior behavior).
+   *
+   * @default 0
+   */
+  syncDepth?: number
 }
 
 /**

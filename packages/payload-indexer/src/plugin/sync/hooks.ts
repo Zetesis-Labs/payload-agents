@@ -38,6 +38,61 @@ const processTableConfigAfterChange = async (
 }
 
 /**
+ * Minimal Payload client surface needed by the hook to repopulate docs.
+ * Kept narrow so tests can stub it without importing Payload types.
+ */
+interface PayloadFindByIDClient {
+  findByID: (args: {
+    collection: string
+    id: number | string
+    depth?: number
+    overrideAccess?: boolean
+    req?: unknown
+  }) => Promise<unknown>
+}
+
+interface AfterChangeReq {
+  context?: Record<string, unknown>
+  payload?: PayloadFindByIDClient
+}
+
+const resolveSyncDepth = (tableConfigs: TableConfig[]): number =>
+  tableConfigs.reduce((max, tableConfig) => (tableConfig.enabled ? Math.max(max, tableConfig.syncDepth ?? 0) : max), 0)
+
+const repopulateDoc = async (
+  doc: PayloadDocument,
+  collectionSlug: string,
+  tableConfigs: TableConfig[],
+  req: AfterChangeReq
+): Promise<PayloadDocument> => {
+  const requestedDepth = resolveSyncDepth(tableConfigs)
+  if (requestedDepth === 0 || !req.payload?.findByID) return doc
+
+  try {
+    const fresh = await req.payload.findByID({
+      collection: collectionSlug,
+      id: doc.id,
+      depth: requestedDepth,
+      overrideAccess: true,
+      // Pass req so the read joins the same transaction as the save that
+      // triggered the hook. Without this, Payload opens a new connection
+      // and reads the pre-commit snapshot, returning stale field values
+      // (e.g. the title from before the user's edit).
+      req
+    })
+    return fresh && typeof fresh === 'object' ? (fresh as PayloadDocument) : doc
+  } catch (error) {
+    logger.warn('Failed to repopulate doc for indexing, using afterChange doc as-is', {
+      collection: collectionSlug,
+      docId: String(doc.id),
+      requestedDepth,
+      error: error instanceof Error ? error.message : String(error)
+    })
+    return doc
+  }
+}
+
+/**
  * Creates the afterChange hook handler for a collection
  */
 const createAfterChangeHook = (
@@ -54,7 +109,7 @@ const createAfterChangeHook = (
   }: {
     doc: PayloadDocument
     operation: 'create' | 'update'
-    req: { context?: Record<string, unknown> }
+    req: AfterChangeReq
   }) => {
     if (req.context?.skipIndexSync) return
 
@@ -62,13 +117,15 @@ const createAfterChangeHook = (
       forceReindex: req.context?.forceReindex === true
     }
 
+    const populatedDoc = await repopulateDoc(doc, collectionSlug, tableConfigs, req)
+
     try {
       for (const tableConfig of tableConfigs) {
         await processTableConfigAfterChange(
           tableConfig,
           adapter,
           collectionSlug,
-          doc,
+          populatedDoc,
           operation,
           embeddingService,
           syncOptions
