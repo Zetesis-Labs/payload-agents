@@ -1,0 +1,12 @@
+{
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard",
+  "include": [
+    "agno-agent-builder/agno_agent_builder",
+    "agno-agent-builder/tests",
+    "agno-agent/agno_agent"
+  ],
+  "reportMissingImports": true,
+  "reportUnusedImport": true,
+  "reportUnusedVariable": true
+}

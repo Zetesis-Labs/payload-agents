@@ -16,6 +16,13 @@
       "cwd": "${workspaceFolder}/apps/mcp"
     },
     {
+      "name": "Agent Runtime",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "[ -f .env ] || cp .env.example .env; uv sync --all-packages && uv run --package agno-agent uvicorn agno_agent.main:app --reload --host 0.0.0.0 --port 8000",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
       "name": "Lint fix",
       "type": "node-terminal",
       "request": "launch",
@@ -40,7 +47,7 @@
   "compounds": [
     {
       "name": "Launch",
-      "configurations": ["Server", "MCP"],
+      "configurations": ["Server", "MCP", "Agent Runtime"],
       "stopAll": true
     },
     {

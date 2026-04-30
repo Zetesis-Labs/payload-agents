@@ -3,7 +3,7 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
-  "runServices": ["db", "typesense", "app", "agent-runtime"],
+  "runServices": ["db", "typesense", "app"],
   "forwardPorts": [3000, 3030, 5432, 8000, 8108],
   "portsAttributes": {
     "3000": { "label": "Payload CMS", "onAutoForward": "openPreview" },

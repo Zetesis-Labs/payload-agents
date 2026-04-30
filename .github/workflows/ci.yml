@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/agent-runtime
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +51,7 @@ jobs:
           enable-cache: true
 
       - name: Install Python + dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --all-packages
 
       - name: Lint (ruff)
         run: uv run ruff check .
@@ -60,7 +60,7 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Type check (mypy)
-        run: uv run mypy agent_runtime/
+        run: uv run mypy agno-agent-builder/agno_agent_builder agno-agent/agno_agent
 
       - name: Tests (pytest)
-        run: uv run pytest -q
+        run: uv run --package agno-agent-builder pytest agno-agent-builder/tests -q

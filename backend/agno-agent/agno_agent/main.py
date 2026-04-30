@@ -1,0 +1,25 @@
+"""ASGI entrypoint — `uvicorn agno_agent.main:app`."""
+
+from __future__ import annotations
+
+from agno_agent_builder import PayloadAgentSource, RuntimeConfig, create_app
+
+from agno_agent.settings import Settings
+
+settings = Settings()
+
+app = create_app(
+    RuntimeConfig(
+        app_name=settings.app_name,
+        agent_source=PayloadAgentSource(
+            base_url=settings.payload_url,
+            internal_secret=settings.internal_secret.get_secret_value(),
+            service_token=settings.payload_service_token or None,
+        ),
+        mcp_url=settings.mcp_url,
+        database_url=settings.database_url,
+        database_schema=settings.database_schema,
+        internal_secret=settings.internal_secret,
+        log_level=settings.log_level,
+    )
+)

@@ -51,30 +51,6 @@ services:
     networks:
       - default_network
 
-  agent-runtime:
-    build:
-      context: ../services/agent-runtime
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    env_file:
-      - devcontainer.env
-      - path: devcontainer.env.local
-        required: false
-    environment:
-      - LOG_LEVEL=DEBUG
-      - PAYLOAD_URL=http://app:3000
-      - MCP_URL=http://app:3030/mcp
-      - DATABASE_URL=postgresql://db_admin:devsecret@db:5432/payload_agents
-      - DATABASE_SCHEMA=agno
-      - INTERNAL_SECRET=dev
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - default_network
-
 volumes:
   node_modules:
   claude_memory:

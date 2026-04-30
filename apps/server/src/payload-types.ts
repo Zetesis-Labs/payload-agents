@@ -71,6 +71,7 @@ export interface Config {
     media: Media;
     posts: Post;
     taxonomy: Taxonomy;
+    'mcp-search-tokens': McpSearchToken;
     agents: Agent;
     'llm-usage-events': LlmUsageEvent;
     'payload-kv': PayloadKv;
@@ -84,6 +85,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
     taxonomy: TaxonomySelect<false> | TaxonomySelect<true>;
+    'mcp-search-tokens': McpSearchTokensSelect<false> | McpSearchTokensSelect<true>;
     agents: AgentsSelect<false> | AgentsSelect<true>;
     'llm-usage-events': LlmUsageEventsSelect<false> | LlmUsageEventsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -235,6 +237,33 @@ export interface Taxonomy {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mcp-search-tokens".
+ */
+export interface McpSearchToken {
+  id: number;
+  user: number | User;
+  /**
+   * Optional. If set, every search made with this token is auto-scoped to these taxonomy slugs (forwarded as `x-taxonomy-slugs` to the MCP server).
+   */
+  taxonomies?: (number | Taxonomy)[] | null;
+  /**
+   * Descriptive name (e.g. "Claude Desktop").
+   */
+  label: string;
+  tokenHash: string;
+  /**
+   * First chars of the token for identification.
+   */
+  tokenPrefix: string;
+  /**
+   * Last time this token authenticated a request.
+   */
+  lastUsedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agents".
  */
 export interface Agent {
@@ -274,7 +303,7 @@ export interface Agent {
   /**
    * Collections to search for RAG context
    */
-  searchCollections?: ('posts_chunk' | 'books_chunk')[] | null;
+  searchCollections?: 'posts_chunk'[] | null;
   /**
    * Taxonomies that filter the RAG content. REQUIRED: if empty, agent will not search any content.
    */
@@ -413,6 +442,10 @@ export interface PayloadLockedDocument {
         value: number | Taxonomy;
       } | null)
     | ({
+        relationTo: 'mcp-search-tokens';
+        value: number | McpSearchToken;
+      } | null)
+    | ({
         relationTo: 'agents';
         value: number | Agent;
       } | null)
@@ -527,6 +560,20 @@ export interface TaxonomySelect<T extends boolean = true> {
   generateSlug?: T;
   slug?: T;
   payload?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mcp-search-tokens_select".
+ */
+export interface McpSearchTokensSelect<T extends boolean = true> {
+  user?: T;
+  taxonomies?: T;
+  label?: T;
+  tokenHash?: T;
+  tokenPrefix?: T;
+  lastUsedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
