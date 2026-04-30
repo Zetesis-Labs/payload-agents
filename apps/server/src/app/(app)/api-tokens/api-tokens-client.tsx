@@ -96,49 +96,49 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
       {newToken && (
-        <div className="rounded border border-green-300 bg-green-50 px-4 py-3">
-          <p className="mb-2 text-sm font-medium text-green-800">
+        <div className="rounded border border-primary/40 bg-primary/10 px-4 py-3">
+          <p className="mb-2 text-sm font-medium">
             Token created — copy it now, you won&apos;t see it again.
           </p>
-          <code className="block rounded bg-white px-3 py-2 text-sm font-mono break-all">
+          <code className="block rounded bg-muted px-3 py-2 font-mono text-sm break-all text-foreground">
             {newToken.token}
           </code>
         </div>
       )}
 
       {loading ? (
-        <p className="text-sm opacity-60">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : tokens.length === 0 ? (
-        <p className="text-sm opacity-60">No tokens yet.</p>
+        <p className="text-sm text-muted-foreground">No tokens yet.</p>
       ) : (
         <ul className="space-y-3">
           {tokens.map(t => (
             <li
               key={t.id}
-              className="flex items-center justify-between rounded border px-4 py-3"
+              className="flex items-center justify-between rounded border border-border bg-card px-4 py-3"
             >
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{t.label}</span>
-                  <code className="rounded bg-zinc-100 px-2 py-0.5 text-xs">
+                  <code className="rounded bg-muted px-2 py-0.5 text-xs">
                     {t.tokenPrefix}****
                   </code>
                   {t.taxonomies.map(tx => (
                     <span
                       key={tx.id}
-                      className="rounded-full border px-2 py-0.5 text-xs"
+                      className="rounded-full border border-border bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
                     >
                       {tx.name}
                     </span>
                   ))}
                 </div>
-                <p className="text-xs opacity-60">
+                <p className="text-xs text-muted-foreground">
                   Created {new Date(t.createdAt).toLocaleDateString()}
                   {t.lastUsedAt && ` · Last used ${new Date(t.lastUsedAt).toLocaleDateString()}`}
                 </p>
@@ -146,7 +146,7 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
               <button
                 type="button"
                 onClick={() => void revoke(t.id)}
-                className="rounded border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+                className="rounded border border-destructive/40 px-3 py-1 text-xs text-destructive hover:bg-destructive/10"
               >
                 Revoke
               </button>
@@ -156,18 +156,18 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
       )}
 
       {showForm ? (
-        <div className="space-y-3 rounded border p-4">
+        <div className="space-y-3 rounded border border-border bg-card p-4">
           <input
             type="text"
             placeholder="Token name (e.g. Claude Desktop)"
             value={newLabel}
             onChange={e => setNewLabel(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm"
+            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             disabled={creating}
           />
           {taxonomies.length > 0 && (
             <div>
-              <label className="mb-2 block text-xs opacity-70">
+              <label className="mb-2 block text-xs text-muted-foreground">
                 Taxonomies (optional). Selected slugs are forwarded to MCP and auto-scope every search.
               </label>
               <TaxonomyCombobox
@@ -183,7 +183,7 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
               type="button"
               onClick={() => void create()}
               disabled={creating || !newLabel.trim()}
-              className="rounded bg-black px-3 py-1 text-sm text-white disabled:opacity-40"
+              className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               {creating ? 'Creating…' : 'Create'}
             </button>
@@ -194,7 +194,7 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
                 setNewLabel('')
                 setSelected([])
               }}
-              className="rounded border px-3 py-1 text-sm"
+              className="rounded border border-border px-3 py-1 text-sm hover:bg-accent hover:text-accent-foreground"
             >
               Cancel
             </button>
@@ -204,7 +204,7 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="rounded bg-black px-4 py-2 text-sm text-white"
+          className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
           Create token
         </button>
@@ -278,15 +278,15 @@ function TaxonomyCombobox({ options, selectedIds, onChange, disabled }: Taxonomy
         type="button"
         onClick={() => setOpen(o => !o)}
         disabled={disabled}
-        className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded border px-2 py-1.5 text-left text-sm hover:bg-zinc-50 disabled:opacity-50"
+        className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded border border-border bg-background px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
       >
         {selected.length === 0 ? (
-          <span className="px-1 text-xs opacity-60">Select taxonomies…</span>
+          <span className="px-1 text-xs text-muted-foreground">Select taxonomies…</span>
         ) : (
           selected.map(tx => (
             <span
               key={tx.id}
-              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs"
+              className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
             >
               {tx.name}
               <span
@@ -311,24 +311,24 @@ function TaxonomyCombobox({ options, selectedIds, onChange, disabled }: Taxonomy
             </span>
           ))
         )}
-        <span className="ml-auto opacity-50" aria-hidden>
+        <span className="ml-auto text-muted-foreground" aria-hidden>
           ▾
         </span>
       </button>
 
       {open && (
-        <div className="absolute z-10 mt-1 w-full rounded border bg-white shadow-lg">
+        <div className="absolute z-10 mt-1 w-full rounded border border-border bg-popover text-popover-foreground shadow-lg">
           <input
             ref={inputRef}
             type="text"
             placeholder="Search…"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            className="w-full border-b px-3 py-2 text-sm outline-none"
+            className="w-full border-b border-border bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
           <div className="max-h-56 overflow-y-auto py-1">
             {visible.length === 0 ? (
-              <p className="px-3 py-2 text-xs opacity-50">No matches.</p>
+              <p className="px-3 py-2 text-xs text-muted-foreground">No matches.</p>
             ) : (
               visible.map(tx => {
                 const checked = selectedIds.includes(tx.id)
@@ -337,13 +337,13 @@ function TaxonomyCombobox({ options, selectedIds, onChange, disabled }: Taxonomy
                     key={tx.id}
                     type="button"
                     onClick={() => toggle(tx.id)}
-                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-zinc-50 ${
-                      checked ? 'bg-zinc-50' : ''
+                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground ${
+                      checked ? 'bg-accent/40' : ''
                     }`}
                   >
                     <span>
                       {tx.name}
-                      <span className="ml-2 text-xs opacity-50">{tx.slug}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{tx.slug}</span>
                     </span>
                     {checked && <span aria-hidden>✓</span>}
                   </button>
@@ -351,7 +351,7 @@ function TaxonomyCombobox({ options, selectedIds, onChange, disabled }: Taxonomy
               })
             )}
             {hiddenCount > 0 && (
-              <p className="border-t px-3 py-1.5 text-[11px] opacity-50">
+              <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
                 +{hiddenCount} more — refine your search to see them.
               </p>
             )}
