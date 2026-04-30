@@ -1,8 +1,8 @@
-import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@/payload.config'
 import Link from 'next/link'
 import { ZetesisLogo } from '@/components/zetesis-logo'
+import { ApiTokensLink } from './api-tokens-link'
 
 const PER_PAGE = 10
 
@@ -18,7 +18,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
   const { page: pageParam } = await searchParams
   const currentPage = Math.max(1, Number(pageParam) || 1)
   const payload = await getPayload({ config })
-  const { user } = await payload.auth({ headers: await headers() })
   const { docs: posts, totalPages } = await payload.find({
     collection: 'posts',
     sort: '-publishedAt',
@@ -48,14 +47,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
           >
             Admin Panel
           </Link>
-          {user && (
-            <Link
-              href="/api-tokens"
-              className="rounded-md border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-card"
-            >
-              API Tokens
-            </Link>
-          )}
+          <ApiTokensLink />
+
           <a
             href="https://github.com/Zetesis-Labs/PayloadAgents"
             target="_blank"
