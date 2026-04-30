@@ -30,8 +30,17 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
   const [showForm, setShowForm] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [selected, setSelected] = useState<number[]>([])
+  const [taxonomyFilter, setTaxonomyFilter] = useState('')
   const [newToken, setNewToken] = useState<NewTokenResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const filteredTaxonomies = (() => {
+    const q = taxonomyFilter.trim().toLowerCase()
+    if (!q) return taxonomies
+    return taxonomies.filter(
+      tx => tx.name.toLowerCase().includes(q) || tx.slug.toLowerCase().includes(q)
+    )
+  })()
 
   const fetchTokens = useCallback(async () => {
     try {
@@ -68,6 +77,7 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
       setNewToken(data)
       setNewLabel('')
       setSelected([])
+      setTaxonomyFilter('')
       setShowForm(false)
       void fetchTokens()
     } catch (err) {
@@ -170,28 +180,48 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
               <p className="mb-2 text-xs opacity-70">
                 Taxonomies (optional). Selected slugs are forwarded to MCP and auto-scope every search.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {taxonomies.map(tx => {
-                  const checked = selected.includes(tx.id)
-                  return (
-                    <button
-                      key={tx.id}
-                      type="button"
-                      onClick={() =>
-                        setSelected(prev =>
-                          prev.includes(tx.id) ? prev.filter(id => id !== tx.id) : [...prev, tx.id]
-                        )
-                      }
-                      className={`rounded-full border px-3 py-1 text-xs ${
-                        checked ? 'border-black bg-black text-white' : 'hover:bg-zinc-50'
-                      }`}
-                      disabled={creating}
-                    >
-                      {tx.name}
-                    </button>
-                  )
-                })}
+              <input
+                type="text"
+                placeholder="Filter taxonomies…"
+                value={taxonomyFilter}
+                onChange={e => setTaxonomyFilter(e.target.value)}
+                className="mb-2 w-full rounded border px-3 py-1.5 text-xs"
+                disabled={creating}
+              />
+              <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
+                {filteredTaxonomies.length === 0 ? (
+                  <p className="text-xs opacity-50">No matches.</p>
+                ) : (
+                  filteredTaxonomies.map(tx => {
+                    const checked = selected.includes(tx.id)
+                    return (
+                      <button
+                        key={tx.id}
+                        type="button"
+                        onClick={() =>
+                          setSelected(prev =>
+                            prev.includes(tx.id)
+                              ? prev.filter(id => id !== tx.id)
+                              : [...prev, tx.id]
+                          )
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs ${
+                          checked ? 'border-black bg-black text-white' : 'hover:bg-zinc-50'
+                        }`}
+                        disabled={creating}
+                      >
+                        {tx.name}
+                      </button>
+                    )
+                  })
+                )}
               </div>
+              {selected.length > 0 && (
+                <p className="mt-2 text-xs opacity-60">
+                  {selected.length} selected
+                  {taxonomyFilter && ` (filter active — selected items may be hidden)`}
+                </p>
+              )}
             </div>
           )}
           <div className="flex gap-2">
@@ -209,6 +239,7 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
                 setShowForm(false)
                 setNewLabel('')
                 setSelected([])
+                setTaxonomyFilter('')
               }}
               className="rounded border px-3 py-1 text-sm"
             >
