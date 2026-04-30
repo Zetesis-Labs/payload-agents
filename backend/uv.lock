@@ -80,7 +80,7 @@ requires-dist = [
 
 [[package]]
 name = "agno-agent-builder"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "agno-agent-builder" }
 dependencies = [
     { name = "agno", extra = ["anthropic", "mcp", "openai", "os", "postgres"] },
@@ -94,7 +94,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agno", extras = ["anthropic", "mcp", "openai", "os", "postgres"], specifier = ">=2.5.16" },
+    { name = "agno", extras = ["anthropic", "mcp", "openai", "os", "postgres"], specifier = ">=2.6.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
