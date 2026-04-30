@@ -21,7 +21,6 @@ export function resolveAuth(req: IncomingMessage, strategy: McpAuthStrategy | un
     const headerName = (effective.headerName ?? DEFAULT_HEADER_NAME).toLowerCase()
     const raw = req.headers[headerName]
     const tenantSlug = Array.isArray(raw) ? raw[0] : raw
-    if (!tenantSlug) return null
 
     // Optional: taxonomy slugs for server-enforced content scoping
     const taxonomyRaw = req.headers[TAXONOMY_HEADER_NAME]
@@ -33,7 +32,12 @@ export function resolveAuth(req: IncomingMessage, strategy: McpAuthStrategy | un
           .filter(Boolean)
       : undefined
 
-    return { tenantSlug, taxonomySlugs }
+    // Single-tenant deploys (no tenant header) can still send taxonomy
+    // filters. Return a context whenever at least one of the two is present;
+    // null means "no auth headers at all" → no auto-scoping.
+    if (!tenantSlug && !taxonomySlugs?.length) return null
+
+    return { tenantSlug: tenantSlug || undefined, taxonomySlugs }
   }
 
   // Exhaustive guard. When new variants are added, TypeScript will force

@@ -7,6 +7,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import type { Payload } from 'payload'
 import { buildConfig } from 'payload'
 import { Media } from './collections/Media'
+import { McpSearchTokens } from './collections/McpSearchTokens'
 import { Posts } from './collections/Posts'
 import { Taxonomies } from './collections/Taxonomies'
 import { Users } from './collections/Users'
@@ -35,7 +36,7 @@ export default buildConfig({
     locales: [...locales],
     defaultLocale
   },
-  collections: [Users, Media, Posts, Taxonomies],
+  collections: [Users, Media, Posts, Taxonomies, McpSearchTokens],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'CHANGE_ME',
   typescript: {
