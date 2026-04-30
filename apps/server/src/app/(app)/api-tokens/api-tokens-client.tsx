@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface TaxonomyInfo {
   id: number
@@ -30,17 +30,8 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
   const [showForm, setShowForm] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [selected, setSelected] = useState<number[]>([])
-  const [taxonomyFilter, setTaxonomyFilter] = useState('')
   const [newToken, setNewToken] = useState<NewTokenResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const filteredTaxonomies = (() => {
-    const q = taxonomyFilter.trim().toLowerCase()
-    if (!q) return taxonomies
-    return taxonomies.filter(
-      tx => tx.name.toLowerCase().includes(q) || tx.slug.toLowerCase().includes(q)
-    )
-  })()
 
   const fetchTokens = useCallback(async () => {
     try {
@@ -77,7 +68,6 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
       setNewToken(data)
       setNewLabel('')
       setSelected([])
-      setTaxonomyFilter('')
       setShowForm(false)
       void fetchTokens()
     } catch (err) {
@@ -177,51 +167,15 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
           />
           {taxonomies.length > 0 && (
             <div>
-              <p className="mb-2 text-xs opacity-70">
+              <label className="mb-2 block text-xs opacity-70">
                 Taxonomies (optional). Selected slugs are forwarded to MCP and auto-scope every search.
-              </p>
-              <input
-                type="text"
-                placeholder="Filter taxonomies…"
-                value={taxonomyFilter}
-                onChange={e => setTaxonomyFilter(e.target.value)}
-                className="mb-2 w-full rounded border px-3 py-1.5 text-xs"
+              </label>
+              <TaxonomyCombobox
+                options={taxonomies}
+                selectedIds={selected}
+                onChange={setSelected}
                 disabled={creating}
               />
-              <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
-                {filteredTaxonomies.length === 0 ? (
-                  <p className="text-xs opacity-50">No matches.</p>
-                ) : (
-                  filteredTaxonomies.map(tx => {
-                    const checked = selected.includes(tx.id)
-                    return (
-                      <button
-                        key={tx.id}
-                        type="button"
-                        onClick={() =>
-                          setSelected(prev =>
-                            prev.includes(tx.id)
-                              ? prev.filter(id => id !== tx.id)
-                              : [...prev, tx.id]
-                          )
-                        }
-                        className={`rounded-full border px-3 py-1 text-xs ${
-                          checked ? 'border-black bg-black text-white' : 'hover:bg-zinc-50'
-                        }`}
-                        disabled={creating}
-                      >
-                        {tx.name}
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-              {selected.length > 0 && (
-                <p className="mt-2 text-xs opacity-60">
-                  {selected.length} selected
-                  {taxonomyFilter && ` (filter active — selected items may be hidden)`}
-                </p>
-              )}
             </div>
           )}
           <div className="flex gap-2">
@@ -239,7 +193,6 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
                 setShowForm(false)
                 setNewLabel('')
                 setSelected([])
-                setTaxonomyFilter('')
               }}
               className="rounded border px-3 py-1 text-sm"
             >
@@ -255,6 +208,155 @@ export function ApiTokensClient({ taxonomies }: { taxonomies: TaxonomyInfo[] }) 
         >
           Create token
         </button>
+      )}
+    </div>
+  )
+}
+
+interface TaxonomyComboboxProps {
+  options: TaxonomyInfo[]
+  selectedIds: number[]
+  onChange: (next: number[]) => void
+  disabled?: boolean
+}
+
+function TaxonomyCombobox({ options, selectedIds, onChange, disabled }: TaxonomyComboboxProps) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    inputRef.current?.focus()
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
+  const selected = options.filter(o => selectedIds.includes(o.id))
+  const q = query.trim().toLowerCase()
+  const matchScore = (o: TaxonomyInfo): number => {
+    if (!q) return 0
+    const name = o.name.toLowerCase()
+    const slug = o.slug.toLowerCase()
+    if (name === q || slug === q) return 0
+    if (name.startsWith(q) || slug.startsWith(q)) return 1
+    return 2
+  }
+  const matched = q
+    ? options
+        .filter(o => o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q))
+        .sort((a, b) => matchScore(a) - matchScore(b))
+    : options
+  const MAX_VISIBLE = 10
+  const visible = matched.slice(0, MAX_VISIBLE)
+  const hiddenCount = Math.max(0, matched.length - visible.length)
+
+  const toggle = (id: number) => {
+    onChange(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id])
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        disabled={disabled}
+        className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded border px-2 py-1.5 text-left text-sm hover:bg-zinc-50 disabled:opacity-50"
+      >
+        {selected.length === 0 ? (
+          <span className="px-1 text-xs opacity-60">Select taxonomies…</span>
+        ) : (
+          selected.map(tx => (
+            <span
+              key={tx.id}
+              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs"
+            >
+              {tx.name}
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label={`Remove ${tx.name}`}
+                onClick={e => {
+                  e.stopPropagation()
+                  toggle(tx.id)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    toggle(tx.id)
+                  }
+                }}
+                className="cursor-pointer opacity-60 hover:opacity-100"
+              >
+                ×
+              </span>
+            </span>
+          ))
+        )}
+        <span className="ml-auto opacity-50" aria-hidden>
+          ▾
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute z-10 mt-1 w-full rounded border bg-white shadow-lg">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Search…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="w-full border-b px-3 py-2 text-sm outline-none"
+          />
+          <div className="max-h-56 overflow-y-auto py-1">
+            {visible.length === 0 ? (
+              <p className="px-3 py-2 text-xs opacity-50">No matches.</p>
+            ) : (
+              visible.map(tx => {
+                const checked = selectedIds.includes(tx.id)
+                return (
+                  <button
+                    key={tx.id}
+                    type="button"
+                    onClick={() => toggle(tx.id)}
+                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-zinc-50 ${
+                      checked ? 'bg-zinc-50' : ''
+                    }`}
+                  >
+                    <span>
+                      {tx.name}
+                      <span className="ml-2 text-xs opacity-50">{tx.slug}</span>
+                    </span>
+                    {checked && <span aria-hidden>✓</span>}
+                  </button>
+                )
+              })
+            )}
+            {hiddenCount > 0 && (
+              <p className="border-t px-3 py-1.5 text-[11px] opacity-50">
+                +{hiddenCount} more — refine your search to see them.
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
