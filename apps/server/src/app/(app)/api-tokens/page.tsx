@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@/payload.config'
@@ -29,6 +30,12 @@ export default async function ApiTokensPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
+      <Link
+        href="/"
+        className="mb-6 inline-flex items-center gap-1 text-sm opacity-70 hover:opacity-100"
+      >
+        <span aria-hidden>←</span> Back to home
+      </Link>
       <h1 className="text-3xl font-bold mb-2">API Tokens</h1>
       <p className="text-muted-foreground mb-8 text-sm opacity-70">
         Tokens to connect external MCP clients (Claude Desktop, Cursor, …) to the search service.
