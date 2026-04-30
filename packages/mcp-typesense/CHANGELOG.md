@@ -1,5 +1,11 @@
 # @zetesis/mcp-typesense
 
+## 0.2.1
+
+### Patch Changes
+
+- [#44](https://github.com/Zetesis-Labs/PayloadAgents/pull/44) [`5ffdff5`](https://github.com/Zetesis-Labs/PayloadAgents/commit/5ffdff5b574026a6a16be52166c1be350c1ad326) Thanks [@Fiser12](https://github.com/Fiser12)! - Allow taxonomy-only auth contexts. The header strategy used to discard the entire context whenever `x-tenant-slug` was missing, even if `x-taxonomy-slugs` was present. Single-tenant deploys (no tenant header) couldn't auto-scope by taxonomy at all. Now `resolveAuth` returns a context whenever at least one of the two headers is present and `tenantSlug` becomes optional in the resolved object. Multi-tenant deploys keep working unchanged because they always send both headers.
+
 ## 0.2.0
 
 ### Minor Changes
