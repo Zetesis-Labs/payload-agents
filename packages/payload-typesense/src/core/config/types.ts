@@ -29,6 +29,12 @@ export interface SyncFeatureConfig {
 // --- Main Configuration ---
 
 export interface FeatureFlags {
+  /**
+   * Plugin-level embedding provider. Used as a fallback for tables that
+   * don't declare their own `embedding.provider` and don't use `autoEmbed`.
+   * Optional: when every table has its own provider or is autoEmbed, this
+   * can be omitted entirely.
+   */
   embedding?: EmbeddingProviderConfig
   search?: SearchFeatureConfig
   sync?: SyncFeatureConfig

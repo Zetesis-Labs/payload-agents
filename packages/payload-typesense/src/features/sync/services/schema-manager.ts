@@ -5,7 +5,11 @@ import { isTypesense404, type TypesenseFieldMapping } from '../../../adapter/typ
 import type { ModularPluginConfig } from '../../../core/config/types'
 import { logger } from '../../../core/logging/logger'
 import { getTypesenseCollectionName } from '../../../core/utils/naming'
-import { getChunkCollectionSchema, getFullDocumentCollectionSchema } from '../../../shared/schema/collection-schemas'
+import {
+  type CollectionSchemaEmbeddingOptions,
+  getChunkCollectionSchema,
+  getFullDocumentCollectionSchema
+} from '../../../shared/schema/collection-schemas'
 
 export class SchemaManager {
   constructor(
@@ -21,23 +25,49 @@ export class SchemaManager {
 
     logger.info('Starting schema synchronization...')
 
-    const embeddingDimensions = this.config?.features?.embedding?.dimensions
-
     for (const [collectionSlug, tableConfigs] of Object.entries(this.config.collections)) {
       if (!tableConfigs) continue
 
       for (const tableConfig of tableConfigs) {
-        if (!embeddingDimensions) {
-          console.warn(`Embedding dimensions not configured. Skipping schema sync for collection: ${collectionSlug}`)
-          continue
-        }
         if (!tableConfig.enabled) continue
 
-        await this.syncTable(collectionSlug, tableConfig, embeddingDimensions)
+        const embedding = this.resolveEmbeddingOptions(collectionSlug, tableConfig)
+        if (!embedding) continue
+
+        await this.syncTable(collectionSlug, tableConfig, embedding)
       }
     }
 
     logger.info('Schema synchronization completed.')
+  }
+
+  /**
+   * Pick the embedding config for a single table:
+   * - `autoEmbed` wins outright (Typesense generates the vector).
+   * - per-table `provider.dimensions` next.
+   * - global `features.embedding.dimensions` as fallback.
+   * Returns null and skips the table when none of these apply.
+   */
+  private resolveEmbeddingOptions(
+    collectionSlug: string,
+    tableConfig: TableConfig<TypesenseFieldMapping>
+  ): CollectionSchemaEmbeddingOptions | null {
+    if (tableConfig.embedding?.autoEmbed) {
+      if (tableConfig.embedding.provider) {
+        logger.warn('Table declares both `autoEmbed` and `provider`; `autoEmbed` wins, ignoring `provider`', {
+          collection: collectionSlug,
+          tableName: tableConfig.tableName
+        })
+      }
+      return { autoEmbed: tableConfig.embedding.autoEmbed }
+    }
+
+    const dimensions = tableConfig.embedding?.provider?.dimensions ?? this.config.features?.embedding?.dimensions
+    if (!dimensions) {
+      logger.warn(`Embedding dimensions not configured. Skipping schema sync for collection: ${collectionSlug}`)
+      return null
+    }
+    return { dimensions }
   }
 
   /**
@@ -46,7 +76,7 @@ export class SchemaManager {
   private async syncTable(
     collectionSlug: string,
     tableConfig: TableConfig<TypesenseFieldMapping>,
-    embeddingDimensions: number
+    embedding: CollectionSchemaEmbeddingOptions
   ): Promise<void> {
     const tableName = getTypesenseCollectionName(collectionSlug, tableConfig)
 
@@ -54,9 +84,9 @@ export class SchemaManager {
     let targetSchema: CollectionCreateSchema
 
     if (tableConfig.embedding?.chunking) {
-      targetSchema = getChunkCollectionSchema(tableName, tableConfig, embeddingDimensions)
+      targetSchema = getChunkCollectionSchema(tableName, tableConfig, embedding)
     } else {
-      targetSchema = getFullDocumentCollectionSchema(tableName, tableConfig, embeddingDimensions)
+      targetSchema = getFullDocumentCollectionSchema(tableName, tableConfig, embedding)
     }
 
     try {

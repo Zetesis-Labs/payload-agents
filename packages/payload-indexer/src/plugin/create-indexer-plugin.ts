@@ -10,11 +10,11 @@ import type { FieldMapping, PayloadDocument, TableConfig } from '../document/typ
 import { GeminiEmbeddingProvider } from '../embedding/providers/gemini-provider'
 import { OpenAIEmbeddingProvider } from '../embedding/providers/openai-provider'
 import { EmbeddingServiceImpl } from '../embedding/service'
-import type { EmbeddingService } from '../embedding/types'
+import type { EmbeddingProviderConfig, EmbeddingService } from '../embedding/types'
 import { createSyncStatusEndpoints } from '../sync-status/create-sync-status-endpoint'
 import { checkSyncStatus } from '../sync-status/sync-status-service'
 import type { SyncStatusValue } from '../sync-status/types'
-import { applySyncHooks } from './sync/hooks'
+import { applySyncHooks, type EmbeddingResolver } from './sync/hooks'
 import type { IndexerPluginConfig, SyncFeatureConfig } from './types'
 
 /**
@@ -23,10 +23,27 @@ import type { IndexerPluginConfig, SyncFeatureConfig } from './types'
 export interface IndexerPluginResult {
   /** The Payload plugin function */
   plugin: (config: Config) => Config
-  /** The embedding service instance (if configured) */
+  /**
+   * The plugin-level embedding service (if `features.embedding` is set).
+   * Tables that declare their own `embedding.provider` get a separate
+   * service — use `embeddingResolver` to look it up.
+   */
   embeddingService?: EmbeddingService
+  /**
+   * Resolves the embedding service to use for a given table. Returns the
+   * per-table service when the table declares `embedding.provider`, the
+   * plugin-level service as a fallback, and `undefined` when the table
+   * uses `autoEmbed` (the backend handles embedding) or has no embedding.
+   */
+  embeddingResolver: EmbeddingResolver
   /** The adapter instance */
   adapter: IndexerAdapter
+}
+
+const buildEmbeddingService = (config: EmbeddingProviderConfig, logger: Logger): EmbeddingService => {
+  const provider =
+    config.type === 'gemini' ? new GeminiEmbeddingProvider(config, logger) : new OpenAIEmbeddingProvider(config, logger)
+  return new EmbeddingServiceImpl(provider, logger, config)
 }
 
 /**
@@ -80,28 +97,32 @@ export function createIndexerPlugin<TFieldMapping extends FieldMapping>(
   const { adapter, features, collections } = config
   const logger = new Logger({ enabled: true, prefix: '[payload-indexer]' })
 
-  // 1. Create Embedding Service (optional)
-  let embeddingService: EmbeddingService | undefined
-  const embeddingConfig = features.embedding
-
-  if (embeddingConfig) {
-    const provider =
-      embeddingConfig.type === 'gemini'
-        ? new GeminiEmbeddingProvider(embeddingConfig, logger)
-        : new OpenAIEmbeddingProvider(embeddingConfig, logger)
-
-    embeddingService = new EmbeddingServiceImpl(provider, logger, embeddingConfig)
-
-    logger.debug('Embedding service initialized', {
-      provider: embeddingConfig.type
-    })
+  // 1. Plugin-level embedding service (optional global default)
+  const embeddingService = features.embedding ? buildEmbeddingService(features.embedding, logger) : undefined
+  if (embeddingService && features.embedding) {
+    logger.debug('Embedding service initialized', { provider: features.embedding.type })
   }
 
-  // 2. Create the plugin function
+  // 2. Per-table embedding services. Built lazily and memoized so two tables
+  //    that share an identical provider config reuse the same client.
+  const perTableServices = new Map<EmbeddingProviderConfig, EmbeddingService>()
+  const embeddingResolver: EmbeddingResolver = (_collectionSlug, tableConfig) => {
+    if (tableConfig.embedding?.autoEmbed) return undefined
+    const provider = tableConfig.embedding?.provider
+    if (!provider) return embeddingService
+    const cached = perTableServices.get(provider)
+    if (cached) return cached
+    const built = buildEmbeddingService(provider, logger)
+    perTableServices.set(provider, built)
+    logger.debug('Per-table embedding service initialized', { provider: provider.type })
+    return built
+  }
+
+  // 3. Create the plugin function
   const plugin = (payloadConfig: Config): Config => {
     // Apply sync hooks to collections
     if (payloadConfig.collections && features.sync?.enabled) {
-      payloadConfig.collections = applySyncHooks(payloadConfig.collections, config, adapter, embeddingService)
+      payloadConfig.collections = applySyncHooks(payloadConfig.collections, config, adapter, embeddingResolver)
 
       logger.debug('Sync hooks applied to collections', {
         collectionsCount: Object.keys(collections).length
@@ -132,6 +153,7 @@ export function createIndexerPlugin<TFieldMapping extends FieldMapping>(
   return {
     plugin,
     embeddingService,
+    embeddingResolver,
     adapter
   }
 }

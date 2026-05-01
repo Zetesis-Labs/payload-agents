@@ -14,6 +14,12 @@ import { buildConversationalUrl, buildMultiSearchRequestBody } from '../query-bu
 export type RAGSearchConfig = {
   /** Collections to search in */
   searchCollections: string[]
+  /**
+   * Subset of `searchCollections` whose `embedding` field is auto-embedded
+   * by Typesense (declared with `embed.model_config` in the schema). For
+   * those, the handler does NOT need a precomputed `queryEmbedding`.
+   */
+  autoEmbedCollections?: string[]
   /** Conversation model ID */
   modelId: string
   /** Number of results to retrieve */
@@ -37,8 +43,11 @@ export type RAGSearchConfig = {
 export type RAGChatRequest = {
   /** User's message */
   userMessage: string
-  /** Query embedding vector */
-  queryEmbedding: number[]
+  /**
+   * Pre-computed embedding for `userMessage`. Optional when every collection
+   * in the search is listed in `RAGSearchConfig.autoEmbedCollections`.
+   */
+  queryEmbedding?: number[]
   /** Optional chat/conversation ID for follow-up messages */
   chatId?: string
   /** Optional selected document IDs to filter search */
@@ -86,7 +95,10 @@ export async function executeRAGSearch(
   // Build the multi-search request body
   const requestBody = buildMultiSearchRequestBody({
     userMessage: request.userMessage,
-    queryEmbedding: request.queryEmbedding,
+    ...(request.queryEmbedding !== undefined && { queryEmbedding: request.queryEmbedding }),
+    ...(searchConfig.autoEmbedCollections !== undefined && {
+      autoEmbedCollections: searchConfig.autoEmbedCollections
+    }),
     selectedDocuments: request.selectedDocuments,
     chatId: request.chatId,
     searchCollections: searchConfig.searchCollections,

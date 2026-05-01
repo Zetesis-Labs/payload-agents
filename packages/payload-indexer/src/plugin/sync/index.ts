@@ -8,4 +8,5 @@ export {
   deleteDocumentFromIndex,
   syncDocumentToIndex
 } from './document-syncer'
+export type { EmbeddingResolver } from './hooks'
 export { applySyncHooks } from './hooks'

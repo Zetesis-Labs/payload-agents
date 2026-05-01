@@ -3,7 +3,11 @@ import type { BuildMultiCollectionVectorSearchParamsOptions } from '../types'
 import { buildVectorSearchParams } from './build-params'
 
 /**
- * Builds multi-collection vector search parameters
+ * Builds multi-collection vector search parameters.
+ *
+ * `searchVector` may be empty when ALL target collections are autoEmbed —
+ * in that case the per-collection params will use `vector_query: '([], …)'`
+ * and Typesense embeds the query itself.
  */
 export const buildMultiCollectionVectorSearchParams = (
   searchVector: number[],
@@ -28,9 +32,11 @@ export const buildMultiCollectionVectorSearchParams = (
       }
     }
 
+    const autoEmbed = Boolean(config?.embedding?.autoEmbed)
+
     // Build search params - don't add filter_by here
     // The filter will be added conditionally in the handler after schema check
-    const collectionSearchParams = buildVectorSearchParams(searchVector, {
+    const collectionSearchParams = buildVectorSearchParams(autoEmbed ? [] : searchVector, {
       ...(query !== undefined && { query }),
       ...(k !== undefined && { k }),
       ...(hybrid !== undefined && { hybrid }),
@@ -41,7 +47,8 @@ export const buildMultiCollectionVectorSearchParams = (
       ...(sort_by !== undefined && { sort_by }),
       ...(searchFields !== undefined && {
         searchFields: searchFields
-      })
+      }),
+      autoEmbed
     })
 
     // Store filter_by separately - handler will add it conditionally

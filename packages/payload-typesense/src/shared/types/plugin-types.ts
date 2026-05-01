@@ -172,8 +172,19 @@ export interface TypesenseRAGSearchResult {
 export interface TypesenseQueryConfig {
   /** User's message/query */
   userMessage: string
-  /** Query embedding vector */
-  queryEmbedding: number[]
+  /**
+   * Pre-computed embedding for `userMessage`. Optional when a target
+   * collection is in `autoEmbedCollections` — for those, Typesense embeds
+   * the query server-side and no vector needs to be sent.
+   */
+  queryEmbedding?: number[]
+  /**
+   * Subset of `searchCollections` whose `embedding` field is auto-embedded
+   * by Typesense. Per-collection requests for these will use
+   * `vector_query: '([], k:N)'` and rely on Typesense's server-side
+   * embedding of the `q` parameter.
+   */
+  autoEmbedCollections?: string[]
   /** Optional: Filter by selected document IDs */
   selectedDocuments?: string[]
   /** Optional: Conversation ID for follow-up */

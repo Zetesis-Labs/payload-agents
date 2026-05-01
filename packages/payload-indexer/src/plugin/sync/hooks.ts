@@ -13,6 +13,13 @@ import type { IndexerPluginConfig, SyncFeatureConfig } from '../types'
 import { deleteDocumentFromIndex, type SyncOptions, syncDocumentToIndex } from './document-syncer'
 
 /**
+ * Resolves the EmbeddingService that should be used for a given table.
+ * Returns `undefined` when the backend handles embedding (autoEmbed) or
+ * when no provider is configured.
+ */
+export type EmbeddingResolver = (collectionSlug: string, tableConfig: TableConfig) => EmbeddingService | undefined
+
+/**
  * Processes a single table config during afterChange, handling shouldIndex and sync
  */
 const processTableConfigAfterChange = async (
@@ -21,7 +28,7 @@ const processTableConfigAfterChange = async (
   collectionSlug: string,
   doc: PayloadDocument,
   operation: 'create' | 'update',
-  embeddingService?: EmbeddingService,
+  embeddingResolver: EmbeddingResolver,
   options?: SyncOptions
 ): Promise<void> => {
   if (!tableConfig.enabled) return
@@ -34,6 +41,7 @@ const processTableConfigAfterChange = async (
     }
   }
 
+  const embeddingService = embeddingResolver(collectionSlug, tableConfig)
   await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig, embeddingService, options)
 }
 
@@ -99,7 +107,7 @@ const createAfterChangeHook = (
   tableConfigs: TableConfig[],
   adapter: IndexerAdapter,
   collectionSlug: string,
-  embeddingService?: EmbeddingService,
+  embeddingResolver: EmbeddingResolver,
   onSyncError?: SyncFeatureConfig['onSyncError']
 ) => {
   return async ({
@@ -127,7 +135,7 @@ const createAfterChangeHook = (
           collectionSlug,
           populatedDoc,
           operation,
-          embeddingService,
+          embeddingResolver,
           syncOptions
         )
       }
@@ -175,7 +183,7 @@ export const applySyncHooks = (
   collections: CollectionConfig[],
   pluginConfig: IndexerPluginConfig,
   adapter: IndexerAdapter,
-  embeddingService?: EmbeddingService
+  embeddingResolver: EmbeddingResolver
 ): CollectionConfig[] => {
   if (
     !pluginConfig.features.sync?.enabled ||
@@ -210,7 +218,7 @@ export const applySyncHooks = (
             tableConfigs,
             adapter,
             collection.slug,
-            embeddingService,
+            embeddingResolver,
             pluginConfig.features.sync?.onSyncError
           )
         ],

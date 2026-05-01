@@ -158,6 +158,11 @@ export class DocumentSyncer {
     private options?: SyncOptions
   ) {}
 
+  /** True when the backend (not the indexer) generates the embedding. */
+  private get isAutoEmbed(): boolean {
+    return this.config.embedding?.autoEmbed !== undefined
+  }
+
   async sync(doc: PayloadDocument, operation: 'create' | 'update'): Promise<void> {
     logger.debug(`Syncing document ${doc.id} to table ${this.tableName}`)
 
@@ -201,8 +206,10 @@ export class DocumentSyncer {
       ...(contentHash && { content_hash: contentHash })
     }
 
-    // 5. Generate embedding if configured
-    if (sourceText && this.embeddingService) {
+    // 5. Generate embedding if configured (skipped under autoEmbed — the
+    //    backend reads `embedding.autoEmbed.from` and generates the vector
+    //    itself on every upsert).
+    if (sourceText && this.embeddingService && !this.isAutoEmbed) {
       const embedding = await this.generateEmbedding(sourceText, doc.id)
       if (embedding) indexDoc.embedding = embedding
     }
@@ -308,6 +315,27 @@ export class DocumentSyncer {
       formattedText = this.config.embedding.chunking.interceptResult({ ...chunk, headers, formattedText }, doc)
     }
 
+    const baseChunk: Record<string, unknown> = {
+      id: `${doc.id}_chunk_${chunk.index}`,
+      parent_doc_id: String(doc.id),
+      chunk_index: chunk.index,
+      chunk_text: formattedText,
+      is_chunk: true,
+      headers,
+      createdAt: new Date(doc.createdAt).getTime(),
+      updatedAt: new Date(doc.updatedAt).getTime(),
+      content_hash: contentHash,
+      ...fields
+    }
+
+    // Under autoEmbed, the backend produces the vector from `chunk_text` (or
+    // whatever fields are listed in `embedding.autoEmbed.from`). We must not
+    // send an `embedding` property — Typesense rejects writes to autoEmbed
+    // fields.
+    if (this.isAutoEmbed) {
+      return baseChunk as IndexDocument
+    }
+
     const embedding = await this.generateEmbedding(formattedText, doc.id, chunk.index)
 
     if (!embedding) {
@@ -327,17 +355,8 @@ export class DocumentSyncer {
     }
 
     return {
-      id: `${doc.id}_chunk_${chunk.index}`,
-      parent_doc_id: String(doc.id),
-      chunk_index: chunk.index,
-      chunk_text: formattedText,
-      is_chunk: true,
-      headers,
-      embedding: embedding ?? [],
-      createdAt: new Date(doc.createdAt).getTime(),
-      updatedAt: new Date(doc.updatedAt).getTime(),
-      content_hash: contentHash,
-      ...fields
+      ...baseChunk,
+      embedding: embedding ?? []
     } as IndexDocument
   }
 

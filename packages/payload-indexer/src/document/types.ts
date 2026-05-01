@@ -2,6 +2,8 @@
  * Document types and field mapping configuration
  */
 
+import type { EmbeddingProviderConfig } from '../embedding/types'
+
 /**
  * Base field mapping configuration
  * Defines how a Payload field maps to an index field
@@ -106,14 +108,78 @@ export interface ChunkingConfig {
 export type EmbeddingFailureBehavior = 'skip-chunk' | 'error' | 'empty-vector'
 
 /**
+ * Auto-embedding configuration. When set on a table, the indexer client
+ * does not call any embedding API: the search backend itself generates the
+ * embedding on every upsert and on every search query, using the model
+ * declared in its schema.
+ *
+ * Mutually exclusive with `EmbeddingTableConfig.provider` (and with the
+ * global `features.embedding` for that table).
+ */
+export interface AutoEmbedConfig {
+  /**
+   * Names of fields IN THE INDEXED DOCUMENT (not in Payload) whose contents
+   * the backend should concatenate to produce the embedding source text.
+   *
+   * For chunked tables the typical value is `['chunk_text']`. For full
+   * documents it is the same field names declared in `TableConfig.fields`.
+   */
+  from: string[]
+  /**
+   * Backend-specific embedding model configuration. The shape mirrors the
+   * Typesense `model_config` object since that is the only auto-embed
+   * backend supported today.
+   */
+  modelConfig: {
+    /** e.g. `openai/text-embedding-3-small`, `ts/multilingual-e5-large` */
+    modelName: string
+    apiKey?: string
+    accessToken?: string
+    clientId?: string
+    clientSecret?: string
+    projectId?: string
+    refreshToken?: string
+    url?: string
+    /** Required by E5-family models — usually `'passage:'` */
+    indexingPrefix?: string
+    /** Required by E5-family models — usually `'query:'` */
+    queryPrefix?: string
+  }
+}
+
+/**
  * Embedding configuration for a table
  */
 export interface EmbeddingTableConfig {
   /**
-   * Source fields to extract and transform for embedding generation
-   * These will be concatenated if multiple are provided
+   * Source fields to extract and transform for embedding generation.
+   * These will be concatenated if multiple are provided.
+   *
+   * Ignored when `autoEmbed` is set — the backend reads the indexed fields
+   * directly from `autoEmbed.from`.
    */
   fields: (string | SourceField)[]
+
+  /**
+   * Per-table embedding provider. When set, this table uses its own
+   * provider/model/dimensions instead of the plugin-level
+   * `features.embedding`. Lets different tables embed with different
+   * providers (e.g. OpenAI Large for one table, Gemini for another).
+   *
+   * Mutually exclusive with `autoEmbed`.
+   */
+  provider?: EmbeddingProviderConfig
+
+  /**
+   * Delegate embedding generation to the search backend (auto-embed).
+   * When set, the indexer does not compute or send the `embedding` field;
+   * the backend generates it on upsert and on search using the declared
+   * `modelConfig`.
+   *
+   * Mutually exclusive with `provider` and with the global
+   * `features.embedding` for this table.
+   */
+  autoEmbed?: AutoEmbedConfig
 
   /**
    * Optional chunking configuration

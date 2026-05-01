@@ -33,12 +33,21 @@ export class SearchService {
       return this.performTraditionalSearch(query, targetCollections, options)
     }
 
-    // 2. Semantic / Hybrid Search
-    const searchVector = await generateOrGetVector(query, undefined, this.pluginOptions.features.embedding)
-
-    if (!searchVector) {
-      // Fallback to traditional if vector generation fails
-      return this.performTraditionalSearch(query, targetCollections, options)
+    // 2. Semantic / Hybrid Search.
+    //    Skip the embedding round-trip entirely when every target collection
+    //    is auto-embed: each per-collection request will carry
+    //    `vector_query: '([], k:N)'` and Typesense embeds the q server-side.
+    const allAutoEmbed = targetCollections.every(([, config]) => Boolean(config.embedding?.autoEmbed))
+    let searchVector: number[]
+    if (allAutoEmbed) {
+      searchVector = []
+    } else {
+      const generated = await generateOrGetVector(query, undefined, this.pluginOptions.features.embedding)
+      if (!generated) {
+        // Fallback to traditional if vector generation fails
+        return this.performTraditionalSearch(query, targetCollections, options)
+      }
+      searchVector = generated
     }
 
     try {

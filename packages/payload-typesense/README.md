@@ -100,6 +100,67 @@ collections: {
 }
 ```
 
+### Embedding strategies
+
+You can pick one of three embedding modes per table:
+
+1. **Global provider** (default) — every table uses `features.embedding`. The
+   indexer calls OpenAI/Gemini for every chunk and again for every search query.
+2. **Per-table provider** — set `embedding.provider` on a specific table to
+   override the global one. Useful for mixing models (e.g. OpenAI Large on
+   one table, Gemini on another) without writing a second plugin instance.
+3. **Auto-embed (Typesense generates)** — set `embedding.autoEmbed` and
+   Typesense embeds documents on every upsert and queries on every search,
+   using the model declared in the schema. The indexer never calls an
+   embedding API and search shaves one round-trip per query.
+
+```typescript
+collections: {
+  posts: [
+    {
+      enabled: true,
+      tableName: 'posts_chunk',
+      fields: [...],
+      embedding: {
+        fields: ['title', 'content'],
+        chunking: { strategy: 'markdown' },
+        // Auto-embed: Typesense uses ts/multilingual-e5-large to embed
+        // both `chunk_text` on upsert and the user query on search.
+        autoEmbed: {
+          from: ['chunk_text'],
+          modelConfig: {
+            modelName: 'ts/multilingual-e5-large',
+            indexingPrefix: 'passage:',
+            queryPrefix: 'query:',
+          },
+        },
+      },
+    },
+  ],
+  books: [
+    {
+      enabled: true,
+      tableName: 'books_chunk',
+      fields: [...],
+      embedding: {
+        fields: ['title', 'content'],
+        chunking: { strategy: 'markdown' },
+        // Per-table provider overrides the plugin-level `features.embedding`.
+        provider: {
+          type: 'openai',
+          model: 'text-embedding-3-large',
+          dimensions: 3072,
+          apiKey: process.env.OPENAI_API_KEY!,
+        },
+      },
+    },
+  ],
+}
+```
+
+`provider` and `autoEmbed` are mutually exclusive within a single table. When
+both are set the plugin uses `autoEmbed` and logs a warning.
+
 ### RAG & Agents Configuration
 
 Enable RAG to build chat interfaces on top of your data.
@@ -204,13 +265,10 @@ Session management endpoints: `createSessionGETHandler`, `createSessionPATCHHand
 
 We are actively working to improve the modularity and flexibility of the plugin.
 
-### 1. Modular Embedding Strategies (High Priority)
-**Goal:** Allow different embedding models for different collections (tables).
-*   **Current State:** Global embedding configuration only.
-*   **Future:**
-    *   Move `embedding` config to `CollectionTableConfig`.
-    *   Support "Table X" -> Gemini, "Table Y" -> OpenAI Large.
-    *   Update RAG agents to dynamically select the correct embedding model based on the collection being queried.
+### 1. Modular Embedding Strategies — **Done**
+*   ~~Move `embedding` config to `CollectionTableConfig`.~~ — `embedding.provider` per table.
+*   ~~Support "Table X" -> Gemini, "Table Y" -> OpenAI Large.~~
+*   ~~Auto-embed via Typesense `embed.model_config` (no client-side embedding round-trip).~~ — see `embedding.autoEmbed`.
 
 ### 2. Expanded Provider Support
 *   **Embeddings:** Add support for Cohere, HuggingFace, and local models (via Ollama).

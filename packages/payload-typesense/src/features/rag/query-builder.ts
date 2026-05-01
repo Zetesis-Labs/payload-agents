@@ -76,6 +76,7 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
   const {
     searchCollections,
     queryEmbedding,
+    autoEmbedCollections = [],
     selectedDocuments,
     kResults = 10,
     advancedConfig = {},
@@ -83,11 +84,25 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
     requireTaxonomies = false
   } = config
 
+  const autoEmbedSet = new Set(autoEmbedCollections)
+
   return searchCollections.map((collection: string) => {
+    const isAutoEmbed = autoEmbedSet.has(collection)
+
+    if (!isAutoEmbed && (!queryEmbedding || queryEmbedding.length === 0)) {
+      throw new Error(
+        `RAG search for collection "${collection}" requires a queryEmbedding ` +
+          `(or include the collection in autoEmbedCollections to let Typesense embed the query)`
+      )
+    }
+
+    const vectorPayload = isAutoEmbed ? '[]' : `[${(queryEmbedding ?? []).join(',')}]`
+
     const request: TypesenseSearchRequest = {
       collection,
-      query_by: 'chunk_text,title,headers',
-      vector_query: `embedding:([${queryEmbedding.join(',')}], k:${kResults})`,
+      // For autoEmbed, query_by must include `embedding` so Typesense embeds the q.
+      query_by: isAutoEmbed ? 'embedding,chunk_text,title,headers' : 'chunk_text,title,headers',
+      vector_query: `embedding:(${vectorPayload}, k:${kResults})`,
       exclude_fields: 'embedding',
       ...buildAdvancedSearchParams(advancedConfig)
     }

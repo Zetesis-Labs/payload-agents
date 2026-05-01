@@ -66,6 +66,7 @@ export type { IndexableCollectionConfig } from './plugin/types'
 
 export { mapPayloadDocumentToIndex } from './document/field-mapper'
 export type {
+  AutoEmbedConfig,
   BaseDocument,
   ChunkDocument,
   ChunkingConfig,
@@ -161,6 +162,7 @@ export type { SyncHookContext } from './hooks'
 
 // Plugin types
 export type {
+  EmbeddingResolver,
   IndexerFeatureConfig,
   IndexerPluginConfig,
   IndexerPluginResult,
