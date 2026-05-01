@@ -23,6 +23,20 @@
       "cwd": "${workspaceFolder}/backend"
     },
     {
+      "name": "Worker (kicker)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "uv sync --all-packages && uv run --package payload-worker uvicorn payload_worker.main:app --reload --host 0.0.0.0 --port 8001",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "Worker (taskiq)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "uv sync --all-packages && uv run --package payload-worker taskiq worker payload_worker.main:broker --reload",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
       "name": "Lint fix",
       "type": "node-terminal",
       "request": "launch",
@@ -47,7 +61,7 @@
   "compounds": [
     {
       "name": "Launch",
-      "configurations": ["Server", "MCP", "Agent Runtime"],
+      "configurations": ["Server", "MCP", "Agent Runtime", "Worker (kicker)", "Worker (taskiq)"],
       "stopAll": true
     },
     {
