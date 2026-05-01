@@ -1,9 +1,9 @@
-# payload-worker
+# payload-documents-worker
 
-Default consumer of [`payload-worker-builder`](../payload-worker-builder/). Lives in the workspace as a thin wrapper that loads env vars into a `RuntimeConfig` and exposes:
+Default consumer of [`payload-documents-worker-builder`](../payload-documents-worker-builder/). Lives in the workspace as a thin wrapper that loads env vars into a `RuntimeConfig` and exposes:
 
-* `payload_worker.main:app` — FastAPI HTTP kicker (uvicorn)
-* `payload_worker.main:broker` — taskiq broker (taskiq worker CLI)
+* `payload_documents_worker.main:app` — FastAPI HTTP kicker (uvicorn)
+* `payload_documents_worker.main:broker` — taskiq broker (taskiq worker CLI)
 
 ## Run
 
@@ -12,8 +12,8 @@ Default consumer of [`payload-worker-builder`](../payload-worker-builder/). Live
 [ -f .env ] || cp .env.example .env
 uv sync --all-packages
 
-uvicorn payload_worker.main:app --host 0.0.0.0 --port 8001    # HTTP kicker
-taskiq worker payload_worker.main:broker                       # consumer
+uvicorn payload_documents_worker.main:app --host 0.0.0.0 --port 8001    # HTTP kicker
+taskiq worker payload_documents_worker.main:broker                       # consumer
 ```
 
 ## Env

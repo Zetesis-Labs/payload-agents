@@ -5,7 +5,7 @@ export interface DocumentsPluginOverrides {
 }
 
 /**
- * When set, the parse endpoint enqueues a task on a `payload-worker-builder`
+ * When set, the parse endpoint enqueues a task on a `payload-documents-worker-builder`
  * runtime instead of calling LlamaParse inline. The worker downloads the
  * upload, runs the parse, and writes `parsed_text` / `parse_status` back via
  * Payload REST. The parse-status endpoint becomes a passive read in this mode
@@ -14,12 +14,12 @@ export interface DocumentsPluginOverrides {
 export interface DocumentsWorkerConfig {
   /**
    * Base URL of the FastAPI HTTP "kicker" exposed by the worker
-   * (e.g. `http://localhost:8001` or `http://payload-worker:8001`).
+   * (e.g. `http://localhost:8001` or `http://payload-documents-worker:8001`).
    */
   url: string
   /**
    * Shared secret sent as `X-Internal-Secret`. Must match the value
-   * `payload-worker-builder.RuntimeConfig.internal_secret` was built with.
+   * `payload-documents-worker-builder.RuntimeConfig.internal_secret` was built with.
    */
   internalSecret: string
 }

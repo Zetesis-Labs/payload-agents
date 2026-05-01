@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Same shape as `payload_worker_builder.RuntimeConfig` but populated from env.
+    """Same shape as `payload_documents_worker_builder.RuntimeConfig` but populated from env.
 
     Kept separate so the lib stays decoupled from any specific env-loading
     strategy — consumers in other repos may load from Vault, Helm values, etc.
@@ -18,8 +18,6 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
-
-    app_name: str = "payload-worker"
 
     redis_url: str = "redis://redis:6379"
 

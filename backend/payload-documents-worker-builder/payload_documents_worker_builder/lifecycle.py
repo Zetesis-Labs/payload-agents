@@ -11,7 +11,7 @@ import logging
 
 import structlog
 
-from payload_worker_builder.config import RuntimeConfig
+from payload_documents_worker_builder.config import RuntimeConfig
 
 
 def configure_logging(config: RuntimeConfig) -> None:

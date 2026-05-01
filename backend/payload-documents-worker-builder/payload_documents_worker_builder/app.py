@@ -19,11 +19,11 @@ from dataclasses import dataclass
 from fastapi import FastAPI
 from taskiq import AsyncBroker
 
-from payload_worker_builder.broker import create_broker
-from payload_worker_builder.config import RuntimeConfig
-from payload_worker_builder.http import create_http_app
-from payload_worker_builder.lifecycle import configure_logging
-from payload_worker_builder.tasks import register_parse_document_task
+from payload_documents_worker_builder.broker import create_broker
+from payload_documents_worker_builder.config import RuntimeConfig
+from payload_documents_worker_builder.http import create_http_app
+from payload_documents_worker_builder.lifecycle import configure_logging
+from payload_documents_worker_builder.tasks import register_parse_document_task
 
 
 @dataclass(slots=True, frozen=True)

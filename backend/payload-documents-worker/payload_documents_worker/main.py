@@ -6,15 +6,15 @@ module-level `app` and `broker` symbols are what the CLIs import.
 
 from __future__ import annotations
 
-from payload_worker_builder import RuntimeConfig, create_app
+from payload_documents_worker_builder import RuntimeConfig, create_app
 
-from payload_worker.settings import Settings
+from payload_documents_worker.settings import Settings
 
 _settings = Settings()
 
 _worker = create_app(
     RuntimeConfig(
-        app_name=_settings.app_name,
+        app_name="payload-documents-worker",
         redis_url=_settings.redis_url,
         payload_url=_settings.payload_url,
         payload_service_token=_settings.payload_service_token,

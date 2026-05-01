@@ -19,10 +19,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from taskiq import AsyncBroker
 
-from payload_worker_builder.config import RuntimeConfig
-from payload_worker_builder.tasks import PARSE_DOCUMENT_TASK_NAME
+from payload_documents_worker_builder.config import RuntimeConfig
+from payload_documents_worker_builder.tasks import PARSE_DOCUMENT_TASK_NAME
 
-logger = structlog.get_logger("payload_worker_builder.http")
+logger = structlog.get_logger("payload_documents_worker_builder.http")
 
 
 class ParseDocumentRequest(BaseModel):

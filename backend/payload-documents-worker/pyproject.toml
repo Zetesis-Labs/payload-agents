@@ -1,13 +1,13 @@
 [project]
-name = "payload-worker"
+name = "payload-documents-worker"
 version = "0.1.0"
-description = "Default consumer of payload-worker-builder for the PayloadAgents devcontainer."
+description = "Default consumer of payload-documents-worker-builder for the PayloadAgents devcontainer."
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Zetesis Labs" }]
 dependencies = [
-    "payload-worker-builder",
+    "payload-documents-worker-builder",
     "pydantic-settings>=2.6",
 ]
 
@@ -16,4 +16,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["payload_worker"]
+packages = ["payload_documents_worker"]

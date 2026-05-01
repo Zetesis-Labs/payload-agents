@@ -1,4 +1,4 @@
-# payload-worker-builder
+# payload-documents-worker-builder
 
 Parametrizable [taskiq](https://taskiq-python.github.io/) worker for Payload CMS, ready to drop into a workspace.
 
@@ -12,7 +12,7 @@ Provides:
 ## Usage
 
 ```python
-from payload_worker_builder import RuntimeConfig, create_app
+from payload_documents_worker_builder import RuntimeConfig, create_app
 from pydantic import SecretStr
 
 config = RuntimeConfig(
@@ -38,7 +38,7 @@ taskiq worker my_worker.main:broker                     # task consumer
 ## Architecture
 
 ```
-   Next.js (Payload)               payload-worker (uvicorn)        payload-worker (taskiq)
+   Next.js (Payload)               payload-documents-worker (uvicorn)        payload-documents-worker (taskiq)
   ─────────────────────────       ────────────────────────────    ────────────────────────────
   POST /api/documents/{id}/parse  POST /tasks/parse-document      consume `parse_document` task
    ├ stamps parse_status='queued'  ├ broker.kiq()                  ├ download file from Payload
@@ -52,7 +52,7 @@ taskiq worker my_worker.main:broker                     # task consumer
 ## Public API
 
 ```python
-from payload_worker_builder import (
+from payload_documents_worker_builder import (
     create_app,
     create_broker,
     RuntimeConfig,

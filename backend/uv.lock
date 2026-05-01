@@ -12,8 +12,8 @@ resolution-markers = [
 members = [
     "agno-agent",
     "agno-agent-builder",
-    "payload-worker",
-    "payload-worker-builder",
+    "payload-documents-worker",
+    "payload-documents-worker-builder",
     "zetesis-backend",
 ]
 
@@ -1471,24 +1471,24 @@ wheels = [
 ]
 
 [[package]]
-name = "payload-worker"
+name = "payload-documents-worker"
 version = "0.1.0"
-source = { editable = "payload-worker" }
+source = { editable = "payload-documents-worker" }
 dependencies = [
-    { name = "payload-worker-builder" },
+    { name = "payload-documents-worker-builder" },
     { name = "pydantic-settings" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "payload-worker-builder", editable = "payload-worker-builder" },
+    { name = "payload-documents-worker-builder", editable = "payload-documents-worker-builder" },
     { name = "pydantic-settings", specifier = ">=2.6" },
 ]
 
 [[package]]
-name = "payload-worker-builder"
+name = "payload-documents-worker-builder"
 version = "0.1.0"
-source = { editable = "payload-worker-builder" }
+source = { editable = "payload-documents-worker-builder" }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },

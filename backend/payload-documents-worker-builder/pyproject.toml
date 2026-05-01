@@ -1,5 +1,5 @@
 [project]
-name = "payload-worker-builder"
+name = "payload-documents-worker-builder"
 version = "0.1.0"
 description = "Parametrizable taskiq-based worker for Payload CMS — FastAPI kick app + Postgres LISTEN/NOTIFY broker + LlamaParse parse-document task."
 requires-python = ">=3.12"
@@ -37,7 +37,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["payload_worker_builder"]
+packages = ["payload_documents_worker_builder"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"payload_worker_builder/py.typed" = "payload_worker_builder/py.typed"
+"payload_documents_worker_builder/py.typed" = "payload_documents_worker_builder/py.typed"

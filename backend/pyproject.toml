@@ -5,13 +5,13 @@ description = "Workspace root for Zetesis Python services."
 requires-python = ">=3.12"
 
 [tool.uv.workspace]
-members = ["agno-agent-builder", "agno-agent", "payload-worker-builder", "payload-worker"]
+members = ["agno-agent-builder", "agno-agent", "payload-documents-worker-builder", "payload-documents-worker"]
 
 [tool.uv.sources]
 agno-agent-builder = { workspace = true }
 agno-agent = { workspace = true }
-payload-worker-builder = { workspace = true }
-payload-worker = { workspace = true }
+payload-documents-worker-builder = { workspace = true }
+payload-documents-worker = { workspace = true }
 
 [dependency-groups]
 dev = [

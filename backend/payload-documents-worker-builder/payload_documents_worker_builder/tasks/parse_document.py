@@ -18,16 +18,16 @@ from typing import Any
 import structlog
 from taskiq import AsyncBroker
 
-from payload_worker_builder.clients.llama_parse import (
+from payload_documents_worker_builder.clients.llama_parse import (
     LlamaParseClient,
     LlamaParseError,
 )
-from payload_worker_builder.clients.payload import PayloadClient, PayloadError
-from payload_worker_builder.config import RuntimeConfig
+from payload_documents_worker_builder.clients.payload import PayloadClient, PayloadError
+from payload_documents_worker_builder.config import RuntimeConfig
 
 PARSE_DOCUMENT_TASK_NAME = "documents.parse"
 
-logger = structlog.get_logger("payload_worker_builder.parse_document")
+logger = structlog.get_logger("payload_documents_worker_builder.parse_document")
 
 
 def register_parse_document_task(broker: AsyncBroker, config: RuntimeConfig) -> None:

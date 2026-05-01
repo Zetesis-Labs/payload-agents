@@ -11,7 +11,7 @@ from __future__ import annotations
 from taskiq import AsyncBroker, SmartRetryMiddleware
 from taskiq_redis import RedisStreamBroker
 
-from payload_worker_builder.config import RuntimeConfig
+from payload_documents_worker_builder.config import RuntimeConfig
 
 
 def create_broker(config: RuntimeConfig) -> AsyncBroker:
