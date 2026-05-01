@@ -72,6 +72,18 @@ export const createParseStatusEndpoint = (config: EndpointConfig): Endpoint => (
     if (idOrError instanceof Response) return idOrError
     const id = idOrError
 
+    // In worker mode the parse runs out-of-process and the worker writes
+    // `parsed_text` / `parse_status` directly via Payload REST. The status
+    // endpoint becomes a passive read of whatever the worker last stamped.
+    if (config.worker) {
+      const docOrError = await fetchDocument(req, config.collectionSlug, id)
+      if (docOrError instanceof Response) return docOrError
+      const status = docOrError.parse_status ?? 'idle'
+      const body: { status: string; error?: string } = { status }
+      if (status === 'error' && docOrError.parse_error) body.error = docOrError.parse_error
+      return Response.json(body)
+    }
+
     const clientOrError = getLlamaParseClient(config)
     if (clientOrError instanceof Response) return clientOrError
     const client = clientOrError

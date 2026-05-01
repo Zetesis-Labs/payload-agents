@@ -5,6 +5,12 @@ export interface EndpointConfig {
   collectionSlug: string
   apiKey: string | undefined
   baseUrl: string
+  worker?: WorkerEndpointConfig
+}
+
+export interface WorkerEndpointConfig {
+  url: string
+  internalSecret: string
 }
 
 export interface DocumentRecord {

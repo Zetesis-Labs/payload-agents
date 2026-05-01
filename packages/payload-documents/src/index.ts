@@ -16,5 +16,6 @@ export {
   DEFAULT_COLLECTION_SLUG,
   type DocumentsPluginConfig,
   type DocumentsPluginOverrides,
-  type DocumentsPluginResult
+  type DocumentsPluginResult,
+  type DocumentsWorkerConfig
 } from './plugin'

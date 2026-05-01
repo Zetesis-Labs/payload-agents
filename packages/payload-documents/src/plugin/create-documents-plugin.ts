@@ -12,7 +12,7 @@ export const createDocumentsPlugin = (options: DocumentsPluginConfig = {}): Docu
   const plugin = (payloadConfig: Config): Config => {
     const apiKey = options.llamaParseApiKey ?? process.env.LLAMA_CLOUD_API_KEY
 
-    const endpointConfig = { collectionSlug: slug, apiKey, baseUrl }
+    const endpointConfig = { collectionSlug: slug, apiKey, baseUrl, worker: options.worker }
 
     let collection = buildDocumentsCollection(slug)
     collection = {
