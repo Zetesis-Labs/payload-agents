@@ -118,14 +118,7 @@ const createAfterChangeHook = (
 
     try {
       for (const tableConfig of tableConfigs) {
-        await processTableConfigAfterChange(
-          tableConfig,
-          adapter,
-          collectionSlug,
-          populatedDoc,
-          operation,
-          syncOptions
-        )
+        await processTableConfigAfterChange(tableConfig, adapter, collectionSlug, populatedDoc, operation, syncOptions)
       }
     } catch (error) {
       const syncError = error instanceof Error ? error : new Error(String(error))
