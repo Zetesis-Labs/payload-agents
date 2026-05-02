@@ -342,9 +342,6 @@ importers:
 
   packages/payload-indexer:
     dependencies:
-      '@google/generative-ai':
-        specifier: ^0.24.1
-        version: 0.24.1
       '@langchain/textsplitters':
         specifier: ^1.0.0
         version: 1.0.1(@langchain/core@1.1.30(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))
@@ -456,18 +453,12 @@ importers:
 
   packages/payload-typesense:
     dependencies:
-      '@google/generative-ai':
-        specifier: ^0.24.1
-        version: 0.24.1
       '@payloadcms/richtext-lexical':
         specifier: ^3.81.0
         version: 3.81.0(@faceless-ui/modal@3.0.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@faceless-ui/scroll-info@2.0.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@payloadcms/next@3.81.0(@types/react@19.1.8)(graphql@16.13.1)(monaco-editor@0.55.1)(next@16.1.6(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.77.4))(payload@3.81.0(graphql@16.13.1)(typescript@5.7.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.7.3))(@types/react@19.1.8)(monaco-editor@0.55.1)(next@16.1.6(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.77.4))(payload@3.81.0(graphql@16.13.1)(typescript@5.7.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.7.3)(yjs@13.6.29)
       '@zetesis/payload-indexer':
         specifier: workspace:*
         version: link:../payload-indexer
-      openai:
-        specifier: ^4.104.0
-        version: 4.104.0(ws@8.19.0)(zod@4.3.6)
       payload:
         specifier: ^3.81.0
         version: 3.81.0(graphql@16.13.1)(typescript@5.7.3)
@@ -7225,6 +7216,7 @@ packages:
 
   uuid@10.0.0:
     resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   uuid@11.1.0:
@@ -7233,6 +7225,7 @@ packages:
 
   uuid@9.0.0:
     resolution: {integrity: sha512-MXcSTerfPa4uqyzStbRoTgt5XIe3x5+42+q1sDuy3R5MDk66URdLMOZe5aPX/SQd+kuYAh0FdP/pO28IkQyTeg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   validate-npm-package-license@3.0.4:
@@ -12788,21 +12781,6 @@ snapshots:
     optionalDependencies:
       ws: 8.19.0
       zod: 3.25.76
-    transitivePeerDependencies:
-      - encoding
-
-  openai@4.104.0(ws@8.19.0)(zod@4.3.6):
-    dependencies:
-      '@types/node': 18.19.130
-      '@types/node-fetch': 2.6.13
-      abort-controller: 3.0.0
-      agentkeepalive: 4.6.0
-      form-data-encoder: 1.7.2
-      formdata-node: 4.4.1
-      node-fetch: 2.7.0
-    optionalDependencies:
-      ws: 8.19.0
-      zod: 4.3.6
     transitivePeerDependencies:
       - encoding
 
