@@ -98,50 +98,61 @@ export interface ChunkingConfig {
 }
 
 /**
- * Behavior when embedding generation fails for a chunk.
- * - `'skip-chunk'` — omit the chunk from the batch (default, logs warning)
- * - `'error'` — throw, failing the entire sync operation
- * - `'empty-vector'` — insert chunk with empty vector (silently excluded from vector search)
+ * Backend-agnostic auto-embedding configuration. The search backend
+ * generates the embedding on every upsert and on every search query, using
+ * the model declared in its schema. The indexer never calls an embedding
+ * API.
+ *
+ * `modelConfig` is opaque to the indexer — its concrete shape is defined
+ * by each adapter package (e.g. `TypesenseAutoEmbedConfig` in
+ * `@zetesis/payload-typesense`). Adapters consume it when translating the
+ * table config into the backend's native schema.
  */
-export type EmbeddingFailureBehavior = 'skip-chunk' | 'error' | 'empty-vector'
+export interface AutoEmbedConfig {
+  /**
+   * Names of fields IN THE INDEXED DOCUMENT (not in Payload) whose contents
+   * the backend reads to produce the embedding source text.
+   *
+   * For chunked tables the typical value is `['chunk_text']`. For full
+   * documents it is the same field names declared in `TableConfig.fields`.
+   */
+  from: string[]
+  /**
+   * Backend-specific embedding model configuration. Opaque at the indexer
+   * level; each adapter narrows the shape via its own type
+   * (e.g. `TypesenseAutoEmbedConfig['modelConfig']`). Typed as `object`
+   * (not `Record<string, unknown>`) so concrete typed interfaces from
+   * adapter packages are assignable without index-signature gymnastics.
+   */
+  modelConfig: object
+}
 
 /**
- * Embedding configuration for a table
+ * Embedding configuration for a table.
+ *
+ * The search backend (declared via `autoEmbed`) is the only embedding
+ * provider — there is no client-side embedding path.
  */
 export interface EmbeddingTableConfig {
   /**
-   * Source fields to extract and transform for embedding generation
-   * These will be concatenated if multiple are provided
+   * Source fields used to extract content for chunking. Ignored when the
+   * table is not chunked: `autoEmbed.from` declares which indexed field the
+   * backend reads to produce the vector.
    */
   fields: (string | SourceField)[]
 
   /**
-   * Optional chunking configuration
-   * If provided, the content will be chunked before embedding
+   * Backend auto-embedding configuration. The backend computes the vector
+   * on upsert (from the fields listed in `autoEmbed.from`) and on search
+   * (from the `q` parameter).
+   */
+  autoEmbed: AutoEmbedConfig
+
+  /**
+   * Optional chunking configuration. When set, the indexer splits the
+   * source text into chunks and writes one indexed document per chunk.
    */
   chunking?: ChunkingConfig
-
-  /**
-   * Behavior when embedding generation fails for a chunk.
-   * @default 'skip-chunk'
-   */
-  onEmbeddingFailure?: EmbeddingFailureBehavior
-
-  /**
-   * When true, on `update` operations the indexer compares the content hash
-   * against the stored one and, if unchanged, performs a partial metadata
-   * update instead of re-chunking and re-embedding. This saves embedding
-   * cost but its partial-update path can leave non-content fields stale in
-   * subtle ways (e.g. when a localized field is edited or when an updateable
-   * field's mapping changes).
-   *
-   * Default `false` — every update re-runs the full sync (re-chunk + re-embed).
-   * Opt in only when you have validated that all your mapped fields propagate
-   * correctly through the partial-update path for your adapter.
-   *
-   * @default false
-   */
-  reuseEmbeddingsWhenContentUnchanged?: boolean
 }
 
 /**

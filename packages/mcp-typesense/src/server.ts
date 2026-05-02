@@ -16,7 +16,6 @@ import { resolveAuth } from './auth/resolve'
 import { createContentFetcher } from './content/payload-rest'
 import type { CollectionRegistry, ContentFetcher, ToolContext } from './context'
 import { DEFAULT_INSTRUCTIONS } from './defaults'
-import { createOpenAIEmbeddings } from './embeddings/openai'
 import { registerResources } from './resources'
 import { createTaxonomyResolver } from './taxonomy/resolver'
 import { registerTools } from './tools'
@@ -47,11 +46,10 @@ function buildCollectionRegistry(collections: ChunkCollectionConfig[]): Collecti
 
 function buildToolContext(config: McpServerConfig): ToolContext {
   const typesense = createTypesenseClient(config.typesense)
-  const embeddings = createOpenAIEmbeddings(config.embeddings)
   const collections = buildCollectionRegistry(config.collections)
   const taxonomy = createTaxonomyResolver(config.taxonomy)
   const content: ContentFetcher | null = config.content ? createContentFetcher(config.content) : null
-  return { typesense, embeddings, collections, taxonomy, content }
+  return { typesense, collections, taxonomy, content }
 }
 
 export function createMcpServer(config: McpServerConfig): McpServerHandle {

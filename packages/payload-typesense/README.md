@@ -100,6 +100,77 @@ collections: {
 }
 ```
 
+### Embedding strategies
+
+The search backend (Typesense) is the only embedding provider — there is no
+client-side embedding path. Each chunked table declares an
+`embedding.autoEmbed` block describing which indexed field(s) Typesense
+should embed and which model to use. Typesense embeds documents on every
+upsert and the query on every search, server-side. The indexer never calls
+an embedding API.
+
+You can mix models per table by giving each table its own `modelConfig` —
+e.g. `openai/text-embedding-3-small` on posts, `ts/multilingual-e5-large` on
+books, etc. Type the value via `TypesenseAutoEmbedConfig` (re-exported from
+`@zetesis/payload-typesense`) to keep `modelConfig` type-safe.
+
+```typescript
+import type { TypesenseAutoEmbedConfig } from '@zetesis/payload-typesense'
+
+const builtinAutoEmbed: TypesenseAutoEmbedConfig = {
+  from: ['chunk_text'],
+  modelConfig: {
+    // Built-in Typesense model — no API key needed, embeds locally.
+    modelName: 'ts/multilingual-e5-large',
+    indexingPrefix: 'passage:',
+    queryPrefix: 'query:',
+  },
+}
+
+const openaiAutoEmbed: TypesenseAutoEmbedConfig = {
+  from: ['chunk_text'],
+  modelConfig: {
+    // Typesense calls OpenAI itself; the client app does not.
+    modelName: 'openai/text-embedding-3-small',
+    apiKey: process.env.OPENAI_API_KEY!,
+  },
+}
+
+collections: {
+  posts: [
+    {
+      enabled: true,
+      tableName: 'posts_chunk',
+      fields: [...],
+      embedding: {
+        fields: ['title', 'content'],
+        chunking: { strategy: 'markdown' },
+        autoEmbed: openaiAutoEmbed,
+      },
+    },
+  ],
+  books: [
+    {
+      enabled: true,
+      tableName: 'books_chunk',
+      fields: [...],
+      embedding: {
+        fields: ['title', 'content'],
+        chunking: { strategy: 'markdown' },
+        autoEmbed: builtinAutoEmbed,
+      },
+    },
+  ],
+}
+```
+
+When the source-text hash matches what Typesense already has for the parent
+document, the indexer issues a partial metadata update and skips the
+re-chunk + re-upsert — Typesense doesn't pay re-embedding cost on
+metadata-only edits (title, taxonomy, etc.). Edits that change the source
+content trigger full reindex of that doc's chunks. Bypass via
+`req.context.forceReindex = true` from a hook caller.
+
 ### RAG & Agents Configuration
 
 Enable RAG to build chat interfaces on top of your data.
@@ -204,13 +275,10 @@ Session management endpoints: `createSessionGETHandler`, `createSessionPATCHHand
 
 We are actively working to improve the modularity and flexibility of the plugin.
 
-### 1. Modular Embedding Strategies (High Priority)
-**Goal:** Allow different embedding models for different collections (tables).
-*   **Current State:** Global embedding configuration only.
-*   **Future:**
-    *   Move `embedding` config to `CollectionTableConfig`.
-    *   Support "Table X" -> Gemini, "Table Y" -> OpenAI Large.
-    *   Update RAG agents to dynamically select the correct embedding model based on the collection being queried.
+### 1. Modular Embedding Strategies — **Done**
+*   ~~Move `embedding` config to `CollectionTableConfig`.~~ — `embedding.provider` per table.
+*   ~~Support "Table X" -> Gemini, "Table Y" -> OpenAI Large.~~
+*   ~~Auto-embed via Typesense `embed.model_config` (no client-side embedding round-trip).~~ — see `embedding.autoEmbed`.
 
 ### 2. Expanded Provider Support
 *   **Embeddings:** Add support for Cohere, HuggingFace, and local models (via Ollama).

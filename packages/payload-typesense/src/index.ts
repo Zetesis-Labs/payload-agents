@@ -36,7 +36,11 @@ export type {
   RAGSearchResult
 } from './features/rag'
 
-export type { TypesenseConnectionConfig } from './shared/types/plugin-types'
+export type {
+  TypesenseAutoEmbedConfig,
+  TypesenseConnectionConfig,
+  TypesenseModelConfig
+} from './shared/types/plugin-types'
 
 export type {
   ApiResponse,
@@ -61,12 +65,6 @@ export type {
 // ============================================================================
 
 export { createTypesenseClient, testTypesenseConnection } from './core/client/typesense-client'
-
-export {
-  generateEmbedding,
-  generateEmbeddingsBatchWithUsage,
-  generateEmbeddingWithUsage
-} from './features/embedding/embeddings'
 
 export {
   buildConversationalUrl,

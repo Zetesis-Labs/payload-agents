@@ -1,6 +1,7 @@
 import type { TableConfig } from '@zetesis/payload-indexer'
 import type { CollectionCreateSchema } from 'typesense/lib/Typesense/Collections'
 import type { TypesenseFieldMapping } from '../../adapter/types'
+import type { TypesenseAutoEmbedConfig } from '../types/plugin-types'
 
 /**
  * Field schema definitions for Typesense collections
@@ -22,17 +23,49 @@ const getBaseFields = () => [
   { name: 'updatedAt', type: 'int64' as const }
 ]
 
+interface AutoEmbedFieldOptions {
+  optional: boolean
+  autoEmbed: TypesenseAutoEmbedConfig
+}
+
 /**
- * Creates embedding field definition
- * @param optional - Whether the embedding field is optional
- * @param dimensions - Number of dimensions for the embedding vector (default: 1536)
+ * Build the `embedding` field for the schema. Typesense generates the
+ * vector on every upsert/search using the declared `embed` block.
  */
-const getEmbeddingField = (optional: boolean = true, dimensions: number) => ({
-  name: 'embedding',
-  type: 'float[]' as const,
-  num_dim: dimensions,
-  ...(optional && { optional: true })
-})
+const buildEmbeddingField = (options: AutoEmbedFieldOptions): TypesenseFieldSchema => {
+  const { optional, autoEmbed } = options
+
+  return {
+    name: 'embedding',
+    type: 'float[]' as const,
+    ...(optional && { optional: true }),
+    embed: {
+      from: autoEmbed.from,
+      model_config: {
+        model_name: autoEmbed.modelConfig.modelName,
+        ...(autoEmbed.modelConfig.apiKey !== undefined && { api_key: autoEmbed.modelConfig.apiKey }),
+        ...(autoEmbed.modelConfig.accessToken !== undefined && {
+          access_token: autoEmbed.modelConfig.accessToken
+        }),
+        ...(autoEmbed.modelConfig.clientId !== undefined && { client_id: autoEmbed.modelConfig.clientId }),
+        ...(autoEmbed.modelConfig.clientSecret !== undefined && {
+          client_secret: autoEmbed.modelConfig.clientSecret
+        }),
+        ...(autoEmbed.modelConfig.projectId !== undefined && { project_id: autoEmbed.modelConfig.projectId }),
+        ...(autoEmbed.modelConfig.refreshToken !== undefined && {
+          refresh_token: autoEmbed.modelConfig.refreshToken
+        }),
+        ...(autoEmbed.modelConfig.url !== undefined && { url: autoEmbed.modelConfig.url }),
+        ...(autoEmbed.modelConfig.indexingPrefix !== undefined && {
+          indexing_prefix: autoEmbed.modelConfig.indexingPrefix
+        }),
+        ...(autoEmbed.modelConfig.queryPrefix !== undefined && {
+          query_prefix: autoEmbed.modelConfig.queryPrefix
+        })
+      }
+    }
+  } as TypesenseFieldSchema
+}
 
 /**
  * Maps TypesenseFieldMapping to TypesenseFieldSchema
@@ -51,13 +84,18 @@ const mapFieldMappingsToSchema = (fields: TypesenseFieldMapping[]): TypesenseFie
  * Gets chunk-specific fields for chunk collections
  */
 const getChunkFields = () => [
-  { name: 'parent_doc_id', type: 'string' as const, facet: true }, // Required for chunks
+  { name: 'parent_doc_id', type: 'string' as const, facet: true },
   { name: 'chunk_index', type: 'int32' as const },
-  { name: 'chunk_text', type: 'string' as const }, // The chunk content
-  { name: 'is_chunk', type: 'bool' as const }, // Always true for chunks
-  { name: 'headers', type: 'string[]' as const, facet: true, optional: true }, // Hierarchical header metadata
-  { name: 'content_hash', type: 'string' as const, optional: true } // SHA-256 of source text for change detection
+  { name: 'chunk_text', type: 'string' as const },
+  { name: 'is_chunk', type: 'bool' as const },
+  { name: 'headers', type: 'string[]' as const, facet: true, optional: true },
+  { name: 'content_hash', type: 'string' as const, optional: true }
 ]
+
+export interface CollectionSchemaEmbeddingOptions {
+  /** Backend auto-embed config. Omit to build a schema without an embedding field. */
+  autoEmbed?: TypesenseAutoEmbedConfig
+}
 
 /**
  * Creates a complete schema for a chunk collection
@@ -65,14 +103,11 @@ const getChunkFields = () => [
 export const getChunkCollectionSchema = (
   collectionSlug: string,
   tableConfig: TableConfig<TypesenseFieldMapping>,
-  embeddingDimensions: number
+  embedding: CollectionSchemaEmbeddingOptions
 ) => {
   const fields = tableConfig.fields ? mapFieldMappingsToSchema(tableConfig.fields) : []
 
-  // Get user-defined field names to avoid duplicates
   const userFieldNames = new Set([...fields.map(f => f.name), ...getChunkFields().map(f => f.name)])
-
-  // Filter base fields to exclude any that are already defined by user or chunk fields
   const baseFields = getBaseFields().filter(f => !userFieldNames.has(f.name))
 
   return {
@@ -81,7 +116,7 @@ export const getChunkCollectionSchema = (
       ...baseFields,
       ...getChunkFields(),
       ...fields,
-      getEmbeddingField(false, embeddingDimensions) // Embeddings are required for chunks
+      ...(embedding.autoEmbed ? [buildEmbeddingField({ optional: false, autoEmbed: embedding.autoEmbed })] : [])
     ]
   }
 }
@@ -92,14 +127,11 @@ export const getChunkCollectionSchema = (
 export const getFullDocumentCollectionSchema = (
   collectionSlug: string,
   tableConfig: TableConfig<TypesenseFieldMapping>,
-  embeddingDimensions: number
+  embedding: CollectionSchemaEmbeddingOptions
 ) => {
   const mappedFields = mapFieldMappingsToSchema(tableConfig.fields)
 
-  // Get user-defined field names to avoid duplicates
   const userFieldNames = new Set(mappedFields.map(f => f.name))
-
-  // Filter base fields to exclude any that are already defined by user
   const baseFields = getBaseFields().filter(f => !userFieldNames.has(f.name))
 
   return {
@@ -107,8 +139,7 @@ export const getFullDocumentCollectionSchema = (
     fields: [
       ...baseFields,
       ...mappedFields,
-      // Optional embedding for full documents
-      getEmbeddingField(true, embeddingDimensions),
+      ...(embedding.autoEmbed ? [buildEmbeddingField({ optional: true, autoEmbed: embedding.autoEmbed })] : []),
       { name: 'content_hash', type: 'string' as const, optional: true }
     ]
   }

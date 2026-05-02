@@ -167,13 +167,15 @@ export interface TypesenseRAGSearchResult {
 }
 
 /**
- * Configuration for building Typesense queries
+ * Configuration for building Typesense queries.
+ *
+ * Typesense embeds the query (`userMessage`) server-side using each
+ * collection's declared `embed.model_config` — no client-side vector is
+ * sent.
  */
 export interface TypesenseQueryConfig {
   /** User's message/query */
   userMessage: string
-  /** Query embedding vector */
-  queryEmbedding: number[]
   /** Optional: Filter by selected document IDs */
   selectedDocuments?: string[]
   /** Optional: Conversation ID for follow-up */
@@ -188,36 +190,6 @@ export interface TypesenseQueryConfig {
   taxonomySlugs?: string[]
   /** When true, block search if no taxonomySlugs are assigned (prevents global searches in multi-tenant setups) */
   requireTaxonomies?: boolean
-}
-
-/**
- * Embedding result with usage tracking
- */
-export interface EmbeddingWithUsage {
-  /** The embedding vector */
-  embedding: number[]
-  /** Usage information */
-  usage: {
-    /** Number of tokens used */
-    promptTokens: number
-    /** Total tokens (same as prompt_tokens for embeddings) */
-    totalTokens: number
-  }
-}
-
-/**
- * Batch embedding result with usage tracking
- */
-export interface BatchEmbeddingWithUsage {
-  /** Array of embedding vectors */
-  embeddings: number[][]
-  /** Total usage information */
-  usage: {
-    /** Number of tokens used */
-    promptTokens: number
-    /** Total tokens (same as prompt_tokens for embeddings) */
-    totalTokens: number
-  }
 }
 
 // --- RAG Callbacks (minimal — chat/sessions moved to payload-agents-core) ---
@@ -239,9 +211,6 @@ export interface RAGConfig {
   advanced?: AdvancedSearchConfig
 }
 
-// Re-export embedding types from payload-indexer (single source of truth)
-export type { EmbeddingProviderConfig } from '@zetesis/payload-indexer'
-
 type TypesenseProtocol = 'http' | 'https'
 
 type TypesenseNode = {
@@ -260,4 +229,36 @@ export type TypesenseConnectionConfig = {
   retryIntervalSeconds?: number
   numRetries?: number
   nodes: [TypesenseNode, ...Array<TypesenseNode>]
+}
+
+/**
+ * Typesense-specific `model_config` shape — mirrors the fields Typesense
+ * accepts in its `embed.model_config` schema declaration. Use this type
+ * when typing `EmbeddingTableConfig.autoEmbed` in a Typesense-backed
+ * project; it satisfies the agnostic `AutoEmbedConfig` from
+ * `@zetesis/payload-indexer` while keeping the model fields type-safe.
+ */
+export interface TypesenseModelConfig {
+  /** e.g. `openai/text-embedding-3-small`, `ts/multilingual-e5-large` */
+  modelName: string
+  apiKey?: string
+  accessToken?: string
+  clientId?: string
+  clientSecret?: string
+  projectId?: string
+  refreshToken?: string
+  url?: string
+  /** Required by E5-family models — usually `'passage:'` */
+  indexingPrefix?: string
+  /** Required by E5-family models — usually `'query:'` */
+  queryPrefix?: string
+}
+
+/**
+ * Typesense-flavoured auto-embed config. Assignable to the agnostic
+ * `AutoEmbedConfig` from `@zetesis/payload-indexer`.
+ */
+export interface TypesenseAutoEmbedConfig {
+  from: string[]
+  modelConfig: TypesenseModelConfig
 }

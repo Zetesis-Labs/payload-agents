@@ -34,6 +34,10 @@ export function createMockChunkedTableConfig(overrides: Partial<TableConfig> = {
         strategy: 'text',
         size: 500,
         overlap: 50
+      },
+      autoEmbed: {
+        from: ['chunk_text'],
+        modelConfig: { modelName: 'mock-model' }
       }
     },
     ...overrides

@@ -8,7 +8,6 @@ import type { IndexerAdapter } from '../../adapter/types'
 import { logger } from '../../core/logging/logger'
 import { recordSyncFailure } from '../../core/metrics/sync-metrics'
 import type { PayloadDocument, TableConfig } from '../../document/types'
-import type { EmbeddingService } from '../../embedding/types'
 import type { IndexerPluginConfig, SyncFeatureConfig } from '../types'
 import { deleteDocumentFromIndex, type SyncOptions, syncDocumentToIndex } from './document-syncer'
 
@@ -21,7 +20,6 @@ const processTableConfigAfterChange = async (
   collectionSlug: string,
   doc: PayloadDocument,
   operation: 'create' | 'update',
-  embeddingService?: EmbeddingService,
   options?: SyncOptions
 ): Promise<void> => {
   if (!tableConfig.enabled) return
@@ -34,7 +32,7 @@ const processTableConfigAfterChange = async (
     }
   }
 
-  await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig, embeddingService, options)
+  await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig, options)
 }
 
 /**
@@ -99,7 +97,6 @@ const createAfterChangeHook = (
   tableConfigs: TableConfig[],
   adapter: IndexerAdapter,
   collectionSlug: string,
-  embeddingService?: EmbeddingService,
   onSyncError?: SyncFeatureConfig['onSyncError']
 ) => {
   return async ({
@@ -121,15 +118,7 @@ const createAfterChangeHook = (
 
     try {
       for (const tableConfig of tableConfigs) {
-        await processTableConfigAfterChange(
-          tableConfig,
-          adapter,
-          collectionSlug,
-          populatedDoc,
-          operation,
-          embeddingService,
-          syncOptions
-        )
+        await processTableConfigAfterChange(tableConfig, adapter, collectionSlug, populatedDoc, operation, syncOptions)
       }
     } catch (error) {
       const syncError = error instanceof Error ? error : new Error(String(error))
@@ -174,8 +163,7 @@ const createAfterDeleteHook = (tableConfigs: TableConfig[], adapter: IndexerAdap
 export const applySyncHooks = (
   collections: CollectionConfig[],
   pluginConfig: IndexerPluginConfig,
-  adapter: IndexerAdapter,
-  embeddingService?: EmbeddingService
+  adapter: IndexerAdapter
 ): CollectionConfig[] => {
   if (
     !pluginConfig.features.sync?.enabled ||
@@ -206,13 +194,7 @@ export const applySyncHooks = (
         ...collection.hooks,
         afterChange: [
           ...(collection.hooks?.afterChange || []),
-          createAfterChangeHook(
-            tableConfigs,
-            adapter,
-            collection.slug,
-            embeddingService,
-            pluginConfig.features.sync?.onSyncError
-          )
+          createAfterChangeHook(tableConfigs, adapter, collection.slug, pluginConfig.features.sync?.onSyncError)
         ],
         afterDelete: [
           ...(collection.hooks?.afterDelete || []),

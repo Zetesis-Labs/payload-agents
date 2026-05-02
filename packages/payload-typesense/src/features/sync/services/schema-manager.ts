@@ -5,7 +5,12 @@ import { isTypesense404, type TypesenseFieldMapping } from '../../../adapter/typ
 import type { ModularPluginConfig } from '../../../core/config/types'
 import { logger } from '../../../core/logging/logger'
 import { getTypesenseCollectionName } from '../../../core/utils/naming'
-import { getChunkCollectionSchema, getFullDocumentCollectionSchema } from '../../../shared/schema/collection-schemas'
+import {
+  type CollectionSchemaEmbeddingOptions,
+  getChunkCollectionSchema,
+  getFullDocumentCollectionSchema
+} from '../../../shared/schema/collection-schemas'
+import type { TypesenseAutoEmbedConfig } from '../../../shared/types/plugin-types'
 
 export class SchemaManager {
   constructor(
@@ -21,23 +26,48 @@ export class SchemaManager {
 
     logger.info('Starting schema synchronization...')
 
-    const embeddingDimensions = this.config?.features?.embedding?.dimensions
-
     for (const [collectionSlug, tableConfigs] of Object.entries(this.config.collections)) {
       if (!tableConfigs) continue
 
       for (const tableConfig of tableConfigs) {
-        if (!embeddingDimensions) {
-          console.warn(`Embedding dimensions not configured. Skipping schema sync for collection: ${collectionSlug}`)
-          continue
-        }
         if (!tableConfig.enabled) continue
 
-        await this.syncTable(collectionSlug, tableConfig, embeddingDimensions)
+        const embedding = this.resolveEmbeddingOptions(collectionSlug, tableConfig)
+        if (!embedding) continue
+
+        await this.syncTable(collectionSlug, tableConfig, embedding)
       }
     }
 
     logger.info('Schema synchronization completed.')
+  }
+
+  /**
+   * Picks the embedding config for a single table. Only `autoEmbed` is
+   * supported — if the table declares no `embedding`, the schema is built
+   * without an embedding field at all (skip vector search for that table).
+   */
+  private resolveEmbeddingOptions(
+    collectionSlug: string,
+    tableConfig: TableConfig<TypesenseFieldMapping>
+  ): CollectionSchemaEmbeddingOptions | null {
+    if (tableConfig.embedding?.autoEmbed) {
+      // The indexer's `AutoEmbedConfig` declares `modelConfig` as opaque
+      // (`Record<string, unknown>`); narrow to the Typesense shape at the
+      // adapter boundary. Misconfigured shapes still surface as Typesense
+      // 4xx at schema-create time, never silently miswritten.
+      return { autoEmbed: tableConfig.embedding.autoEmbed as TypesenseAutoEmbedConfig }
+    }
+
+    if (tableConfig.embedding) {
+      logger.warn(
+        `Table "${tableConfig.tableName ?? collectionSlug}" declares \`embedding\` without \`autoEmbed\`; ` +
+          'autoEmbed is the only supported embedding mode. Skipping schema sync.'
+      )
+      return null
+    }
+
+    return { autoEmbed: undefined }
   }
 
   /**
@@ -46,29 +76,25 @@ export class SchemaManager {
   private async syncTable(
     collectionSlug: string,
     tableConfig: TableConfig<TypesenseFieldMapping>,
-    embeddingDimensions: number
+    embedding: CollectionSchemaEmbeddingOptions
   ): Promise<void> {
     const tableName = getTypesenseCollectionName(collectionSlug, tableConfig)
 
-    // Generate target schema
     let targetSchema: CollectionCreateSchema
 
     if (tableConfig.embedding?.chunking) {
-      targetSchema = getChunkCollectionSchema(tableName, tableConfig, embeddingDimensions)
+      targetSchema = getChunkCollectionSchema(tableName, tableConfig, embedding)
     } else {
-      targetSchema = getFullDocumentCollectionSchema(tableName, tableConfig, embeddingDimensions)
+      targetSchema = getFullDocumentCollectionSchema(tableName, tableConfig, embedding)
     }
 
     try {
-      // Check if collection exists
       const collection = await this.client.collections(tableName).retrieve()
 
-      // Collection exists, check for updates (new fields)
       // Typesense only allows adding fields, not modifying/deleting (requires reindex)
       await this.updateCollectionSchema(tableName, collection, targetSchema)
     } catch (error: unknown) {
       if (isTypesense404(error)) {
-        // Collection doesn't exist, create it
         logger.info(`Creating collection: ${tableName}`)
         await this.client.collections().create(targetSchema)
       } else {
@@ -87,7 +113,6 @@ export class SchemaManager {
 
     const fields = currentSchema.fields
     const currentFields = new Set(fields.map(f => f.name))
-    // Filter out fields that already exist OR are 'id' (which is immutable)
     const newFields = targetSchema.fields?.filter(f => !currentFields.has(f.name) && f.name !== 'id') || []
 
     if (newFields.length > 0) {
@@ -96,7 +121,6 @@ export class SchemaManager {
       })
 
       try {
-        // Update collection with new fields
         await this.client.collections(tableName).update({
           fields: newFields
         })

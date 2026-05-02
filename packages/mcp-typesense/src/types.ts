@@ -22,24 +22,6 @@ export interface TypesenseConnectionConfig {
 }
 
 // ============================================================================
-// EMBEDDINGS
-// ============================================================================
-
-/**
- * Embedding provider. Only OpenAI is supported in Phase A; the tagged union
- * leaves room for other providers (Voyage, Cohere, Gemini, etc.) to be added
- * additively in later phases.
- */
-export type EmbeddingConfig = {
-  provider: 'openai'
-  apiKey: string
-  /** Model name. Example: "text-embedding-3-small". */
-  model: string
-  /** Output dimensions. Must match the dimensions indexed in Typesense. */
-  dimensions: number
-}
-
-// ============================================================================
 // COLLECTIONS
 // ============================================================================
 
@@ -261,7 +243,6 @@ export interface McpServerConfig {
   server: ServerInfoConfig
   transport?: TransportConfig
   typesense: TypesenseConnectionConfig
-  embeddings: EmbeddingConfig
   collections: ChunkCollectionConfig[]
   taxonomy: TaxonomyConfig
   /** Required to enable `get_book_toc`. If absent, that tool is skipped. */

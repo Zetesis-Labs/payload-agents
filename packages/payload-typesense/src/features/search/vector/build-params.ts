@@ -2,12 +2,13 @@ import { DEFAULT_ALPHA, DEFAULT_K, DEFAULT_PAGE, DEFAULT_PER_PAGE, DEFAULT_SEARC
 import type { BuildVectorSearchParamsOptions } from '../types'
 
 /**
- * Builds vector search parameters for a single collection
+ * Builds vector search parameters for a single auto-embedded collection.
+ *
+ * Typesense embeds the `q` parameter server-side using the model declared
+ * in the collection schema. The `vector_query: '([], k:N)'` syntax tells
+ * Typesense to use the embedded `q` as the search vector.
  */
-export const buildVectorSearchParams = (
-  searchVector: number[],
-  options: BuildVectorSearchParamsOptions
-): Record<string, unknown> => {
+export const buildVectorSearchParams = (options: BuildVectorSearchParamsOptions): Record<string, unknown> => {
   const {
     query,
     k = DEFAULT_K,
@@ -20,27 +21,24 @@ export const buildVectorSearchParams = (
     searchFields
   } = options
 
+  const fields = searchFields?.length ? searchFields : DEFAULT_SEARCH_FIELDS
+
   const searchParams: Record<string, unknown> = {
-    q: '*', // Required by Typesense, use wildcard for pure vector search
-    vector_query: `embedding:([${searchVector.join(',')}], k:${k})`,
+    q: query ?? '*',
+    query_by: hybrid ? [...fields, 'embedding'].join(',') : 'embedding',
+    vector_query: hybrid ? `embedding:([], k:${k}, alpha:${alpha})` : `embedding:([], k:${k})`,
     per_page,
     page,
-    exclude_fields: 'embedding'
+    exclude_fields: 'embedding',
+    // Typesense rejects prefix search when a remote embedder is involved,
+    // which is always the case under autoEmbed.
+    prefix: false
   }
 
-  // Add keyword search if hybrid mode
-  if (hybrid && query) {
-    searchParams.q = query
-    searchParams.query_by = searchFields?.join(',') || DEFAULT_SEARCH_FIELDS.join(',')
-    searchParams.vector_query = `embedding:([${searchVector.join(',')}], k:${k}, alpha:${alpha})`
-  }
-
-  // Add filters if provided
   if (filter_by) {
     searchParams.filter_by = filter_by
   }
 
-  // Add sorting if provided
   if (sort_by) {
     searchParams.sort_by = sort_by
   }
