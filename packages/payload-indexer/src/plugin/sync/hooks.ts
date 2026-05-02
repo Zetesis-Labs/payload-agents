@@ -8,16 +8,8 @@ import type { IndexerAdapter } from '../../adapter/types'
 import { logger } from '../../core/logging/logger'
 import { recordSyncFailure } from '../../core/metrics/sync-metrics'
 import type { PayloadDocument, TableConfig } from '../../document/types'
-import type { EmbeddingService } from '../../embedding/types'
 import type { IndexerPluginConfig, SyncFeatureConfig } from '../types'
-import { deleteDocumentFromIndex, type SyncOptions, syncDocumentToIndex } from './document-syncer'
-
-/**
- * Resolves the EmbeddingService that should be used for a given table.
- * Returns `undefined` when the backend handles embedding (autoEmbed) or
- * when no provider is configured.
- */
-export type EmbeddingResolver = (collectionSlug: string, tableConfig: TableConfig) => EmbeddingService | undefined
+import { deleteDocumentFromIndex, syncDocumentToIndex } from './document-syncer'
 
 /**
  * Processes a single table config during afterChange, handling shouldIndex and sync
@@ -27,9 +19,7 @@ const processTableConfigAfterChange = async (
   adapter: IndexerAdapter,
   collectionSlug: string,
   doc: PayloadDocument,
-  operation: 'create' | 'update',
-  embeddingResolver: EmbeddingResolver,
-  options?: SyncOptions
+  operation: 'create' | 'update'
 ): Promise<void> => {
   if (!tableConfig.enabled) return
 
@@ -41,8 +31,7 @@ const processTableConfigAfterChange = async (
     }
   }
 
-  const embeddingService = embeddingResolver(collectionSlug, tableConfig)
-  await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig, embeddingService, options)
+  await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig)
 }
 
 /**
@@ -107,7 +96,6 @@ const createAfterChangeHook = (
   tableConfigs: TableConfig[],
   adapter: IndexerAdapter,
   collectionSlug: string,
-  embeddingResolver: EmbeddingResolver,
   onSyncError?: SyncFeatureConfig['onSyncError']
 ) => {
   return async ({
@@ -121,23 +109,11 @@ const createAfterChangeHook = (
   }) => {
     if (req.context?.skipIndexSync) return
 
-    const syncOptions: SyncOptions = {
-      forceReindex: req.context?.forceReindex === true
-    }
-
     const populatedDoc = await repopulateDoc(doc, collectionSlug, tableConfigs, req)
 
     try {
       for (const tableConfig of tableConfigs) {
-        await processTableConfigAfterChange(
-          tableConfig,
-          adapter,
-          collectionSlug,
-          populatedDoc,
-          operation,
-          embeddingResolver,
-          syncOptions
-        )
+        await processTableConfigAfterChange(tableConfig, adapter, collectionSlug, populatedDoc, operation)
       }
     } catch (error) {
       const syncError = error instanceof Error ? error : new Error(String(error))
@@ -182,8 +158,7 @@ const createAfterDeleteHook = (tableConfigs: TableConfig[], adapter: IndexerAdap
 export const applySyncHooks = (
   collections: CollectionConfig[],
   pluginConfig: IndexerPluginConfig,
-  adapter: IndexerAdapter,
-  embeddingResolver: EmbeddingResolver
+  adapter: IndexerAdapter
 ): CollectionConfig[] => {
   if (
     !pluginConfig.features.sync?.enabled ||
@@ -214,13 +189,7 @@ export const applySyncHooks = (
         ...collection.hooks,
         afterChange: [
           ...(collection.hooks?.afterChange || []),
-          createAfterChangeHook(
-            tableConfigs,
-            adapter,
-            collection.slug,
-            embeddingResolver,
-            pluginConfig.features.sync?.onSyncError
-          )
+          createAfterChangeHook(tableConfigs, adapter, collection.slug, pluginConfig.features.sync?.onSyncError)
         ],
         afterDelete: [
           ...(collection.hooks?.afterDelete || []),

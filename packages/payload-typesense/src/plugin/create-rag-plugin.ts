@@ -31,7 +31,6 @@ export function createTypesenseRAGPlugin(config: TypesenseRAGPluginConfig) {
       const searchEndpoints = createSearchEndpoints(typesenseClient, {
         typesense: config.typesense,
         features: {
-          embedding: config.embeddingConfig,
           search: config.search
         },
         collections: config.collections || {},
@@ -68,9 +67,7 @@ export function createTypesenseRAGPlugin(config: TypesenseRAGPluginConfig) {
           logger.info('Syncing Typesense collections schema...')
           const schemaManager = new SchemaManager(typesenseClient, {
             typesense: config.typesense,
-            features: {
-              embedding: config.embeddingConfig
-            },
+            features: {},
             collections: config.collections
           })
           await schemaManager.syncCollections()

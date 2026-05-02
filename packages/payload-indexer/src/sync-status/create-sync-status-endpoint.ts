@@ -6,14 +6,12 @@
 import type { Endpoint, PayloadRequest, Where } from 'payload'
 import type { IndexerAdapter } from '../adapter/types'
 import type { PayloadDocument, TableConfig } from '../document/types'
-import type { EmbeddingService } from '../embedding/types'
 import { syncDocumentToIndex } from '../plugin/sync/document-syncer'
 import { checkBatchSyncStatus, checkSyncStatus } from './sync-status-service'
 
 interface SyncStatusEndpointConfig {
   adapter: IndexerAdapter
   collections: Record<string, TableConfig[]>
-  embeddingService?: EmbeddingService
 }
 
 /**
@@ -60,7 +58,7 @@ const findDocumentWithAccessCheck = async (
  * - ids (comma-separated doc IDs)
  */
 export const createSyncStatusEndpoints = (config: SyncStatusEndpointConfig): Endpoint[] => {
-  const { adapter, collections, embeddingService } = config
+  const { adapter, collections } = config
 
   return [
     // Single document sync status
@@ -200,9 +198,7 @@ export const createSyncStatusEndpoints = (config: SyncStatusEndpointConfig): End
 
           const enabledConfigs = tableConfigs.filter(t => t.enabled)
           for (const tableConfig of enabledConfigs) {
-            await syncDocumentToIndex(adapter, collection, doc, 'update', tableConfig, embeddingService, {
-              forceReindex: true
-            })
+            await syncDocumentToIndex(adapter, collection, doc, 'update', tableConfig)
           }
 
           const tableConfig = resolveTableConfig(tableConfigs)

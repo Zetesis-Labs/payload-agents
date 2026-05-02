@@ -1,13 +1,13 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 import {
   type EndpointConfig,
-  type WorkerEndpointConfig,
   fetchDocument,
   fetchUploadedFile,
   getLlamaParseClient,
   getRouteId,
   requireAuth,
-  updateDocument
+  updateDocument,
+  type WorkerEndpointConfig
 } from './shared'
 
 export const createParseEndpoint = (config: EndpointConfig): Endpoint => ({

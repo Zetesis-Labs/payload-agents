@@ -29,7 +29,6 @@
     "prepublishOnly": "pnpm clean && pnpm build"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@langchain/textsplitters": "^1.0.0",
     "openai": "^4.68.0"
   },

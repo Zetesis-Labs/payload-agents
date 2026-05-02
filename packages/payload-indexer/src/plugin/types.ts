@@ -5,7 +5,6 @@
 import type { CollectionSlug } from 'payload'
 import type { IndexerAdapter } from '../adapter/types'
 import type { FieldMapping, TableConfig } from '../document/types'
-import type { EmbeddingProviderConfig } from '../embedding/types'
 
 /**
  * Context passed to the onSyncError callback
@@ -55,8 +54,6 @@ export interface SearchFeatureConfig {
  * Feature flags for the indexer plugin
  */
 export interface IndexerFeatureConfig {
-  /** Embedding provider configuration */
-  embedding?: EmbeddingProviderConfig
   /** Sync feature configuration */
   sync?: SyncFeatureConfig
   /** Search feature configuration */

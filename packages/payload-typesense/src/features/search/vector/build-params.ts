@@ -2,19 +2,13 @@ import { DEFAULT_ALPHA, DEFAULT_K, DEFAULT_PAGE, DEFAULT_PER_PAGE, DEFAULT_SEARC
 import type { BuildVectorSearchParamsOptions } from '../types'
 
 /**
- * Builds vector search parameters for a single collection.
+ * Builds vector search parameters for a single auto-embedded collection.
  *
- * Two modes:
- * - manual: caller supplies `searchVector` (precomputed embedding of `query`).
- *   `vector_query` carries the raw float array.
- * - autoEmbed: caller passes `searchVector: []` and `autoEmbed: true`.
- *   `vector_query: '([], k:N)'` tells Typesense to embed the `q` text using
- *   the model declared in the collection schema.
+ * Typesense embeds the `q` parameter server-side using the model declared
+ * in the collection schema. The `vector_query: '([], k:N)'` syntax tells
+ * Typesense to use the embedded `q` as the search vector.
  */
-export const buildVectorSearchParams = (
-  searchVector: number[],
-  options: BuildVectorSearchParamsOptions
-): Record<string, unknown> => {
+export const buildVectorSearchParams = (options: BuildVectorSearchParamsOptions): Record<string, unknown> => {
   const {
     query,
     k = DEFAULT_K,
@@ -24,45 +18,27 @@ export const buildVectorSearchParams = (
     per_page = DEFAULT_PER_PAGE,
     filter_by,
     sort_by,
-    searchFields,
-    autoEmbed = false
+    searchFields
   } = options
 
-  const vectorPayload = autoEmbed ? '[]' : `[${searchVector.join(',')}]`
+  const fields = searchFields?.length ? searchFields : DEFAULT_SEARCH_FIELDS
 
   const searchParams: Record<string, unknown> = {
-    // Pure vector mode without auto-embed: the wildcard q is required by
-    // Typesense. With autoEmbed the q text drives the embedding, so we must
-    // pass the actual user query.
-    q: autoEmbed && query ? query : '*',
-    vector_query: `embedding:(${vectorPayload}, k:${k})`,
+    q: query ?? '*',
+    query_by: hybrid ? [...fields, 'embedding'].join(',') : 'embedding',
+    vector_query: hybrid ? `embedding:([], k:${k}, alpha:${alpha})` : `embedding:([], k:${k})`,
     per_page,
     page,
-    exclude_fields: 'embedding'
+    exclude_fields: 'embedding',
+    // Typesense rejects prefix search when a remote embedder is involved,
+    // which is always the case under autoEmbed.
+    prefix: false
   }
 
-  // When autoEmbed is true and we have a query, query_by must include the
-  // embedding field so Typesense knows to embed the q. We can keep keyword
-  // hybrid by adding text fields too.
-  if (autoEmbed && query) {
-    const fields = searchFields?.length ? searchFields : DEFAULT_SEARCH_FIELDS
-    searchParams.query_by = hybrid ? [...fields, 'embedding'].join(',') : 'embedding'
-    if (hybrid) {
-      searchParams.vector_query = `embedding:(${vectorPayload}, k:${k}, alpha:${alpha})`
-    }
-  } else if (hybrid && query) {
-    // Manual hybrid: traditional q for keyword, raw vector for semantic.
-    searchParams.q = query
-    searchParams.query_by = searchFields?.join(',') || DEFAULT_SEARCH_FIELDS.join(',')
-    searchParams.vector_query = `embedding:(${vectorPayload}, k:${k}, alpha:${alpha})`
-  }
-
-  // Add filters if provided
   if (filter_by) {
     searchParams.filter_by = filter_by
   }
 
-  // Add sorting if provided
   if (sort_by) {
     searchParams.sort_by = sort_by
   }

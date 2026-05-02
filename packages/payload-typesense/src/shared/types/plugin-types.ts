@@ -167,24 +167,15 @@ export interface TypesenseRAGSearchResult {
 }
 
 /**
- * Configuration for building Typesense queries
+ * Configuration for building Typesense queries.
+ *
+ * Typesense embeds the query (`userMessage`) server-side using each
+ * collection's declared `embed.model_config` — no client-side vector is
+ * sent.
  */
 export interface TypesenseQueryConfig {
   /** User's message/query */
   userMessage: string
-  /**
-   * Pre-computed embedding for `userMessage`. Optional when a target
-   * collection is in `autoEmbedCollections` — for those, Typesense embeds
-   * the query server-side and no vector needs to be sent.
-   */
-  queryEmbedding?: number[]
-  /**
-   * Subset of `searchCollections` whose `embedding` field is auto-embedded
-   * by Typesense. Per-collection requests for these will use
-   * `vector_query: '([], k:N)'` and rely on Typesense's server-side
-   * embedding of the `q` parameter.
-   */
-  autoEmbedCollections?: string[]
   /** Optional: Filter by selected document IDs */
   selectedDocuments?: string[]
   /** Optional: Conversation ID for follow-up */
@@ -199,36 +190,6 @@ export interface TypesenseQueryConfig {
   taxonomySlugs?: string[]
   /** When true, block search if no taxonomySlugs are assigned (prevents global searches in multi-tenant setups) */
   requireTaxonomies?: boolean
-}
-
-/**
- * Embedding result with usage tracking
- */
-export interface EmbeddingWithUsage {
-  /** The embedding vector */
-  embedding: number[]
-  /** Usage information */
-  usage: {
-    /** Number of tokens used */
-    promptTokens: number
-    /** Total tokens (same as prompt_tokens for embeddings) */
-    totalTokens: number
-  }
-}
-
-/**
- * Batch embedding result with usage tracking
- */
-export interface BatchEmbeddingWithUsage {
-  /** Array of embedding vectors */
-  embeddings: number[][]
-  /** Total usage information */
-  usage: {
-    /** Number of tokens used */
-    promptTokens: number
-    /** Total tokens (same as prompt_tokens for embeddings) */
-    totalTokens: number
-  }
 }
 
 // --- RAG Callbacks (minimal — chat/sessions moved to payload-agents-core) ---
@@ -249,9 +210,6 @@ export interface RAGConfig {
   /** Advanced search settings */
   advanced?: AdvancedSearchConfig
 }
-
-// Re-export embedding types from payload-indexer (single source of truth)
-export type { EmbeddingProviderConfig } from '@zetesis/payload-indexer'
 
 type TypesenseProtocol = 'http' | 'https'
 

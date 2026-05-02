@@ -2,7 +2,7 @@
  * Types for the composable Typesense RAG plugin
  */
 
-import type { EmbeddingProviderConfig, TableConfig } from '@zetesis/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { TypesenseFieldMapping } from '../adapter/types'
 import type {
   AdvancedSearchConfig,
@@ -35,9 +35,6 @@ export interface TypesenseSearchConfig {
 export interface TypesenseRAGPluginConfig {
   /** Typesense connection configuration */
   typesense: TypesenseConnectionConfig
-
-  /** Embedding provider config (for search query embedding) */
-  embeddingConfig?: EmbeddingProviderConfig
 
   /** Collection configurations (for schema sync) */
   collections?: Record<string, TableConfig<TypesenseFieldMapping>[]>

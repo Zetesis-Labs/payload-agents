@@ -82,26 +82,6 @@ describe('sync hooks', () => {
       expect(mockSyncDocumentToIndex).not.toHaveBeenCalled()
     })
 
-    it('passes forceReindex from req.context', async () => {
-      const hook = getAfterChangeHook()
-
-      await hook?.({
-        doc: createMockDocument(),
-        operation: 'update',
-        req: { context: { forceReindex: true } }
-      })
-
-      expect(mockSyncDocumentToIndex).toHaveBeenCalledWith(
-        expect.anything(), // adapter
-        'posts',
-        expect.anything(), // doc
-        'update',
-        expect.anything(), // tableConfig
-        undefined, // embeddingService
-        { forceReindex: true }
-      )
-    })
-
     it('records sync failure and re-throws on error', async () => {
       mockSyncDocumentToIndex.mockRejectedValueOnce(new Error('sync failed'))
 
@@ -139,21 +119,6 @@ describe('sync hooks', () => {
       })
     })
 
-    it('still throws after onSyncError', async () => {
-      mockSyncDocumentToIndex.mockRejectedValueOnce(new Error('sync failed'))
-      const onSyncError = vi.fn()
-
-      const hook = getAfterChangeHook([createMockTableConfig()], onSyncError)
-
-      await expect(
-        hook?.({
-          doc: createMockDocument(),
-          operation: 'create',
-          req: {}
-        })
-      ).rejects.toThrow('sync failed')
-    })
-
     describe('syncDepth', () => {
       it('does not refetch when no table config sets syncDepth', async () => {
         const findByID = vi.fn()
@@ -171,8 +136,6 @@ describe('sync hooks', () => {
           'posts',
           expect.objectContaining({ id: 'doc-1' }),
           'update',
-          expect.anything(),
-          undefined,
           expect.anything()
         )
       })
@@ -206,8 +169,6 @@ describe('sync hooks', () => {
           'posts',
           expect.objectContaining({ title: 'populated' }),
           'update',
-          expect.anything(),
-          undefined,
           expect.anything()
         )
       })
@@ -228,8 +189,6 @@ describe('sync hooks', () => {
           'posts',
           expect.objectContaining({ title: 'stale' }),
           'update',
-          expect.anything(),
-          undefined,
           expect.anything()
         )
       })

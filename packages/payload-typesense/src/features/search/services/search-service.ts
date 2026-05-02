@@ -8,7 +8,6 @@ import { performTraditionalMultiCollectionSearch } from '../endpoints/handlers/e
 import { processVectorSearchResults } from '../results/process-vector-results'
 import type { CombinedSearchResult, UniversalSearchOptions } from '../types'
 import { buildMultiCollectionVectorSearchParams } from '../vector/build-multi-collection-params'
-import { generateOrGetVector } from '../vector/generate-vector'
 
 export class SearchService {
   constructor(
@@ -21,38 +20,25 @@ export class SearchService {
     targetCollections: Array<[string, TableConfig]>,
     options: UniversalSearchOptions
   ): Promise<CombinedSearchResult> {
-    // Cache key generation
     const cacheKey = `search:${query}:${JSON.stringify(options)}:${targetCollections.map(c => c[0]).join(',')}`
     const cachedResult = searchCache.get(query, cacheKey, options) as CombinedSearchResult | null
     if (cachedResult) return cachedResult
 
     const searchMode = options.mode || 'semantic'
 
-    // 1. Simple / Traditional Search
     if (searchMode === 'simple') {
       return this.performTraditionalSearch(query, targetCollections, options)
     }
 
-    // 2. Semantic / Hybrid Search.
-    //    Skip the embedding round-trip entirely when every target collection
-    //    is auto-embed: each per-collection request will carry
-    //    `vector_query: '([], k:N)'` and Typesense embeds the q server-side.
-    const allAutoEmbed = targetCollections.every(([, config]) => Boolean(config.embedding?.autoEmbed))
-    let searchVector: number[]
-    if (allAutoEmbed) {
-      searchVector = []
-    } else {
-      const generated = await generateOrGetVector(query, undefined, this.pluginOptions.features.embedding)
-      if (!generated) {
-        // Fallback to traditional if vector generation fails
-        return this.performTraditionalSearch(query, targetCollections, options)
-      }
-      searchVector = generated
+    // Vector search: Typesense embeds the query server-side. Tables without
+    // an `autoEmbed` config are filtered out — they have no embedding field.
+    const autoEmbedTargets = targetCollections.filter(([, config]) => Boolean(config.embedding?.autoEmbed))
+    if (autoEmbedTargets.length === 0) {
+      return this.performTraditionalSearch(query, targetCollections, options)
     }
 
     try {
-      // Execute Vector Search
-      const results = await this.executeVectorSearch(query, searchVector, targetCollections, options)
+      const results = await this.executeVectorSearch(query, autoEmbedTargets, options)
       searchCache.set(query, results, cacheKey, options)
       return results
     } catch (error) {
@@ -71,11 +57,10 @@ export class SearchService {
 
   private async executeVectorSearch(
     query: string,
-    searchVector: number[],
     targetCollections: Array<[string, TableConfig]>,
     options: UniversalSearchOptions
   ): Promise<CombinedSearchResult> {
-    const searches = buildMultiCollectionVectorSearchParams(searchVector, targetCollections, {
+    const searches = buildMultiCollectionVectorSearchParams(targetCollections, {
       query,
       k: Math.min(30, DEFAULT_K),
       hybrid: true,

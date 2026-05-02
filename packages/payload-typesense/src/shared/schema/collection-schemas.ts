@@ -22,59 +22,48 @@ const getBaseFields = () => [
   { name: 'updatedAt', type: 'int64' as const }
 ]
 
-interface EmbeddingFieldOptions {
+interface AutoEmbedFieldOptions {
   optional: boolean
-  /** Required only when `autoEmbed` is undefined — Typesense infers it from the model otherwise. */
-  dimensions?: number
-  autoEmbed?: AutoEmbedConfig
+  autoEmbed: AutoEmbedConfig
 }
 
 /**
- * Build the `embedding` field for the schema. Two modes:
- * - manual: caller computes the vector and uploads it; field declares `num_dim`.
- * - autoEmbed: Typesense generates the vector on every upsert/search using
- *   the declared `embed` block. Dimensions are inferred from the model and
- *   must NOT be specified.
+ * Build the `embedding` field for the schema. Typesense generates the
+ * vector on every upsert/search using the declared `embed` block.
  */
-const buildEmbeddingField = (options: EmbeddingFieldOptions): TypesenseFieldSchema => {
-  const { optional, dimensions, autoEmbed } = options
-  const base = { name: 'embedding', type: 'float[]' as const, ...(optional && { optional: true }) }
+const buildEmbeddingField = (options: AutoEmbedFieldOptions): TypesenseFieldSchema => {
+  const { optional, autoEmbed } = options
 
-  if (autoEmbed) {
-    return {
-      ...base,
-      embed: {
-        from: autoEmbed.from,
-        model_config: {
-          model_name: autoEmbed.modelConfig.modelName,
-          ...(autoEmbed.modelConfig.apiKey !== undefined && { api_key: autoEmbed.modelConfig.apiKey }),
-          ...(autoEmbed.modelConfig.accessToken !== undefined && {
-            access_token: autoEmbed.modelConfig.accessToken
-          }),
-          ...(autoEmbed.modelConfig.clientId !== undefined && { client_id: autoEmbed.modelConfig.clientId }),
-          ...(autoEmbed.modelConfig.clientSecret !== undefined && {
-            client_secret: autoEmbed.modelConfig.clientSecret
-          }),
-          ...(autoEmbed.modelConfig.projectId !== undefined && { project_id: autoEmbed.modelConfig.projectId }),
-          ...(autoEmbed.modelConfig.refreshToken !== undefined && {
-            refresh_token: autoEmbed.modelConfig.refreshToken
-          }),
-          ...(autoEmbed.modelConfig.url !== undefined && { url: autoEmbed.modelConfig.url }),
-          ...(autoEmbed.modelConfig.indexingPrefix !== undefined && {
-            indexing_prefix: autoEmbed.modelConfig.indexingPrefix
-          }),
-          ...(autoEmbed.modelConfig.queryPrefix !== undefined && {
-            query_prefix: autoEmbed.modelConfig.queryPrefix
-          })
-        }
+  return {
+    name: 'embedding',
+    type: 'float[]' as const,
+    ...(optional && { optional: true }),
+    embed: {
+      from: autoEmbed.from,
+      model_config: {
+        model_name: autoEmbed.modelConfig.modelName,
+        ...(autoEmbed.modelConfig.apiKey !== undefined && { api_key: autoEmbed.modelConfig.apiKey }),
+        ...(autoEmbed.modelConfig.accessToken !== undefined && {
+          access_token: autoEmbed.modelConfig.accessToken
+        }),
+        ...(autoEmbed.modelConfig.clientId !== undefined && { client_id: autoEmbed.modelConfig.clientId }),
+        ...(autoEmbed.modelConfig.clientSecret !== undefined && {
+          client_secret: autoEmbed.modelConfig.clientSecret
+        }),
+        ...(autoEmbed.modelConfig.projectId !== undefined && { project_id: autoEmbed.modelConfig.projectId }),
+        ...(autoEmbed.modelConfig.refreshToken !== undefined && {
+          refresh_token: autoEmbed.modelConfig.refreshToken
+        }),
+        ...(autoEmbed.modelConfig.url !== undefined && { url: autoEmbed.modelConfig.url }),
+        ...(autoEmbed.modelConfig.indexingPrefix !== undefined && {
+          indexing_prefix: autoEmbed.modelConfig.indexingPrefix
+        }),
+        ...(autoEmbed.modelConfig.queryPrefix !== undefined && {
+          query_prefix: autoEmbed.modelConfig.queryPrefix
+        })
       }
-    } as TypesenseFieldSchema
-  }
-
-  if (dimensions === undefined) {
-    throw new Error('Cannot build embedding field without dimensions or autoEmbed configuration')
-  }
-  return { ...base, num_dim: dimensions }
+    }
+  } as TypesenseFieldSchema
 }
 
 /**
@@ -94,16 +83,16 @@ const mapFieldMappingsToSchema = (fields: TypesenseFieldMapping[]): TypesenseFie
  * Gets chunk-specific fields for chunk collections
  */
 const getChunkFields = () => [
-  { name: 'parent_doc_id', type: 'string' as const, facet: true }, // Required for chunks
+  { name: 'parent_doc_id', type: 'string' as const, facet: true },
   { name: 'chunk_index', type: 'int32' as const },
-  { name: 'chunk_text', type: 'string' as const }, // The chunk content
-  { name: 'is_chunk', type: 'bool' as const }, // Always true for chunks
-  { name: 'headers', type: 'string[]' as const, facet: true, optional: true }, // Hierarchical header metadata
-  { name: 'content_hash', type: 'string' as const, optional: true } // SHA-256 of source text for change detection
+  { name: 'chunk_text', type: 'string' as const },
+  { name: 'is_chunk', type: 'bool' as const },
+  { name: 'headers', type: 'string[]' as const, facet: true, optional: true },
+  { name: 'content_hash', type: 'string' as const, optional: true }
 ]
 
 export interface CollectionSchemaEmbeddingOptions {
-  dimensions?: number
+  /** Backend auto-embed config. Omit to build a schema without an embedding field. */
   autoEmbed?: AutoEmbedConfig
 }
 
@@ -117,15 +106,17 @@ export const getChunkCollectionSchema = (
 ) => {
   const fields = tableConfig.fields ? mapFieldMappingsToSchema(tableConfig.fields) : []
 
-  // Get user-defined field names to avoid duplicates
   const userFieldNames = new Set([...fields.map(f => f.name), ...getChunkFields().map(f => f.name)])
-
-  // Filter base fields to exclude any that are already defined by user or chunk fields
   const baseFields = getBaseFields().filter(f => !userFieldNames.has(f.name))
 
   return {
     name: collectionSlug,
-    fields: [...baseFields, ...getChunkFields(), ...fields, buildEmbeddingField({ optional: false, ...embedding })]
+    fields: [
+      ...baseFields,
+      ...getChunkFields(),
+      ...fields,
+      ...(embedding.autoEmbed ? [buildEmbeddingField({ optional: false, autoEmbed: embedding.autoEmbed })] : [])
+    ]
   }
 }
 
@@ -139,10 +130,7 @@ export const getFullDocumentCollectionSchema = (
 ) => {
   const mappedFields = mapFieldMappingsToSchema(tableConfig.fields)
 
-  // Get user-defined field names to avoid duplicates
   const userFieldNames = new Set(mappedFields.map(f => f.name))
-
-  // Filter base fields to exclude any that are already defined by user
   const baseFields = getBaseFields().filter(f => !userFieldNames.has(f.name))
 
   return {
@@ -150,7 +138,7 @@ export const getFullDocumentCollectionSchema = (
     fields: [
       ...baseFields,
       ...mappedFields,
-      buildEmbeddingField({ optional: true, ...embedding }),
+      ...(embedding.autoEmbed ? [buildEmbeddingField({ optional: true, autoEmbed: embedding.autoEmbed })] : []),
       { name: 'content_hash', type: 'string' as const, optional: true }
     ]
   }

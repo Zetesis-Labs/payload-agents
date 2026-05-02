@@ -5,7 +5,6 @@
 export type { IndexerPluginResult } from './create-indexer-plugin'
 // Main factory
 export { createIndexerPlugin } from './create-indexer-plugin'
-export type { EmbeddingResolver, SyncOptions } from './sync'
 // Sync utilities (for custom implementations)
 export {
   applySyncHooks,

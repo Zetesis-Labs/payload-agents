@@ -42,32 +42,27 @@ export class SchemaManager {
   }
 
   /**
-   * Pick the embedding config for a single table:
-   * - `autoEmbed` wins outright (Typesense generates the vector).
-   * - per-table `provider.dimensions` next.
-   * - global `features.embedding.dimensions` as fallback.
-   * Returns null and skips the table when none of these apply.
+   * Picks the embedding config for a single table. Only `autoEmbed` is
+   * supported — if the table declares no `embedding`, the schema is built
+   * without an embedding field at all (skip vector search for that table).
    */
   private resolveEmbeddingOptions(
     collectionSlug: string,
     tableConfig: TableConfig<TypesenseFieldMapping>
   ): CollectionSchemaEmbeddingOptions | null {
     if (tableConfig.embedding?.autoEmbed) {
-      if (tableConfig.embedding.provider) {
-        logger.warn('Table declares both `autoEmbed` and `provider`; `autoEmbed` wins, ignoring `provider`', {
-          collection: collectionSlug,
-          tableName: tableConfig.tableName
-        })
-      }
       return { autoEmbed: tableConfig.embedding.autoEmbed }
     }
 
-    const dimensions = tableConfig.embedding?.provider?.dimensions ?? this.config.features?.embedding?.dimensions
-    if (!dimensions) {
-      logger.warn(`Embedding dimensions not configured. Skipping schema sync for collection: ${collectionSlug}`)
+    if (tableConfig.embedding) {
+      logger.warn(
+        `Table "${tableConfig.tableName ?? collectionSlug}" declares \`embedding\` without \`autoEmbed\`; ` +
+          'autoEmbed is the only supported embedding mode. Skipping schema sync.'
+      )
       return null
     }
-    return { dimensions }
+
+    return { autoEmbed: undefined }
   }
 
   /**
@@ -80,7 +75,6 @@ export class SchemaManager {
   ): Promise<void> {
     const tableName = getTypesenseCollectionName(collectionSlug, tableConfig)
 
-    // Generate target schema
     let targetSchema: CollectionCreateSchema
 
     if (tableConfig.embedding?.chunking) {
@@ -90,15 +84,12 @@ export class SchemaManager {
     }
 
     try {
-      // Check if collection exists
       const collection = await this.client.collections(tableName).retrieve()
 
-      // Collection exists, check for updates (new fields)
       // Typesense only allows adding fields, not modifying/deleting (requires reindex)
       await this.updateCollectionSchema(tableName, collection, targetSchema)
     } catch (error: unknown) {
       if (isTypesense404(error)) {
-        // Collection doesn't exist, create it
         logger.info(`Creating collection: ${tableName}`)
         await this.client.collections().create(targetSchema)
       } else {
@@ -117,7 +108,6 @@ export class SchemaManager {
 
     const fields = currentSchema.fields
     const currentFields = new Set(fields.map(f => f.name))
-    // Filter out fields that already exist OR are 'id' (which is immutable)
     const newFields = targetSchema.fields?.filter(f => !currentFields.has(f.name) && f.name !== 'id') || []
 
     if (newFields.length > 0) {
@@ -126,7 +116,6 @@ export class SchemaManager {
       })
 
       try {
-        // Update collection with new fields
         await this.client.collections(tableName).update({
           fields: newFields
         })

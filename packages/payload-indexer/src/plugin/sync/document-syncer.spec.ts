@@ -5,9 +5,7 @@ import {
   createMockDocument,
   createMockTableConfig
 } from '../../__test-utils__/mock-documents'
-import { createMockEmbeddingService } from '../../__test-utils__/mock-embedding'
 import type { IndexerAdapter } from '../../adapter/types'
-import type { EmbeddingService } from '../../embedding/types'
 
 vi.mock('../../core/logging/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -43,26 +41,21 @@ vi.mock('../../core/utils/chunk-format-utils', () => ({
 }))
 
 const mockRecordSyncSuccess = vi.fn()
-const mockRecordEmbeddingFailure = vi.fn()
 const mockRecordDeletion = vi.fn()
 vi.mock('../../core/metrics/sync-metrics', () => ({
   recordSyncSuccess: (...args: unknown[]) => mockRecordSyncSuccess(...args),
   recordSyncFailure: vi.fn(),
-  recordEmbeddingFailure: (...args: unknown[]) => mockRecordEmbeddingFailure(...args),
   recordDeletion: (...args: unknown[]) => mockRecordDeletion(...args)
 }))
 
 import { deleteDocumentFromIndex, syncDocumentToIndex } from './document-syncer'
 
-describe('DocumentSyncer', () => {
+describe('DocumentSyncer (autoEmbed-only)', () => {
   let adapter: IndexerAdapter
-  let embeddingService: EmbeddingService
 
   beforeEach(() => {
     adapter = createMockAdapter()
-    embeddingService = createMockEmbeddingService()
     mockRecordSyncSuccess.mockReset()
-    mockRecordEmbeddingFailure.mockReset()
     mockRecordDeletion.mockReset()
     mockMapPayloadDocumentToIndex.mockReset().mockResolvedValue({ title: 'Test Document' })
     mockChunkText.mockReset().mockResolvedValue([
@@ -86,121 +79,25 @@ describe('DocumentSyncer', () => {
       expect(upsertedDoc.title).toBe('Test Document')
     })
 
-    it('generates embedding when embeddingService exists', async () => {
+    it('does not write an embedding field — backend handles it', async () => {
       const doc = createMockDocument()
-      const config = createMockTableConfig({
-        embedding: { fields: ['content'] }
-      })
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
-
-      const upsertedDoc = vi.mocked(adapter.upsertDocument).mock.calls[0][1]
-      expect(upsertedDoc.embedding).toEqual([0.1, 0.2, 0.3])
-    })
-
-    it('does not generate embedding without embeddingService', async () => {
-      const doc = createMockDocument()
-      const config = createMockTableConfig({
-        embedding: { fields: ['content'] }
-      })
+      const config = createMockChunkedTableConfig()
 
       await syncDocumentToIndex(adapter, 'posts', doc, 'create', config)
 
-      const upsertedDoc = vi.mocked(adapter.upsertDocument).mock.calls[0][1]
-      expect(upsertedDoc.embedding).toBeUndefined()
-    })
-  })
-
-  describe('syncDocument — content hash', () => {
-    it('skips re-embedding on update if content unchanged (when opted in)', async () => {
-      const doc = createMockDocument()
-      const config = createMockTableConfig({
-        embedding: { fields: ['content'], reuseEmbeddingsWhenContentUnchanged: true }
-      })
-
-      vi.mocked(
-        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
-      ).mockResolvedValue([{ content_hash: 'abc123hash' }])
-      vi.mocked(adapter.updateDocument as NonNullable<typeof adapter.updateDocument>).mockResolvedValue(undefined)
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, embeddingService)
-
-      expect(adapter.updateDocument).toHaveBeenCalledOnce()
-      expect(adapter.upsertDocument).not.toHaveBeenCalled()
-    })
-
-    it('full re-syncs on update by default (no optimization opt-in)', async () => {
-      const doc = createMockDocument()
-      const config = createMockTableConfig({
-        embedding: { fields: ['content'] }
-      })
-
-      vi.mocked(
-        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
-      ).mockResolvedValue([{ content_hash: 'abc123hash' }])
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, embeddingService)
-
-      expect(adapter.upsertDocument).toHaveBeenCalledOnce()
-      expect(adapter.updateDocument).not.toHaveBeenCalled()
-    })
-
-    it('re-embeds on update if content changed', async () => {
-      const doc = createMockDocument()
-      const config = createMockTableConfig({
-        embedding: { fields: ['content'] }
-      })
-
-      vi.mocked(
-        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
-      ).mockResolvedValue([{ content_hash: 'different-hash' }])
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, embeddingService)
-
-      expect(adapter.upsertDocument).toHaveBeenCalledOnce()
-    })
-
-    it('re-embeds when forceReindex is true (ignores hash)', async () => {
-      const doc = createMockDocument()
-      const config = createMockTableConfig({
-        embedding: { fields: ['content'] }
-      })
-
-      vi.mocked(
-        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
-      ).mockResolvedValue([{ content_hash: 'abc123hash' }])
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, embeddingService, { forceReindex: true })
-
-      expect(adapter.upsertDocument).toHaveBeenCalledOnce()
-    })
-
-    it('falls back to full sync if isContentUnchanged throws', async () => {
-      const doc = createMockDocument()
-      const config = createMockTableConfig({
-        embedding: { fields: ['content'] }
-      })
-
-      vi.mocked(
-        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
-      ).mockRejectedValue(new Error('network error'))
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, embeddingService)
-
-      expect(adapter.upsertDocument).toHaveBeenCalledOnce()
+      const upsertedChunks = vi.mocked(adapter.upsertDocuments).mock.calls[0][1]
+      for (const chunk of upsertedChunks) {
+        expect(chunk).not.toHaveProperty('embedding')
+      }
     })
   })
 
   describe('syncChunked', () => {
-    it('builds ALL chunks before mutating (batch atomicity)', async () => {
+    it('builds chunks before mutating', async () => {
       const doc = createMockDocument()
       const config = createMockChunkedTableConfig()
       const callOrder: string[] = []
 
-      vi.mocked(embeddingService.getEmbedding).mockImplementation(async () => {
-        callOrder.push('embed')
-        return [0.1, 0.2, 0.3]
-      })
       vi.mocked(adapter.deleteDocumentsByFilter).mockImplementation(async () => {
         callOrder.push('delete')
         return 0
@@ -209,27 +106,27 @@ describe('DocumentSyncer', () => {
         callOrder.push('upsert')
       })
 
-      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, embeddingService)
+      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config)
 
       const firstDelete = callOrder.indexOf('delete')
-      const lastEmbed = callOrder.lastIndexOf('embed')
-      expect(lastEmbed).toBeLessThan(firstDelete)
+      const firstUpsert = callOrder.indexOf('upsert')
+      expect(firstDelete).toBeLessThan(firstUpsert)
     })
 
-    it('deletes old chunks only on update (not on create)', async () => {
+    it('does not delete old chunks on create', async () => {
       const doc = createMockDocument()
       const config = createMockChunkedTableConfig()
 
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
+      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config)
 
       expect(adapter.deleteDocumentsByFilter).not.toHaveBeenCalled()
     })
 
-    it('calls upsertDocuments with all chunk docs', async () => {
+    it('upserts every chunk produced', async () => {
       const doc = createMockDocument()
       const config = createMockChunkedTableConfig()
 
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
+      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config)
 
       expect(adapter.upsertDocuments).toHaveBeenCalledOnce()
       const chunks = vi.mocked(adapter.upsertDocuments).mock.calls[0][1]
@@ -242,85 +139,18 @@ describe('DocumentSyncer', () => {
       const doc = createMockDocument()
       const config = createMockChunkedTableConfig()
 
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
+      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config)
 
       expect(mockRecordSyncSuccess).toHaveBeenCalledWith('posts', 'doc-1', 2)
     })
 
-    it('returns early without source text (warn)', async () => {
+    it('returns early without source text', async () => {
       const doc = createMockDocument({ content: '' })
       const config = createMockChunkedTableConfig()
 
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
+      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config)
 
       expect(adapter.upsertDocuments).not.toHaveBeenCalled()
-    })
-
-    it('returns early if all chunks fail embedding', async () => {
-      const doc = createMockDocument()
-      const config = createMockChunkedTableConfig()
-
-      vi.mocked(embeddingService.getEmbedding).mockResolvedValue(null)
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
-
-      expect(adapter.upsertDocuments).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('buildChunkDocument — embedding failure behavior', () => {
-    it('skip-chunk: returns null, chunk omitted from batch', async () => {
-      const doc = createMockDocument()
-      const config = createMockChunkedTableConfig({
-        embedding: {
-          fields: ['content'],
-          chunking: { strategy: 'text', size: 500, overlap: 50 },
-          onEmbeddingFailure: 'skip-chunk'
-        }
-      })
-
-      vi.mocked(embeddingService.getEmbedding).mockResolvedValueOnce([0.1, 0.2, 0.3]).mockResolvedValueOnce(null)
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
-
-      const chunks = vi.mocked(adapter.upsertDocuments).mock.calls[0][1]
-      expect(chunks).toHaveLength(1)
-    })
-
-    it('error: throws Error', async () => {
-      const doc = createMockDocument()
-      const config = createMockChunkedTableConfig({
-        embedding: {
-          fields: ['content'],
-          chunking: { strategy: 'text', size: 500, overlap: 50 },
-          onEmbeddingFailure: 'error'
-        }
-      })
-
-      vi.mocked(embeddingService.getEmbedding).mockResolvedValue(null)
-
-      await expect(syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)).rejects.toThrow(
-        'Embedding generation failed'
-      )
-    })
-
-    it('empty-vector: returns doc with embedding: []', async () => {
-      const doc = createMockDocument()
-      const config = createMockChunkedTableConfig({
-        embedding: {
-          fields: ['content'],
-          chunking: { strategy: 'text', size: 500, overlap: 50 },
-          onEmbeddingFailure: 'empty-vector'
-        }
-      })
-
-      vi.mocked(embeddingService.getEmbedding).mockResolvedValue(null)
-
-      await syncDocumentToIndex(adapter, 'posts', doc, 'create', config, embeddingService)
-
-      const chunks = vi.mocked(adapter.upsertDocuments).mock.calls[0][1]
-      expect(chunks).toHaveLength(2)
-      expect(chunks[0].embedding).toEqual([])
     })
   })
 
@@ -334,7 +164,7 @@ describe('DocumentSyncer', () => {
       expect(adapter.deleteDocument).not.toHaveBeenCalled()
     })
 
-    it('deletes by id for non-chunked, fallback to parent_doc_id', async () => {
+    it('deletes by id for non-chunked tables', async () => {
       const config = createMockTableConfig()
 
       await deleteDocumentFromIndex(adapter, 'posts', 'doc-1', config)

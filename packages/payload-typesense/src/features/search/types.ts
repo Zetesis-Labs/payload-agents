@@ -11,12 +11,6 @@ export interface BuildVectorSearchParamsOptions {
   filter_by?: string
   sort_by?: string
   searchFields?: string[]
-  /**
-   * When true, the collection's `embedding` field is auto-embedded by
-   * Typesense. We send `vector_query: '([], k:N)'` and Typesense embeds the
-   * `q` parameter using the model declared in the schema.
-   */
-  autoEmbed?: boolean
 }
 
 /**

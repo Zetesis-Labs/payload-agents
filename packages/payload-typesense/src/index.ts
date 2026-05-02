@@ -63,12 +63,6 @@ export type {
 export { createTypesenseClient, testTypesenseConnection } from './core/client/typesense-client'
 
 export {
-  generateEmbedding,
-  generateEmbeddingsBatchWithUsage,
-  generateEmbeddingWithUsage
-} from './features/embedding/embeddings'
-
-export {
   buildConversationalUrl,
   buildHybridSearchParams,
   buildMultiSearchRequestBody,

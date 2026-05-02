@@ -1,5 +1,8 @@
 /**
- * Query builder utilities for Typesense Conversational RAG
+ * Query builder utilities for Typesense Conversational RAG.
+ *
+ * Every collection is expected to be auto-embedded; Typesense embeds the
+ * `q` parameter server-side. The client never sends a precomputed vector.
  */
 
 import type { TypesenseConnectionConfig } from '../../index'
@@ -34,13 +37,6 @@ interface AdvancedSearchParams {
 
 /**
  * Build the Typesense conversational search URL with all necessary parameters
- *
- * @param config - Query configuration
- * @param config.userMessage - The user's message/query
- * @param config.chatId - Optional conversation ID for follow-up questions
- * @param conversationModelId - The conversation model ID in Typesense
- * @param typesenseConfig - Typesense connection config
- * @returns URL for the Typesense multi_search endpoint with conversation parameters
  */
 export function buildConversationalUrl(
   config: { userMessage: string; chatId?: string },
@@ -52,7 +48,6 @@ export function buildConversationalUrl(
     `${protocol}://${typesenseConfig.nodes[0].host}:${typesenseConfig.nodes[0].port}/multi_search`
   )
 
-  // Add conversation parameters to URL
   typesenseUrl.searchParams.set('q', config.userMessage)
   typesenseUrl.searchParams.set('conversation', 'true')
   typesenseUrl.searchParams.set('conversation_model_id', conversationModelId)
@@ -68,15 +63,10 @@ export function buildConversationalUrl(
 
 /**
  * Build multi-search requests for Typesense with hybrid search configuration
- *
- * @param config - Query configuration including embedding, collections, and filters
- * @returns Array of search requests for Typesense multi_search
  */
 export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
   const {
     searchCollections,
-    queryEmbedding,
-    autoEmbedCollections = [],
     selectedDocuments,
     kResults = 10,
     advancedConfig = {},
@@ -84,39 +74,22 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
     requireTaxonomies = false
   } = config
 
-  const autoEmbedSet = new Set(autoEmbedCollections)
-
   return searchCollections.map((collection: string) => {
-    const isAutoEmbed = autoEmbedSet.has(collection)
-
-    if (!isAutoEmbed && (!queryEmbedding || queryEmbedding.length === 0)) {
-      throw new Error(
-        `RAG search for collection "${collection}" requires a queryEmbedding ` +
-          `(or include the collection in autoEmbedCollections to let Typesense embed the query)`
-      )
-    }
-
-    const vectorPayload = isAutoEmbed ? '[]' : `[${(queryEmbedding ?? []).join(',')}]`
-
     const request: TypesenseSearchRequest = {
       collection,
-      // For autoEmbed, query_by must include `embedding` so Typesense embeds the q.
-      query_by: isAutoEmbed ? 'embedding,chunk_text,title,headers' : 'chunk_text,title,headers',
-      vector_query: `embedding:(${vectorPayload}, k:${kResults})`,
+      query_by: 'embedding,chunk_text,title,headers',
+      vector_query: `embedding:([], k:${kResults})`,
       exclude_fields: 'embedding',
       ...buildAdvancedSearchParams(advancedConfig)
     }
 
-    // Build filters array
     const filters: string[] = []
 
-    // Add document filter if documents are selected
     if (selectedDocuments && selectedDocuments.length > 0) {
       const documentIds = selectedDocuments.map((id: string) => `"${id}"`).join(',')
       filters.push(`parent_doc_id:[${documentIds}]`)
     }
 
-    // Add taxonomy filter if the agent has taxonomies assigned
     if (taxonomySlugs && taxonomySlugs.length > 0) {
       const taxFilter = taxonomySlugs.map((s: string) => `"${s}"`).join(',')
       filters.push(`taxonomy_slugs:[${taxFilter}]`)
@@ -125,7 +98,6 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
       filters.push('id:=__BLOCKED_NO_TAXONOMIES__')
     }
 
-    // Apply combined filters
     if (filters.length > 0) {
       request.filter_by = filters.join(' && ')
     }
@@ -135,13 +107,14 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
 }
 
 /**
- * Build advanced search parameters from config
+ * Build advanced search parameters from config.
  *
- * @param config - Advanced search configuration
- * @returns Object with advanced search parameters
+ * `prefix` is forced to `false`: Typesense rejects prefix search whenever
+ * a remote embedder is in `query_by` (which is always the case here), so
+ * any user-provided `prefix: true` would 400.
  */
 function buildAdvancedSearchParams(config: AdvancedSearchConfig): AdvancedSearchParams {
-  const params: AdvancedSearchParams = {}
+  const params: AdvancedSearchParams = { prefix: false }
 
   if (config.typoTokensThreshold !== undefined) {
     params.typo_tokens_threshold = config.typoTokensThreshold
@@ -149,10 +122,6 @@ function buildAdvancedSearchParams(config: AdvancedSearchConfig): AdvancedSearch
 
   if (config.numTypos !== undefined) {
     params.num_typos = config.numTypos
-  }
-
-  if (config.prefix !== undefined) {
-    params.prefix = config.prefix
   }
 
   if (config.dropTokensThreshold !== undefined) {
@@ -168,9 +137,6 @@ function buildAdvancedSearchParams(config: AdvancedSearchConfig): AdvancedSearch
 
 /**
  * Build the complete Typesense request body for multi-search
- *
- * @param config - Query configuration
- * @returns Request body for Typesense multi_search endpoint
  */
 export function buildMultiSearchRequestBody(config: TypesenseQueryConfig) {
   return {
@@ -180,11 +146,6 @@ export function buildMultiSearchRequestBody(config: TypesenseQueryConfig) {
 
 /**
  * Build hybrid search parameters for combining semantic and keyword search
- *
- * @param alpha - Weight between semantic (1.0) and keyword (0.0) search
- * @param rerankMatches - Whether to rerank hybrid search results
- * @param queryFields - Fields to use for keyword search
- * @returns Object with hybrid search parameters
  */
 export function buildHybridSearchParams(alpha = 0.9, rerankMatches = true, queryFields = 'chunk_text,title') {
   return {

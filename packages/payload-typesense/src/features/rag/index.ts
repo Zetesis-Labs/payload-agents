@@ -5,7 +5,6 @@
  */
 
 export type { TypesenseConnectionConfig } from '../../shared/types/plugin-types'
-export { generateEmbeddingWithUsage } from '../embedding/embeddings'
 // API Types
 export type { ApiContext, AuthenticateMethod } from './endpoints/types'
 // Handlers
