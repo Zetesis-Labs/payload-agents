@@ -105,6 +105,4 @@ def _raise_for_status(response: httpx.Response, op: str) -> None:
     if response.is_success:
         return
     detail = response.text[:500]
-    raise LlamaParseError(
-        f"LlamaParse {op} failed: HTTP {response.status_code} — {detail}"
-    )
+    raise LlamaParseError(f"LlamaParse {op} failed: HTTP {response.status_code} — {detail}")
