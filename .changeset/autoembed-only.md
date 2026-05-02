@@ -1,6 +1,6 @@
 ---
-"@zetesis/payload-indexer": major
-"@zetesis/payload-typesense": major
+"@zetesis/payload-indexer": minor
+"@zetesis/payload-typesense": minor
 ---
 
 Drop client-side embedding path. `autoEmbed` is now the only embedding mode.
