@@ -136,6 +136,7 @@ describe('sync hooks', () => {
           'posts',
           expect.objectContaining({ id: 'doc-1' }),
           'update',
+          expect.anything(),
           expect.anything()
         )
       })
@@ -169,6 +170,7 @@ describe('sync hooks', () => {
           'posts',
           expect.objectContaining({ title: 'populated' }),
           'update',
+          expect.anything(),
           expect.anything()
         )
       })
@@ -189,6 +191,7 @@ describe('sync hooks', () => {
           'posts',
           expect.objectContaining({ title: 'stale' }),
           'update',
+          expect.anything(),
           expect.anything()
         )
       })

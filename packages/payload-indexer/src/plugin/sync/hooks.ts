@@ -9,7 +9,7 @@ import { logger } from '../../core/logging/logger'
 import { recordSyncFailure } from '../../core/metrics/sync-metrics'
 import type { PayloadDocument, TableConfig } from '../../document/types'
 import type { IndexerPluginConfig, SyncFeatureConfig } from '../types'
-import { deleteDocumentFromIndex, syncDocumentToIndex } from './document-syncer'
+import { deleteDocumentFromIndex, type SyncOptions, syncDocumentToIndex } from './document-syncer'
 
 /**
  * Processes a single table config during afterChange, handling shouldIndex and sync
@@ -19,7 +19,8 @@ const processTableConfigAfterChange = async (
   adapter: IndexerAdapter,
   collectionSlug: string,
   doc: PayloadDocument,
-  operation: 'create' | 'update'
+  operation: 'create' | 'update',
+  options?: SyncOptions
 ): Promise<void> => {
   if (!tableConfig.enabled) return
 
@@ -31,7 +32,7 @@ const processTableConfigAfterChange = async (
     }
   }
 
-  await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig)
+  await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig, options)
 }
 
 /**
@@ -109,11 +110,22 @@ const createAfterChangeHook = (
   }) => {
     if (req.context?.skipIndexSync) return
 
+    const syncOptions: SyncOptions = {
+      forceReindex: req.context?.forceReindex === true
+    }
+
     const populatedDoc = await repopulateDoc(doc, collectionSlug, tableConfigs, req)
 
     try {
       for (const tableConfig of tableConfigs) {
-        await processTableConfigAfterChange(tableConfig, adapter, collectionSlug, populatedDoc, operation)
+        await processTableConfigAfterChange(
+          tableConfig,
+          adapter,
+          collectionSlug,
+          populatedDoc,
+          operation,
+          syncOptions
+        )
       }
     } catch (error) {
       const syncError = error instanceof Error ? error : new Error(String(error))

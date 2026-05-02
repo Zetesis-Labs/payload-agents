@@ -230,3 +230,35 @@ export type TypesenseConnectionConfig = {
   numRetries?: number
   nodes: [TypesenseNode, ...Array<TypesenseNode>]
 }
+
+/**
+ * Typesense-specific `model_config` shape — mirrors the fields Typesense
+ * accepts in its `embed.model_config` schema declaration. Use this type
+ * when typing `EmbeddingTableConfig.autoEmbed` in a Typesense-backed
+ * project; it satisfies the agnostic `AutoEmbedConfig` from
+ * `@zetesis/payload-indexer` while keeping the model fields type-safe.
+ */
+export interface TypesenseModelConfig {
+  /** e.g. `openai/text-embedding-3-small`, `ts/multilingual-e5-large` */
+  modelName: string
+  apiKey?: string
+  accessToken?: string
+  clientId?: string
+  clientSecret?: string
+  projectId?: string
+  refreshToken?: string
+  url?: string
+  /** Required by E5-family models — usually `'passage:'` */
+  indexingPrefix?: string
+  /** Required by E5-family models — usually `'query:'` */
+  queryPrefix?: string
+}
+
+/**
+ * Typesense-flavoured auto-embed config. Assignable to the agnostic
+ * `AutoEmbedConfig` from `@zetesis/payload-indexer`.
+ */
+export interface TypesenseAutoEmbedConfig {
+  from: string[]
+  modelConfig: TypesenseModelConfig
+}

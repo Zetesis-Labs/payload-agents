@@ -92,6 +92,86 @@ describe('DocumentSyncer (autoEmbed-only)', () => {
     })
   })
 
+  describe('content hash optimization (always-on)', () => {
+    it('skips re-chunk on update when content unchanged (single-doc)', async () => {
+      const doc = createMockDocument()
+      const config = createMockTableConfig({
+        embedding: {
+          fields: ['content'],
+          autoEmbed: { from: ['chunk_text'], modelConfig: { modelName: 'mock' } }
+        }
+      })
+
+      vi.mocked(
+        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
+      ).mockResolvedValue([{ content_hash: 'abc123hash' }])
+      vi.mocked(adapter.updateDocument as NonNullable<typeof adapter.updateDocument>).mockResolvedValue(undefined)
+
+      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config)
+
+      expect(adapter.updateDocument).toHaveBeenCalledOnce()
+      expect(adapter.upsertDocument).not.toHaveBeenCalled()
+    })
+
+    it('skips re-chunk on update when content unchanged (chunked)', async () => {
+      const doc = createMockDocument()
+      const config = createMockChunkedTableConfig()
+
+      vi.mocked(
+        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
+      ).mockResolvedValue([{ content_hash: 'abc123hash' }])
+      vi.mocked(
+        adapter.updateDocumentsByFilter as NonNullable<typeof adapter.updateDocumentsByFilter>
+      ).mockResolvedValue(2)
+
+      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config)
+
+      expect(adapter.updateDocumentsByFilter).toHaveBeenCalledOnce()
+      expect(adapter.upsertDocuments).not.toHaveBeenCalled()
+    })
+
+    it('full re-syncs on update when content changed', async () => {
+      const doc = createMockDocument()
+      const config = createMockChunkedTableConfig()
+
+      vi.mocked(
+        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
+      ).mockResolvedValue([{ content_hash: 'different-hash' }])
+
+      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config)
+
+      expect(adapter.upsertDocuments).toHaveBeenCalledOnce()
+      expect(adapter.updateDocumentsByFilter).not.toHaveBeenCalled()
+    })
+
+    it('forces full re-sync via forceReindex even when content unchanged', async () => {
+      const doc = createMockDocument()
+      const config = createMockChunkedTableConfig()
+
+      vi.mocked(
+        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
+      ).mockResolvedValue([{ content_hash: 'abc123hash' }])
+
+      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config, { forceReindex: true })
+
+      expect(adapter.upsertDocuments).toHaveBeenCalledOnce()
+      expect(adapter.updateDocumentsByFilter).not.toHaveBeenCalled()
+    })
+
+    it('falls back to full re-sync when hash lookup throws', async () => {
+      const doc = createMockDocument()
+      const config = createMockChunkedTableConfig()
+
+      vi.mocked(
+        adapter.searchDocumentsByFilter as NonNullable<typeof adapter.searchDocumentsByFilter>
+      ).mockRejectedValue(new Error('network error'))
+
+      await syncDocumentToIndex(adapter, 'posts', doc, 'update', config)
+
+      expect(adapter.upsertDocuments).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('syncChunked', () => {
     it('builds chunks before mutating', async () => {
       const doc = createMockDocument()

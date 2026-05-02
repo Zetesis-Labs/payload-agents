@@ -141,7 +141,8 @@ export type {
   SearchFeatureConfig,
   SearchMode,
   SyncErrorContext,
-  SyncFeatureConfig
+  SyncFeatureConfig,
+  SyncOptions
 } from './plugin'
 // Main factory
 // Sync utilities (for custom implementations)

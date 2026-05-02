@@ -1,6 +1,7 @@
-import type { AutoEmbedConfig, TableConfig } from '@zetesis/payload-indexer'
+import type { TableConfig } from '@zetesis/payload-indexer'
 import type { CollectionCreateSchema } from 'typesense/lib/Typesense/Collections'
 import type { TypesenseFieldMapping } from '../../adapter/types'
+import type { TypesenseAutoEmbedConfig } from '../types/plugin-types'
 
 /**
  * Field schema definitions for Typesense collections
@@ -24,7 +25,7 @@ const getBaseFields = () => [
 
 interface AutoEmbedFieldOptions {
   optional: boolean
-  autoEmbed: AutoEmbedConfig
+  autoEmbed: TypesenseAutoEmbedConfig
 }
 
 /**
@@ -93,7 +94,7 @@ const getChunkFields = () => [
 
 export interface CollectionSchemaEmbeddingOptions {
   /** Backend auto-embed config. Omit to build a schema without an embedding field. */
-  autoEmbed?: AutoEmbedConfig
+  autoEmbed?: TypesenseAutoEmbedConfig
 }
 
 /**

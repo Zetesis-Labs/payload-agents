@@ -198,7 +198,7 @@ export const createSyncStatusEndpoints = (config: SyncStatusEndpointConfig): End
 
           const enabledConfigs = tableConfigs.filter(t => t.enabled)
           for (const tableConfig of enabledConfigs) {
-            await syncDocumentToIndex(adapter, collection, doc, 'update', tableConfig)
+            await syncDocumentToIndex(adapter, collection, doc, 'update', tableConfig, { forceReindex: true })
           }
 
           const tableConfig = resolveTableConfig(tableConfigs)

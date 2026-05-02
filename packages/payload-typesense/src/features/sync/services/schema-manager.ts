@@ -10,6 +10,7 @@ import {
   getChunkCollectionSchema,
   getFullDocumentCollectionSchema
 } from '../../../shared/schema/collection-schemas'
+import type { TypesenseAutoEmbedConfig } from '../../../shared/types/plugin-types'
 
 export class SchemaManager {
   constructor(
@@ -51,7 +52,11 @@ export class SchemaManager {
     tableConfig: TableConfig<TypesenseFieldMapping>
   ): CollectionSchemaEmbeddingOptions | null {
     if (tableConfig.embedding?.autoEmbed) {
-      return { autoEmbed: tableConfig.embedding.autoEmbed }
+      // The indexer's `AutoEmbedConfig` declares `modelConfig` as opaque
+      // (`Record<string, unknown>`); narrow to the Typesense shape at the
+      // adapter boundary. Misconfigured shapes still surface as Typesense
+      // 4xx at schema-create time, never silently miswritten.
+      return { autoEmbed: tableConfig.embedding.autoEmbed as TypesenseAutoEmbedConfig }
     }
 
     if (tableConfig.embedding) {

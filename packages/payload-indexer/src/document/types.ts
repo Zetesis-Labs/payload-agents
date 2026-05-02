@@ -98,39 +98,33 @@ export interface ChunkingConfig {
 }
 
 /**
- * Auto-embedding configuration. The search backend generates the embedding
- * on every upsert and on every search query, using the model declared in
- * its schema. The indexer never calls an embedding API.
+ * Backend-agnostic auto-embedding configuration. The search backend
+ * generates the embedding on every upsert and on every search query, using
+ * the model declared in its schema. The indexer never calls an embedding
+ * API.
+ *
+ * `modelConfig` is opaque to the indexer — its concrete shape is defined
+ * by each adapter package (e.g. `TypesenseAutoEmbedConfig` in
+ * `@zetesis/payload-typesense`). Adapters consume it when translating the
+ * table config into the backend's native schema.
  */
 export interface AutoEmbedConfig {
   /**
    * Names of fields IN THE INDEXED DOCUMENT (not in Payload) whose contents
-   * the backend should concatenate to produce the embedding source text.
+   * the backend reads to produce the embedding source text.
    *
    * For chunked tables the typical value is `['chunk_text']`. For full
    * documents it is the same field names declared in `TableConfig.fields`.
    */
   from: string[]
   /**
-   * Backend-specific embedding model configuration. The shape mirrors the
-   * Typesense `model_config` object since that is the only auto-embed
-   * backend supported today.
+   * Backend-specific embedding model configuration. Opaque at the indexer
+   * level; each adapter narrows the shape via its own type
+   * (e.g. `TypesenseAutoEmbedConfig['modelConfig']`). Typed as `object`
+   * (not `Record<string, unknown>`) so concrete typed interfaces from
+   * adapter packages are assignable without index-signature gymnastics.
    */
-  modelConfig: {
-    /** e.g. `openai/text-embedding-3-small`, `ts/multilingual-e5-large` */
-    modelName: string
-    apiKey?: string
-    accessToken?: string
-    clientId?: string
-    clientSecret?: string
-    projectId?: string
-    refreshToken?: string
-    url?: string
-    /** Required by E5-family models — usually `'passage:'` */
-    indexingPrefix?: string
-    /** Required by E5-family models — usually `'query:'` */
-    queryPrefix?: string
-  }
+  modelConfig: object
 }
 
 /**

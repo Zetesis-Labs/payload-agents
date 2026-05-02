@@ -36,7 +36,11 @@ export type {
   RAGSearchResult
 } from './features/rag'
 
-export type { TypesenseConnectionConfig } from './shared/types/plugin-types'
+export type {
+  TypesenseAutoEmbedConfig,
+  TypesenseConnectionConfig,
+  TypesenseModelConfig
+} from './shared/types/plugin-types'
 
 export type {
   ApiResponse,

@@ -13,9 +13,14 @@ never calls an embedding API.
 **`@zetesis/payload-indexer` breaking changes**
 
 - `EmbeddingTableConfig.autoEmbed` is now required when `embedding` is set.
+- `AutoEmbedConfig.modelConfig` is now backend-agnostic
+  (`Record<string, unknown>`) — adapter packages declare their own typed
+  shapes (e.g. `TypesenseAutoEmbedConfig` in `@zetesis/payload-typesense`).
 - Removed `EmbeddingTableConfig.provider`,
   `EmbeddingTableConfig.onEmbeddingFailure`, and
-  `EmbeddingTableConfig.reuseEmbeddingsWhenContentUnchanged`.
+  `EmbeddingTableConfig.reuseEmbeddingsWhenContentUnchanged` (the
+  content-hash optimization is now always-on; bypass via
+  `req.context.forceReindex` or `SyncOptions.forceReindex`).
 - Removed `IndexerFeatureConfig.embedding`.
 - Removed `IndexerPluginResult.embeddingService` and
   `IndexerPluginResult.embeddingResolver`.
@@ -28,11 +33,21 @@ never calls an embedding API.
   `DEFAULT_EMBEDDING_MODEL`, `DEFAULT_GEMINI_EMBEDDING_MODEL`,
   `DEFAULT_EMBEDDING_DIMENSIONS`, `MIN_EMBEDDING_TEXT_LENGTH`.
 - `syncDocumentToIndex` no longer accepts an `embeddingService` argument.
-  Same for `DocumentSyncer`.
+  Same for `DocumentSyncer`. `syncDocumentToIndex` and `DocumentSyncer`
+  accept an optional `SyncOptions { forceReindex?: boolean }` to bypass the
+  content-hash optimization.
 - `applySyncHooks` no longer accepts an `embeddingResolver` argument.
 - `createSyncStatusEndpoints` no longer accepts an `embeddingService`
   argument.
 - Removed `@google/generative-ai` from dependencies.
+
+The content-hash optimization runs unconditionally: when an update's
+source-text hash matches the stored one, the indexer issues a partial
+metadata update via `updateDocumentsByFilter` (chunks) or `updateDocument`
+(single docs), skipping the re-chunk/re-upsert and the backend's
+re-embedding cost. Adapters that don't implement those partial-update
+methods fall back to the full re-sync path automatically. Bypass with
+`req.context.forceReindex = true` or `SyncOptions.forceReindex`.
 
 **`@zetesis/payload-typesense` breaking changes**
 
@@ -53,25 +68,34 @@ never calls an embedding API.
   an `embedding` field at all (was previously optional with `num_dim`).
   Vector search filters out such tables.
 - Removed `@google/generative-ai` and `openai` from dependencies.
+- Added `TypesenseAutoEmbedConfig` and `TypesenseModelConfig` exports for
+  typing the per-table `embedding.autoEmbed` config.
 
 **Migration**
 
 For any indexed table that produced embeddings under the old API, declare
 `autoEmbed` and drop the existing Typesense collection so it is recreated
-with the new `embed` block:
+with the new `embed` block. Type the value via `TypesenseAutoEmbedConfig`
+(re-exported from `@zetesis/payload-typesense`) to keep `modelConfig`
+type-safe:
 
 ```ts
+import type { TypesenseAutoEmbedConfig } from '@zetesis/payload-typesense'
+
+const autoEmbed: TypesenseAutoEmbedConfig = {
+  from: ['chunk_text'],
+  modelConfig: {
+    modelName: 'openai/text-embedding-3-small',
+    apiKey: process.env.OPENAI_API_KEY!
+  }
+}
+
+// then…
 {
   embedding: {
     fields: ['content'],
     chunking: { strategy: 'markdown' },
-    autoEmbed: {
-      from: ['chunk_text'],
-      modelConfig: {
-        modelName: 'openai/text-embedding-3-small',
-        apiKey: process.env.OPENAI_API_KEY!
-      }
-    }
+    autoEmbed
   }
 }
 ```
