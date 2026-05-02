@@ -21,11 +21,17 @@ COPY agno-agent-builder/pyproject.toml ./agno-agent-builder/pyproject.toml
 COPY agno-agent-builder/README.md ./agno-agent-builder/README.md
 COPY agno-agent/pyproject.toml ./agno-agent/pyproject.toml
 COPY agno-agent/README.md ./agno-agent/README.md
+COPY payload-worker-builder/pyproject.toml ./payload-worker-builder/pyproject.toml
+COPY payload-worker-builder/README.md ./payload-worker-builder/README.md
+COPY payload-worker/pyproject.toml ./payload-worker/pyproject.toml
+COPY payload-worker/README.md ./payload-worker/README.md
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-workspace --all-packages
 
 COPY agno-agent-builder/agno_agent_builder ./agno-agent-builder/agno_agent_builder
 COPY agno-agent/agno_agent ./agno-agent/agno_agent
+COPY payload-worker-builder/payload_worker_builder ./payload-worker-builder/payload_worker_builder
+COPY payload-worker/payload_worker ./payload-worker/payload_worker
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --all-packages
 
