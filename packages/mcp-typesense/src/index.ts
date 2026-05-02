@@ -5,6 +5,12 @@
  * content with taxonomy enrichment, LLM sampling synthesis tools, and
  * pluggable auth.
  *
+ * Semantic and hybrid search rely on Typesense's auto-embed: the package
+ * sends queries as text, Typesense embeds them server-side using the model
+ * declared on the chunk collection's schema, and returns vector matches.
+ * The package never calls an embedding API itself — there is no embedding
+ * provider config to set.
+ *
  * ## Quickstart
  *
  * ```ts
@@ -18,12 +24,6 @@
  *     port: 8108,
  *     protocol: 'http',
  *     apiKey: 'xyz',
- *   },
- *   embeddings: {
- *     provider: 'openai',
- *     apiKey: process.env.OPENAI_API_KEY!,
- *     model: 'text-embedding-3-small',
- *     dimensions: 1536,
  *   },
  *   collections: [
  *     {
@@ -44,6 +44,10 @@
  * await mcp.listen()
  * console.log(`MCP server listening on :${mcp.port}`)
  * ```
+ *
+ * The chunk collection (`posts_chunk` here) must declare `embed.from` +
+ * `embed.model_config` on its schema. Use `@zetesis/payload-typesense`'s
+ * `embedding.autoEmbed` block to provision it.
  */
 
 // Defaults — exposed so consumers can extend them
@@ -58,8 +62,6 @@ export type {
   // Content
   ContentConfig,
   ContentSource,
-  // Embeddings
-  EmbeddingConfig,
   // Features
   FeaturesConfig,
   FetchBooksParams,

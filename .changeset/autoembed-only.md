@@ -1,14 +1,16 @@
 ---
 "@zetesis/payload-indexer": minor
 "@zetesis/payload-typesense": minor
+"@zetesis/mcp-typesense": minor
 ---
 
-Drop client-side embedding path. `autoEmbed` is now the only embedding mode.
+Drop client-side embedding path across the indexer, the Typesense plugin,
+and the MCP server. `autoEmbed` is now the only embedding mode.
 
 The search backend (Typesense) generates every vector — on upsert from the
 fields listed in `embedding.autoEmbed.from`, and on search from the `q`
-parameter using the model declared in the collection schema. The indexer
-never calls an embedding API.
+parameter using the model declared in the collection schema. None of the
+three packages call an embedding API directly.
 
 **`@zetesis/payload-indexer` breaking changes**
 
@@ -70,6 +72,25 @@ methods fall back to the full re-sync path automatically. Bypass with
 - Removed `@google/generative-ai` and `openai` from dependencies.
 - Added `TypesenseAutoEmbedConfig` and `TypesenseModelConfig` exports for
   typing the per-table `embedding.autoEmbed` config.
+
+**`@zetesis/mcp-typesense` breaking changes**
+
+- `McpServerConfig.embeddings` removed. `createMcpServer` no longer needs
+  any embedding provider config — the MCP package sends queries as text
+  and Typesense embeds them server-side using each chunk collection's
+  declared `embed.model_config`.
+- Removed exports: `EmbeddingConfig`.
+- Removed internal `embeddings/openai.ts` module and the `openai` runtime
+  dependency.
+- Search builders for `mode: 'semantic'` and `mode: 'hybrid'` now emit
+  `vector_query: 'embedding:([], k:N[, alpha:...])'` and force
+  `prefix: false` (Typesense rejects prefix search whenever a remote
+  embedder participates in `query_by`). Hybrid `query_by` now includes
+  the `embedding` field so the autoEmbed flow kicks in.
+- Each chunk collection must declare `embed.from` + `embed.model_config`
+  on its Typesense schema (e.g. via `@zetesis/payload-typesense`'s
+  `embedding.autoEmbed`). Without it, semantic and hybrid modes fall
+  through to a Typesense error; lexical still works unchanged.
 
 **Migration**
 

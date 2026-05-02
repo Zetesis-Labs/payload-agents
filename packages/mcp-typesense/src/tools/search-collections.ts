@@ -138,16 +138,29 @@ function resolveTargets(ctx: ToolContext, requested: string[] | undefined): Chun
 
 type SearchMode = 'lexical' | 'semantic' | 'hybrid'
 
+/**
+ * Build a Typesense multi-search request for one chunk collection.
+ *
+ * Semantic and hybrid rely on Typesense's auto-embed: the chunk collection
+ * declares `embed.from` + `embed.model_config` on its schema, Typesense
+ * embeds the `q` parameter server-side, and the `vector_query: '([], k:N)'`
+ * syntax tells Typesense to use that server-side embedding as the search
+ * vector. The MCP package never embeds queries client-side — there is no
+ * embedding API key in the package surface.
+ *
+ * `prefix: false` is forced because Typesense rejects prefix search whenever
+ * a remote embedder participates in `query_by` (which is always the case
+ * under semantic/hybrid).
+ */
 function buildSearchParams(args: {
   collectionDef: ChunkCollectionConfig
   mode: SearchMode
   query: string
-  embedding: number[] | null
   filters: Record<string, string | string[]> | undefined
   perPage: number
   page: number
 }): MultiSearchRequestSchema<ChunkDoc, string> {
-  const { collectionDef, mode, query, embedding, filters, perPage, page } = args
+  const { collectionDef, mode, query, filters, perPage, page } = args
   const params: MultiSearchRequestSchema<ChunkDoc, string> = {
     collection: collectionDef.chunkCollection,
     per_page: perPage,
@@ -160,24 +173,27 @@ function buildSearchParams(args: {
     params.filter_by = buildFilterString(filters)
   }
 
-  const queryBy = collectionDef.chunkSearchFields.join(',')
+  const textFields = collectionDef.chunkSearchFields.join(',')
 
-  if (mode === 'semantic' && embedding) {
-    params.q = '*'
-    params.vector_query = `embedding:([${embedding.join(',')}], k:${VECTOR_K})`
-    return params
-  }
-
-  if (mode === 'hybrid' && embedding) {
+  if (mode === 'semantic') {
     params.q = query
-    params.query_by = queryBy
-    params.vector_query = `embedding:([${embedding.join(',')}], k:${VECTOR_K}, alpha:0.7)`
+    params.query_by = 'embedding'
+    params.vector_query = `embedding:([], k:${VECTOR_K})`
+    params.prefix = false
     return params
   }
 
-  // Lexical, or semantic/hybrid without an embedding → lexical fallback
+  if (mode === 'hybrid') {
+    params.q = query
+    params.query_by = `${textFields},embedding`
+    params.vector_query = `embedding:([], k:${VECTOR_K}, alpha:0.7)`
+    params.prefix = false
+    return params
+  }
+
+  // Lexical only.
   params.q = query
-  params.query_by = queryBy
+  params.query_by = textFields
   return params
 }
 
@@ -368,14 +384,11 @@ export async function searchCollections(
   const snippetLength = input.snippet_length ?? DEFAULT_SNIPPET_LENGTH
   const mode: SearchMode = input.mode ?? 'hybrid'
 
-  const embedding = mode === 'semantic' || mode === 'hybrid' ? await ctx.embeddings.generate(input.query) : null
-
   const searches = targets.map(collectionDef =>
     buildSearchParams({
       collectionDef,
       mode,
       query: input.query,
-      embedding,
       filters: scopedFilters,
       perPage,
       page

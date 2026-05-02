@@ -10,19 +10,6 @@ import type { Client as TypesenseClient } from 'typesense'
 import type { ChunkCollectionConfig, FetchBooksParams, RawBookDoc } from './types'
 
 // ============================================================================
-// EMBEDDINGS
-// ============================================================================
-
-export interface EmbeddingService {
-  /** Generate an embedding vector, or null if the provider is not configured. */
-  generate: (text: string) => Promise<number[] | null>
-  /** Expected vector dimensions (used for building Typesense queries). */
-  readonly dimensions: number
-  /** Provider model name. */
-  readonly model: string
-}
-
-// ============================================================================
 // TAXONOMY
 // ============================================================================
 
@@ -92,7 +79,6 @@ export interface ContentFetcher {
 
 export interface ToolContext {
   typesense: TypesenseClient
-  embeddings: EmbeddingService
   collections: CollectionRegistry
   taxonomy: TaxonomyResolver
   /** Present only when ContentConfig was provided in the server config. */
