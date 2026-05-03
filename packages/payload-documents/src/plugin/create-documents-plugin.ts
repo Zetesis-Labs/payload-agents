@@ -1,5 +1,6 @@
-import type { Config } from 'payload'
+import type { Config, Endpoint } from 'payload'
 import { createParseEndpoint } from '../endpoints/parse-endpoint'
+import { createParseResultEndpoint } from '../endpoints/parse-result-endpoint'
 import { createParseStatusEndpoint } from '../endpoints/parse-status-endpoint'
 import { DEFAULT_LLAMA_PARSE_BASE_URL } from '../llama-parse/client'
 import { buildDocumentsCollection } from './build-collection'
@@ -14,14 +15,18 @@ export const createDocumentsPlugin = (options: DocumentsPluginConfig = {}): Docu
 
     const endpointConfig = { collectionSlug: slug, apiKey, baseUrl, worker: options.worker }
 
+    const endpoints: Endpoint[] = [createParseEndpoint(endpointConfig), createParseStatusEndpoint(endpointConfig)]
+    // Internal write endpoint only exists when worker mode is on. It bypasses
+    // collection access via overrideAccess + a shared X-Internal-Secret header,
+    // so leaving it off when the worker isn't wired keeps the surface minimal.
+    if (options.worker) {
+      endpoints.push(createParseResultEndpoint(endpointConfig))
+    }
+
     let collection = buildDocumentsCollection(slug)
     collection = {
       ...collection,
-      endpoints: [
-        ...(collection.endpoints ? collection.endpoints : []),
-        createParseEndpoint(endpointConfig),
-        createParseStatusEndpoint(endpointConfig)
-      ]
+      endpoints: [...(collection.endpoints ? collection.endpoints : []), ...endpoints]
     }
     if (options.overrides?.collection) {
       collection = options.overrides.collection(collection)

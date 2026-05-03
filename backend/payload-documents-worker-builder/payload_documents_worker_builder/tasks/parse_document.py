@@ -58,6 +58,7 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
     payload_client = PayloadClient(
         base_url=str(config.payload_url),
         api_token=config.payload_service_token.get_secret_value(),
+        internal_secret=config.internal_secret.get_secret_value(),
     )
     llama_client = LlamaParseClient(
         api_key=config.llama_cloud_api_key.get_secret_value(),
@@ -65,7 +66,7 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
     )
 
     try:
-        await payload_client.update_document(
+        await payload_client.submit_parse_result(
             config.documents_collection_slug,
             document_id,
             {"parse_status": "processing", "parse_error": None},
@@ -89,7 +90,7 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
         )
         log.info("LlamaParse job created", llama_job_id=job.id)
 
-        await payload_client.update_document(
+        await payload_client.submit_parse_result(
             config.documents_collection_slug,
             document_id,
             {"parse_job_id": job.id, "parse_status": "processing"},
@@ -98,7 +99,7 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
         markdown = await _poll_until_done(llama_client, job.id, config, log)
         log.info("Parse complete; writing back to Payload", chars=len(markdown))
 
-        await payload_client.update_document(
+        await payload_client.submit_parse_result(
             config.documents_collection_slug,
             document_id,
             {
@@ -167,7 +168,7 @@ async def _stamp_error(
 ) -> None:
     """Best-effort error stamp — never raises so we don't shadow the original exception."""
     try:
-        await client.update_document(
+        await client.submit_parse_result(
             config.documents_collection_slug,
             document_id,
             {"parse_status": "error", "parse_error": message[:500]},
