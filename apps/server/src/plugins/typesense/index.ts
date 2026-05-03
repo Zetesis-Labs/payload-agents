@@ -2,7 +2,7 @@ import { createIndexerPlugin } from '@zetesis/payload-indexer'
 import { createTypesenseAdapter, createTypesenseRAGPlugin } from '@zetesis/payload-typesense'
 import type { Config } from 'payload'
 import { collections } from './collections'
-import { embeddingConfig, typesenseConnection } from './config'
+import { typesenseConnection } from './config'
 
 export { collections, getTableConfig } from './collections'
 
@@ -15,7 +15,6 @@ const adapter = createTypesenseAdapter(typesenseConnection)
 const { plugin: indexerPlugin } = createIndexerPlugin({
   adapter,
   features: {
-    embedding: embeddingConfig,
     sync: {
       enabled: true,
       defaultColumns: ['title', '_syncStatus', 'slug']
@@ -26,7 +25,6 @@ const { plugin: indexerPlugin } = createIndexerPlugin({
 
 const typesenseRAGPlugin = createTypesenseRAGPlugin({
   typesense: typesenseConnection,
-  embeddingConfig,
   collections,
   search: {
     enabled: true,

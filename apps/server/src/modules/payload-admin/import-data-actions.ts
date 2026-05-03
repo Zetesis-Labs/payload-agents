@@ -1,12 +1,12 @@
 'use server'
 
 import type { PayloadDocument } from '@zetesis/payload-indexer'
-import { createEmbeddingService, createLogger, syncDocumentToIndex } from '@zetesis/payload-indexer'
+import { syncDocumentToIndex } from '@zetesis/payload-indexer'
 import { createTypesenseAdapter } from '@zetesis/payload-typesense'
 import type { Payload } from 'payload'
 import { getPayload } from '@/modules/get-payload'
 import { collections } from '@/plugins/typesense/collections'
-import { embeddingConfig, typesenseConnection } from '@/plugins/typesense/config'
+import { typesenseConnection } from '@/plugins/typesense/config'
 import { seedPost } from '@/seed/post.seed'
 import type { CollectionTarget, ImportMode, ImportResult, SyncResults } from './admin-types'
 
@@ -36,9 +36,6 @@ async function syncCollectionToTypesense(payload: Payload, collectionSlug: Colle
     throw new Error(`No enabled table configs for ${collectionSlug}`)
   }
 
-  const logger = createLogger({ prefix: '[Sync]' })
-  const embeddingService = createEmbeddingService(embeddingConfig, logger)
-
   const response = await payload.find({
     collection: collectionSlug,
     limit: 0,
@@ -56,14 +53,7 @@ async function syncCollectionToTypesense(payload: Payload, collectionSlug: Colle
     try {
       const indexableDoc = toIndexableDocument(doc)
       for (const tableConfig of enabledConfigs) {
-        await syncDocumentToIndex(
-          adapter,
-          collectionSlug,
-          indexableDoc,
-          'update',
-          tableConfig,
-          tableConfig.embedding ? embeddingService : undefined
-        )
+        await syncDocumentToIndex(adapter, collectionSlug, indexableDoc, 'update', tableConfig)
       }
       results.synced++
     } catch (error: unknown) {

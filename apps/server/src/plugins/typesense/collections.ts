@@ -1,7 +1,15 @@
 import type { IndexableCollectionConfig } from '@zetesis/payload-indexer'
 import { transformLexicalToMarkdown } from '@zetesis/payload-indexer'
-import type { TypesenseFieldMapping } from '@zetesis/payload-typesense'
+import type { TypesenseAutoEmbedConfig, TypesenseFieldMapping } from '@zetesis/payload-typesense'
 import { createDynamicContentTransform, transformCategories } from './transforms'
+
+const postsAutoEmbed: TypesenseAutoEmbedConfig = {
+  from: ['chunk_text'],
+  modelConfig: {
+    modelName: 'openai/text-embedding-3-small',
+    apiKey: process.env.OPENAI_API_KEY as string
+  }
+}
 
 export const collections: IndexableCollectionConfig<TypesenseFieldMapping> = {
   posts: [
@@ -12,7 +20,8 @@ export const collections: IndexableCollectionConfig<TypesenseFieldMapping> = {
       syncDepth: 1,
       embedding: {
         fields: [{ field: 'content', transform: createDynamicContentTransform() }],
-        chunking: { strategy: 'markdown', size: 2000, overlap: 300 }
+        chunking: { strategy: 'markdown', size: 2000, overlap: 300 },
+        autoEmbed: postsAutoEmbed
       },
       fields: [
         { name: 'title', type: 'string' },
