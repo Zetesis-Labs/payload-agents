@@ -2,27 +2,32 @@
 '@zetesis/payload-documents': minor
 ---
 
-Add `POST /:id/parse-result` internal write endpoint for the documents worker.
+Add internal read + write endpoints for the documents worker.
 
-In worker mode the plugin now exposes a dedicated endpoint that the worker
-calls to stamp parse results back onto a document, instead of having the
-worker `PATCH /api/documents/:id` via the standard REST API. The endpoint:
+In worker mode the plugin now exposes two dedicated endpoints the worker
+calls instead of going through the standard REST API for the document:
 
-- is only registered when `worker: { url, internalSecret }` is configured;
-- authenticates with `X-Internal-Secret` (matched against the same
-  `worker.internalSecret` the kicker validates);
-- accepts only a hardcoded whitelist of fields: `parsed_text`,
-  `parse_status`, `parse_error`, `parse_job_id`, `parsed_at`;
-- writes via Payload's local API with `overrideAccess: true`.
+- `GET /:id/parse-context` — returns a hardcoded projection of the fields
+  the worker needs to drive the parse: `id, url, filename, mimeType,
+  language, parsing_instruction, mode`.
+- `POST /:id/parse-result` — accepts a hardcoded whitelist of writeable
+  fields: `parsed_text, parse_status, parse_error, parse_job_id,
+  parsed_at`.
 
-This lets host apps keep the documents collection's `update` access control
-honestly admin-only — no service-account bypass needs to be poked into
-collection access functions for the worker to do its job. Trust between the
-two services lives in one auditable handler instead of being scattered
-across collection access controls.
+Both are only registered when `worker: { url, internalSecret }` is
+configured, both authenticate with `X-Internal-Secret` (matched against
+the same `worker.internalSecret` the kicker validates), and both call
+Payload's local API with `overrideAccess: true`.
 
-Pairs with `payload-documents-worker-builder`'s new `submit_parse_result()`
-client method, which targets this endpoint and replaces the previous direct
-REST `PATCH` calls. Hosts already using worker mode pick this up
-automatically by bumping the package and the worker library together; no
-config changes required.
+This lets host apps keep the documents collection's read + update access
+honestly locked down (multi-tenant filters, admin-only writes, etc.) — no
+service-account bypass needs to be poked into collection access functions
+for the worker to do its job. Trust between the two services lives in two
+small, auditable handlers instead of being scattered across collection
+access controls.
+
+Pairs with `payload-documents-worker-builder`'s new `fetch_parse_context()`
+and `submit_parse_result()` client methods, which target these endpoints
+and replace the previous direct REST `GET` and `PATCH` calls. Hosts
+already using worker mode pick this up automatically by bumping the
+package and the worker library together; no config changes required.

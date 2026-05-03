@@ -1,4 +1,5 @@
 import type { Config, Endpoint } from 'payload'
+import { createParseContextEndpoint } from '../endpoints/parse-context-endpoint'
 import { createParseEndpoint } from '../endpoints/parse-endpoint'
 import { createParseResultEndpoint } from '../endpoints/parse-result-endpoint'
 import { createParseStatusEndpoint } from '../endpoints/parse-status-endpoint'
@@ -16,11 +17,13 @@ export const createDocumentsPlugin = (options: DocumentsPluginConfig = {}): Docu
     const endpointConfig = { collectionSlug: slug, apiKey, baseUrl, worker: options.worker }
 
     const endpoints: Endpoint[] = [createParseEndpoint(endpointConfig), createParseStatusEndpoint(endpointConfig)]
-    // Internal write endpoint only exists when worker mode is on. It bypasses
-    // collection access via overrideAccess + a shared X-Internal-Secret header,
-    // so leaving it off when the worker isn't wired keeps the surface minimal.
+    // Internal read + write endpoints only exist when worker mode is on. They
+    // bypass collection access via overrideAccess + a shared X-Internal-Secret
+    // header, so leaving them off when the worker isn't wired keeps the
+    // surface minimal. Reads project to a hard-coded field set; writes accept
+    // a hard-coded whitelist.
     if (options.worker) {
-      endpoints.push(createParseResultEndpoint(endpointConfig))
+      endpoints.push(createParseContextEndpoint(endpointConfig), createParseResultEndpoint(endpointConfig))
     }
 
     let collection = buildDocumentsCollection(slug)

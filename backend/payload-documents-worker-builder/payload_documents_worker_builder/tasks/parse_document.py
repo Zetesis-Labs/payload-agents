@@ -72,7 +72,7 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
             {"parse_status": "processing", "parse_error": None},
         )
 
-        doc = await payload_client.fetch_document(config.documents_collection_slug, document_id)
+        doc = await payload_client.fetch_parse_context(config.documents_collection_slug, document_id)
         file_url, filename = _resolve_file(doc, config.payload_url.unicode_string())
 
         log.info("Downloading upload from Payload", file_url=file_url)

@@ -1,23 +1,22 @@
 """Tiny Payload CMS REST client used by built-in tasks.
 
 The worker only needs:
-* fetch the document doc (so we can resolve the upload URL + mode/language)
+* fetch the document context (file URL + parser knobs)
 * download the binary attached to that document
 * stamp parse results back (parsed_text / parse_status / parse_error / ...)
 
-Two auth modes are used, by design:
+All Payload-side calls go through dedicated internal endpoints exposed by the
+``payload-documents`` plugin and authenticated with the shared
+``X-Internal-Secret`` header. Both endpoints use Payload's local API with
+``overrideAccess: true`` server-side, so host apps can keep the documents
+collection's access control honestly locked down (multi-tenant filters,
+admin-only writes, etc.) without poking a service-account bypass into the
+collection's access functions.
 
-* **Reads** (``fetch_document``, ``download_upload``) go through the standard
-  Payload REST API authenticated by a service-account API token
-  (``Authorization: Bearer <token>``). Reads are typically open to any
-  authenticated user, so the API token is sufficient and the worker doesn't
-  need elevated rights.
-* **Writes** (``submit_parse_result``) go through the plugin's internal
-  write endpoint (``POST /:id/parse-result``) authenticated by the shared
-  ``X-Internal-Secret`` header. The endpoint validates the secret and uses
-  Payload's local API with ``overrideAccess: true``, so the host app's
-  documents collection can stay honestly admin-only without poking
-  service-account bypasses into its access control.
+The ``api_token`` is still accepted for ``download_upload`` (which fetches
+the binary blob through whatever URL Payload's upload adapter exposes — for
+self-hosted uploads that's a Payload-served route which may need auth; for
+external storage like R2/S3 the URL is public).
 """
 
 from __future__ import annotations
@@ -47,29 +46,34 @@ class PayloadClient:
         if not api_token:
             raise PayloadError("Payload API token is required")
         if not internal_secret:
-            raise PayloadError("Internal secret is required (used for write-back)")
+            raise PayloadError("Internal secret is required for plugin endpoints")
         self._base_url = base_url.rstrip("/")
-        self._read_headers = {"Authorization": f"Bearer {api_token}"}
-        self._write_headers = {"X-Internal-Secret": internal_secret}
+        self._upload_headers = {"Authorization": f"Bearer {api_token}"}
+        self._internal_headers = {"X-Internal-Secret": internal_secret}
         self._timeout = timeout
 
-    async def fetch_document(self, collection: str, doc_id: str | int) -> dict[str, Any]:
-        url = f"{self._base_url}/api/{collection}/{doc_id}?depth=0"
+    async def fetch_parse_context(self, collection: str, doc_id: str | int) -> dict[str, Any]:
+        """GET the plugin's internal read endpoint.
+
+        Returns a projection containing only the fields the worker needs to
+        drive the parse: ``id, url, filename, mimeType, language,
+        parsing_instruction, mode``.
+        """
+        url = f"{self._base_url}/api/{collection}/{doc_id}/parse-context"
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, headers=self._read_headers)
-        _raise_for_status(response, f"GET /{collection}/{doc_id}")
+            response = await client.get(url, headers=self._internal_headers)
+        _raise_for_status(response, f"GET /{collection}/{doc_id}/parse-context")
         body: dict[str, Any] = response.json()
         return body
 
     async def download_upload(self, file_url: str) -> tuple[bytes, str]:
         """Fetch the binary attached to a Payload upload field.
 
-        ``file_url`` is the absolute URL Payload exposes (e.g.
-        ``http://app:3000/api/uploads/file/foo.pdf``). Returns ``(content,
-        filename)``.
+        ``file_url`` is the absolute URL the document exposes (Payload-served
+        route or external storage like R2/S3). Returns ``(content, filename)``.
         """
         async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
-            response = await client.get(file_url, headers=self._read_headers)
+            response = await client.get(file_url, headers=self._upload_headers)
         _raise_for_status(response, f"GET {file_url}")
         # Use the URL's tail as filename; LlamaParse only cares about the extension.
         filename = file_url.rsplit("/", 1)[-1] or "upload.bin"
@@ -88,7 +92,7 @@ class PayloadClient:
         """
         url = f"{self._base_url}/api/{collection}/{doc_id}/parse-result"
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(url, headers=self._write_headers, json=data)
+            response = await client.post(url, headers=self._internal_headers, json=data)
         _raise_for_status(response, f"POST /{collection}/{doc_id}/parse-result")
 
 
