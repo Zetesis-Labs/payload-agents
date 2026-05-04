@@ -1,11 +1,6 @@
 import type { Endpoint, PayloadRequest } from 'payload'
-import {
-  type DocumentRecord,
-  type EndpointConfig,
-  getRouteId,
-  updateDocument,
-  type WorkerEndpointConfig
-} from './shared'
+import type { DocumentRecord } from '../plugin/types'
+import { type EndpointConfig, getRouteId, requireInternalSecret, updateDocument } from './shared'
 
 /**
  * Internal write endpoint used by the documents worker to stamp parse results
@@ -26,26 +21,18 @@ const WRITABLE_FIELDS = [
   'parsed_at'
 ] as const satisfies ReadonlyArray<keyof DocumentRecord>
 
-type WritableField = (typeof WRITABLE_FIELDS)[number]
-type ParseResultBody = Partial<Pick<DocumentRecord, WritableField>>
+type ParseResultBody = Partial<Pick<DocumentRecord, (typeof WRITABLE_FIELDS)[number]>>
 
 const pickWhitelisted = (body: unknown): ParseResultBody | null => {
   if (typeof body !== 'object' || body === null) return null
-  const out: ParseResultBody = {}
+  const source = body as Record<string, unknown>
+  const out: Partial<ParseResultBody> = {}
   for (const key of WRITABLE_FIELDS) {
-    if (key in body) {
-      ;(out as Record<string, unknown>)[key] = (body as Record<string, unknown>)[key]
+    if (key in source) {
+      ;(out as Record<string, unknown>)[key] = source[key]
     }
   }
-  return out
-}
-
-const requireInternalSecret = (req: PayloadRequest, worker: WorkerEndpointConfig): Response | null => {
-  const headerSecret = req.headers?.get?.('x-internal-secret')
-  if (!headerSecret || headerSecret !== worker.internalSecret) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  return null
+  return out as ParseResultBody
 }
 
 export const createParseResultEndpoint = (config: EndpointConfig): Endpoint => ({

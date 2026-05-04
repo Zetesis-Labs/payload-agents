@@ -1,14 +1,7 @@
 import type { Endpoint, PayloadRequest } from 'payload'
-import {
-  type EndpointConfig,
-  fetchDocument,
-  fetchUploadedFile,
-  getLlamaParseClient,
-  getRouteId,
-  requireAuth,
-  updateDocument,
-  type WorkerEndpointConfig
-} from './shared'
+import type { DocumentsWorkerConfig } from '../plugin/types'
+import { fetchUploadedFile, getLlamaParseClient } from './inline-helpers'
+import { type EndpointConfig, fetchDocument, getRouteId, requireAuth, updateDocument } from './shared'
 
 export const createParseEndpoint = (config: EndpointConfig): Endpoint => ({
   path: '/:id/parse',
@@ -33,7 +26,7 @@ const queueOnWorker = async (
   req: PayloadRequest,
   collectionSlug: string,
   id: string,
-  worker: WorkerEndpointConfig
+  worker: DocumentsWorkerConfig
 ): Promise<Response> => {
   await updateDocument(req, collectionSlug, id, {
     parse_status: 'pending',
@@ -89,7 +82,7 @@ const runInline = async (req: PayloadRequest, config: EndpointConfig, id: string
     const job = await client.upload(blob, filename, {
       language: doc.language ?? undefined,
       parsingInstruction: doc.parsing_instruction ?? undefined,
-      mode: doc.mode ?? 'default'
+      mode: doc.mode ?? undefined
     })
 
     await updateDocument(req, config.collectionSlug, id, {
