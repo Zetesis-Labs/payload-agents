@@ -23,17 +23,18 @@ export function createEncryptBeforeChangeHook(config: ResolvedPluginConfig): Col
 }
 
 export function createDecryptAfterReadHook(config: ResolvedPluginConfig): CollectionAfterReadHook {
-  return async ({ doc, req }) => {
+  return async ({ context, doc, req }) => {
     if (!config.encryptionKey) return doc
     if (!doc.apiKey || !isEncrypted(doc.apiKey)) return doc
 
     const isLocalAPI = req.payloadAPI === 'local'
-    const isRuntimeRequest =
-      config.runtimeSecret !== '' && req.headers?.get?.('x-runtime-secret') === config.runtimeSecret
+    // Set by the internal `agents/internal/list` endpoint — the only
+    // out-of-process caller that needs decrypted keys.
+    const isInternalRead = context?.internalAgentRead === true
     const userRoles = req.user && 'role' in req.user ? (req.user as unknown as { role: string[] }).role : []
     const isSuperAdminUser = Array.isArray(userRoles) && userRoles.includes('superadmin')
 
-    if (!isLocalAPI && !isRuntimeRequest && !isSuperAdminUser) {
+    if (!isLocalAPI && !isInternalRead && !isSuperAdminUser) {
       doc.apiKey = undefined
       return doc
     }

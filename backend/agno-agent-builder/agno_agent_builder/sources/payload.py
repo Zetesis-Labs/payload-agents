@@ -1,7 +1,11 @@
 """Payload CMS implementation of `AgentSource`.
 
-Adapts Payload's `/api/agents` REST response into the normalized
-`AgentConfig` shape expected by the rest of the runtime.
+Calls the dedicated internal endpoint on `@zetesis/payload-agents-core`
+(`GET /api/<agents>/internal/list`) authenticated by `X-Internal-Secret`.
+The endpoint runs Payload's local API with `overrideAccess: true` and
+returns the active agents with apiKey decrypted + tenant/taxonomies
+populated, so we don't depend on access-control bypasses in the host's
+collections.
 """
 
 from __future__ import annotations
@@ -17,46 +21,34 @@ from agno_agent_builder.sources.types import AgentConfig
 logger = get_logger(__name__)
 
 _DEFAULT_TIMEOUT_S = 10.0
-_DEFAULT_WHERE: dict[str, str | int] = {"where[isActive][equals]": "true"}
+_DEFAULT_COLLECTION_SLUG = "agents"
+INTERNAL_SECRET_HEADER = "X-Internal-Secret"  # noqa: S105 — header name, not a secret value
 
 
 class PayloadAgentSource:
-    """Fetches agent configs from Payload CMS via REST.
-
-    The `X-Runtime-Secret` header bypasses the `agents` collection's read
-    access control. `depth=1` is required so the `tenant` and `taxonomies`
-    relationships come populated; consumers that change those defaults must
-    also extend `Tenants.read` access for the runtime secret.
-    """
+    """Fetches agent configs from Payload CMS via the plugin's internal endpoint."""
 
     def __init__(
         self,
         *,
         base_url: str,
         internal_secret: str,
-        service_token: str | None = None,
-        depth: int = 1,
-        limit: int = 1000,
-        where: dict[str, str | int] | None = None,
+        collection_slug: str = _DEFAULT_COLLECTION_SLUG,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
+        if not internal_secret:
+            raise ValueError("internal_secret is required")
         self._base_url = base_url.rstrip("/")
         self._internal_secret = internal_secret
-        self._service_token = service_token
-        self._depth = depth
-        self._limit = limit
-        self._where = where if where is not None else dict(_DEFAULT_WHERE)
+        self._collection_slug = collection_slug
         self._timeout_s = timeout_s
 
     async def fetch_agents(self) -> list[AgentConfig]:
-        url = f"{self._base_url}/api/agents"
-        params: dict[str, str | int] = {**self._where, "depth": self._depth, "limit": self._limit}
-        headers: dict[str, str] = {"X-Runtime-Secret": self._internal_secret}
-        if self._service_token:
-            headers["Authorization"] = f"Bearer {self._service_token}"
+        url = f"{self._base_url}/api/{self._collection_slug}/internal/list"
+        headers = {INTERNAL_SECRET_HEADER: self._internal_secret}
 
         async with httpx.AsyncClient(timeout=self._timeout_s) as client:
-            response = await client.get(url, params=params, headers=headers)
+            response = await client.get(url, headers=headers)
             response.raise_for_status()
             data: dict[str, list[dict[str, Any]]] = response.json()
 

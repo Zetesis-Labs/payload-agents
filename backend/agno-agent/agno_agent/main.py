@@ -14,7 +14,6 @@ app = create_app(
         agent_source=PayloadAgentSource(
             base_url=settings.payload_url,
             internal_secret=settings.internal_secret.get_secret_value(),
-            service_token=settings.payload_service_token or None,
         ),
         mcp_url=settings.mcp_url,
         database_url=settings.database_url,
