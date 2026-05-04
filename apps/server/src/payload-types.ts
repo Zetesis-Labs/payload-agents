@@ -74,6 +74,7 @@ export interface Config {
     'mcp-search-tokens': McpSearchToken;
     agents: Agent;
     'llm-usage-events': LlmUsageEvent;
+    documents: Document;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -88,6 +89,7 @@ export interface Config {
     'mcp-search-tokens': McpSearchTokensSelect<false> | McpSearchTokensSelect<true>;
     agents: AgentsSelect<false> | AgentsSelect<true>;
     'llm-usage-events': LlmUsageEventsSelect<false> | LlmUsageEventsSelect<true>;
+    documents: DocumentsSelect<false> | DocumentsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -402,6 +404,57 @@ export interface LlmUsageEvent {
   createdAt: string;
 }
 /**
+ * Documents parsed to markdown via LlamaParse.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "documents".
+ */
+export interface Document {
+  id: number;
+  parse_status?: ('idle' | 'pending' | 'processing' | 'done' | 'error') | null;
+  parse_job_id?: string | null;
+  parsed_at?: string | null;
+  parse_error?: string | null;
+  /**
+   * Optional language hint for OCR (e.g. "es", "en").
+   */
+  language?: string | null;
+  /**
+   * LlamaParse mode passed as `parse_mode`. Page-level is fast + per-page; document-level is slower but reasons across the whole doc. See https://docs.cloud.llamaindex.ai/llamaparse/parameters/parse_mode
+   */
+  mode?:
+    | (
+        | 'parse_page_without_llm'
+        | 'parse_page_with_llm'
+        | 'parse_page_with_lvm'
+        | 'parse_page_with_agent'
+        | 'parse_page_with_layout_agent'
+        | 'parse_document_with_llm'
+        | 'parse_document_with_lvm'
+        | 'parse_document_with_agent'
+      )
+    | null;
+  /**
+   * Free-form instruction to guide LlamaParse (e.g. "preserve tables").
+   */
+  parsing_instruction?: string | null;
+  /**
+   * Markdown returned by LlamaParse. Editable.
+   */
+  parsed_text?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -452,6 +505,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'llm-usage-events';
         value: number | LlmUsageEvent;
+      } | null)
+    | ({
+        relationTo: 'documents';
+        value: number | Document;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -635,6 +692,31 @@ export interface LlmUsageEventsSelect<T extends boolean = true> {
   errorCode?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "documents_select".
+ */
+export interface DocumentsSelect<T extends boolean = true> {
+  parse_status?: T;
+  parse_job_id?: T;
+  parsed_at?: T;
+  parse_error?: T;
+  language?: T;
+  mode?: T;
+  parsing_instruction?: T;
+  parsed_text?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

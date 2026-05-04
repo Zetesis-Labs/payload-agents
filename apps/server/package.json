@@ -21,6 +21,7 @@
     "@zetesis/chat-agent": "workspace:*",
     "@zetesis/payload-agents-core": "workspace:*",
     "@zetesis/payload-agents-metrics": "workspace:*",
+    "@zetesis/payload-documents": "workspace:*",
     "@zetesis/payload-indexer": "workspace:*",
     "@zetesis/payload-lexical-blocks-builder": "workspace:*",
     "@zetesis/payload-taxonomies": "workspace:*",
