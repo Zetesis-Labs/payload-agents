@@ -29,9 +29,7 @@ export class LlamaParseClient {
     form.append('result_type', 'markdown')
     if (opts.language) form.append('language', opts.language)
     if (opts.parsingInstruction) form.append('parsing_instruction', opts.parsingInstruction)
-    const mode = opts.mode ?? 'default'
-    if (mode === 'fast') form.append('fast_mode', 'true')
-    if (mode === 'premium') form.append('premium_mode', 'true')
+    if (opts.mode) form.append('parse_mode', opts.mode)
 
     const res = await fetch(`${this.baseUrl}/parsing/upload`, {
       method: 'POST',

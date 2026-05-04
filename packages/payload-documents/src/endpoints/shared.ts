@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { LlamaParseClient } from '../llama-parse/client'
+import type { LlamaParseMode } from '../llama-parse/types'
 import type { ResolveFileBinary } from '../plugin/types'
 
 export interface EndpointConfig {
@@ -22,7 +23,7 @@ export interface DocumentRecord {
   mimeType?: string | null
   language?: string | null
   parsing_instruction?: string | null
-  mode?: 'fast' | 'default' | 'premium' | null
+  mode?: LlamaParseMode | null
   parse_status?: 'idle' | 'pending' | 'processing' | 'done' | 'error' | null
   parse_job_id?: string | null
   parse_error?: string | null
