@@ -1,6 +1,7 @@
 import type { Config, Endpoint } from 'payload'
 import { createParseContextEndpoint } from '../endpoints/parse-context-endpoint'
 import { createParseEndpoint } from '../endpoints/parse-endpoint'
+import { createParseFileEndpoint } from '../endpoints/parse-file-endpoint'
 import { createParseResultEndpoint } from '../endpoints/parse-result-endpoint'
 import { createParseStatusEndpoint } from '../endpoints/parse-status-endpoint'
 import { DEFAULT_LLAMA_PARSE_BASE_URL } from '../llama-parse/client'
@@ -17,13 +18,17 @@ export const createDocumentsPlugin = (options: DocumentsPluginConfig = {}): Docu
     const endpointConfig = { collectionSlug: slug, apiKey, baseUrl, worker: options.worker }
 
     const endpoints: Endpoint[] = [createParseEndpoint(endpointConfig), createParseStatusEndpoint(endpointConfig)]
-    // Internal read + write endpoints only exist when worker mode is on. They
-    // bypass collection access via overrideAccess + a shared X-Internal-Secret
-    // header, so leaving them off when the worker isn't wired keeps the
-    // surface minimal. Reads project to a hard-coded field set; writes accept
-    // a hard-coded whitelist.
+    // Internal endpoints only exist when worker mode is on. All three gate on
+    // X-Internal-Secret and call Payload's local API with overrideAccess: true,
+    // so the host's collection access can stay locked down. Reads project to a
+    // hardcoded field set; writes accept a hardcoded whitelist; parse-file is
+    // additionally gated on the host wiring `resolveFileBinary` since the
+    // plugin can't read storage on its own.
     if (options.worker) {
       endpoints.push(createParseContextEndpoint(endpointConfig), createParseResultEndpoint(endpointConfig))
+      if (options.worker.resolveFileBinary) {
+        endpoints.push(createParseFileEndpoint(endpointConfig))
+      }
     }
 
     let collection = buildDocumentsCollection(slug)

@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { LlamaParseClient } from '../llama-parse/client'
+import type { ResolveFileBinary } from '../plugin/types'
 
 export interface EndpointConfig {
   collectionSlug: string
@@ -11,6 +12,7 @@ export interface EndpointConfig {
 export interface WorkerEndpointConfig {
   url: string
   internalSecret: string
+  resolveFileBinary?: ResolveFileBinary
 }
 
 export interface DocumentRecord {

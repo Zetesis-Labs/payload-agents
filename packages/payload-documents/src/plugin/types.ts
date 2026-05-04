@@ -1,8 +1,25 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, PayloadRequest } from 'payload'
 
 export interface DocumentsPluginOverrides {
   collection?: (collection: CollectionConfig) => CollectionConfig
 }
+
+/**
+ * Resolves the binary contents of a document's attached upload. The plugin
+ * stays storage-agnostic by deferring this to the host: hosts using S3/R2 wire
+ * this to an `s3.send(new GetObjectCommand(...))` call against their bucket;
+ * hosts on the local filesystem stream from disk; etc.
+ *
+ * Return any payload that the Web Fetch `Response` constructor accepts as a
+ * body (`Uint8Array`, `Buffer`, `ReadableStream`, `Blob`, …). When unset, the
+ * `parse-file` endpoint isn't registered and the worker has no way to fetch
+ * binaries through the plugin.
+ */
+export type ResolveFileBinary = (args: { doc: Record<string, unknown>; req: PayloadRequest }) => Promise<{
+  body: BodyInit
+  contentType?: string
+  contentLength?: number
+}>
 
 /**
  * When set, the parse endpoint enqueues a task on a `payload-documents-worker-builder`
@@ -22,6 +39,19 @@ export interface DocumentsWorkerConfig {
    * `payload-documents-worker-builder.RuntimeConfig.internal_secret` was built with.
    */
   internalSecret: string
+  /**
+   * Optional resolver for the binary contents of a document's attached upload.
+   * When provided, the plugin registers `GET /:id/parse-file` and the worker
+   * fetches the binary through that endpoint instead of touching `doc.url`.
+   * The host owns the storage knowledge (S3 client, bucket, prefix, etc.); the
+   * plugin only provides the auth boundary (`X-Internal-Secret` validation +
+   * `findByID` with `overrideAccess: true` to load the doc).
+   *
+   * When unset, the worker falls back to fetching `doc.url` directly with its
+   * API token — only works when the host's storage adapter exposes the upload
+   * via a URL the worker can reach without Payload-side access control.
+   */
+  resolveFileBinary?: ResolveFileBinary
 }
 
 export interface DocumentsPluginConfig {

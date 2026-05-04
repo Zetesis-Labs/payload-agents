@@ -1,22 +1,22 @@
 """Tiny Payload CMS REST client used by built-in tasks.
 
 The worker only needs:
-* fetch the document context (file URL + parser knobs)
-* download the binary attached to that document
+* fetch the document context (parser knobs + filename)
+* fetch the binary attached to that document
 * stamp parse results back (parsed_text / parse_status / parse_error / ...)
 
 All Payload-side calls go through dedicated internal endpoints exposed by the
 ``payload-documents`` plugin and authenticated with the shared
-``X-Internal-Secret`` header. Both endpoints use Payload's local API with
-``overrideAccess: true`` server-side, so host apps can keep the documents
-collection's access control honestly locked down (multi-tenant filters,
-admin-only writes, etc.) without poking a service-account bypass into the
-collection's access functions.
+``X-Internal-Secret`` header. The endpoints use Payload's local API with
+``overrideAccess: true`` server-side and the binary endpoint defers to a
+host-provided resolver for the actual storage read, so the plugin stays
+storage-agnostic and host apps can keep the documents collection's access
+control honestly locked down (multi-tenant filters, admin-only writes, etc.)
+without poking a service-account bypass into it.
 
-The ``api_token`` is still accepted for ``download_upload`` (which fetches
-the binary blob through whatever URL Payload's upload adapter exposes — for
-self-hosted uploads that's a Payload-served route which may need auth; for
-external storage like R2/S3 the URL is public).
+The ``api_token`` is no longer used for any read on the documents
+collection; it's kept on the constructor for future use (e.g. cross-collection
+helpers). All three plugin endpoints use ``X-Internal-Secret``.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ class PayloadClient:
         if not internal_secret:
             raise PayloadError("Internal secret is required for plugin endpoints")
         self._base_url = base_url.rstrip("/")
-        self._upload_headers = {"Authorization": f"Bearer {api_token}"}
+        self._api_token = api_token  # reserved for future cross-collection helpers
         self._internal_headers = {"X-Internal-Secret": internal_secret}
         self._timeout = timeout
 
@@ -66,18 +66,17 @@ class PayloadClient:
         body: dict[str, Any] = response.json()
         return body
 
-    async def download_upload(self, file_url: str) -> tuple[bytes, str]:
-        """Fetch the binary attached to a Payload upload field.
+    async def fetch_parse_file(self, collection: str, doc_id: str | int) -> bytes:
+        """GET the plugin's internal binary endpoint.
 
-        ``file_url`` is the absolute URL the document exposes (Payload-served
-        route or external storage like R2/S3). Returns ``(content, filename)``.
+        The plugin defers the actual storage read to a host-provided resolver
+        (S3/R2 GetObject, local fs, ...) and streams the result back.
         """
-        async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
-            response = await client.get(file_url, headers=self._upload_headers)
-        _raise_for_status(response, f"GET {file_url}")
-        # Use the URL's tail as filename; LlamaParse only cares about the extension.
-        filename = file_url.rsplit("/", 1)[-1] or "upload.bin"
-        return response.content, filename
+        url = f"{self._base_url}/api/{collection}/{doc_id}/parse-file"
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.get(url, headers=self._internal_headers)
+        _raise_for_status(response, f"GET /{collection}/{doc_id}/parse-file")
+        return response.content
 
     async def submit_parse_result(
         self,

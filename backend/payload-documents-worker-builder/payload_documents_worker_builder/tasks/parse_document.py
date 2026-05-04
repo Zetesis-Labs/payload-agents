@@ -73,12 +73,12 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
         )
 
         doc = await payload_client.fetch_parse_context(config.documents_collection_slug, document_id)
-        file_url, filename = _resolve_file(doc, config.payload_url.unicode_string())
+        upload_filename = _resolve_filename(doc)
 
-        log.info("Downloading upload from Payload", file_url=file_url)
-        file_bytes, _resolved_filename = await payload_client.download_upload(file_url)
-        # Prefer Payload's filename when present; fall back to URL tail.
-        upload_filename = filename or _resolved_filename
+        log.info("Downloading upload from Payload", filename=upload_filename)
+        file_bytes = await payload_client.fetch_parse_file(
+            config.documents_collection_slug, document_id
+        )
 
         log.info("Uploading to LlamaParse", filename=upload_filename, size=len(file_bytes))
         job = await llama_client.upload(
@@ -143,21 +143,17 @@ async def _poll_until_done(
     )
 
 
-def _resolve_file(doc: dict[str, Any], base_url: str) -> tuple[str, str | None]:
-    """Pull the upload URL + filename out of a Payload document.
+def _resolve_filename(doc: dict[str, Any]) -> str:
+    """Pick a filename to send to LlamaParse.
 
-    Payload's `upload` collections expose a top-level `url` field on the
-    fetched doc. If the URL is relative, prepend the configured base URL.
+    LlamaParse only cares about the file extension, so any string Payload gave
+    us is fine. Fall back to a generic name if the parse-context projection
+    didn't include one.
     """
-    file_url = doc.get("url")
-    if not isinstance(file_url, str) or not file_url:
-        raise PayloadError(
-            f"Document {doc.get('id', '?')} has no `url` field — is it an upload-enabled collection?"
-        )
-    if file_url.startswith("/"):
-        file_url = base_url.rstrip("/") + file_url
-    filename = doc.get("filename") if isinstance(doc.get("filename"), str) else None
-    return file_url, filename
+    filename = doc.get("filename")
+    if isinstance(filename, str) and filename:
+        return filename
+    return "upload.bin"
 
 
 async def _stamp_error(
