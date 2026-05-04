@@ -18,10 +18,13 @@ DEFAULT_PUBLIC_PATHS: tuple[str, ...] = (
     "/ready",
     "/docs",
     "/openapi.json",
-    # Trailing slash = prefix match. Each Telegram interface validates its own
-    # X-Telegram-Bot-Api-Secret-Token, so the global X-Internal-Secret is not
-    # required on incoming Telegram webhooks.
+    # Trailing slash = prefix match. Each channel's interface validates its
+    # own request signature (X-Telegram-Bot-Api-Secret-Token, X-Hub-Signature
+    # for Meta/WhatsApp, Ed25519 for Discord), so the global X-Internal-Secret
+    # is not required on incoming channel webhooks.
     "/telegram/",
+    "/whatsapp/",
+    "/discord/",
 )
 DEFAULT_RELOAD_CHANNEL = "agent_reload"
 DEFAULT_RESYNC_INTERVAL_S = 300.0
@@ -40,7 +43,7 @@ class RuntimeConfig(BaseModel):
     mcp_url: str
     database_url: str
     internal_secret: SecretStr
-    payload_url: str | None = None  # Required for Telegram bot loader; optional for CMS-agnostic deployments
+    payload_url: str | None = None  # Required for channel loaders (telegram/whatsapp/discord); optional for CMS-agnostic deployments
     database_schema: str = "agno"
     log_level: str = "INFO"
     reload_channel: str = DEFAULT_RELOAD_CHANNEL
