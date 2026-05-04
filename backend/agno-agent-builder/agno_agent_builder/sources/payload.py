@@ -105,6 +105,7 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
         taxonomy_slugs=taxonomy_slugs,
         search_collections=search_collections,
         tool_call_limit=tool_call_limit,
+        allow_guest_access=bool(doc.get("allowGuestAccess")),
     )
 
 

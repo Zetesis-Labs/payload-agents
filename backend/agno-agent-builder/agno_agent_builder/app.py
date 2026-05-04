@@ -33,6 +33,8 @@ from agno_agent_builder.middleware import (
 from agno_agent_builder.registry import AgentRegistry
 from agno_agent_builder.reload_listener import run_reload_listener
 from agno_agent_builder.schemas import ErrorResponse, ReloadResponse
+from agno_agent_builder.telegram_bind_middleware import TelegramBindMiddleware, TelegramBindState
+from agno_agent_builder.telegram_loader import fetch_installations, mount_telegram_interfaces
 
 _AgentList = list[Agent | RemoteAgent | AgentProtocol | AgentFactory]
 
@@ -47,6 +49,7 @@ def create_app(config: RuntimeConfig) -> FastAPI:
     logger = get_logger(config.app_name)
 
     secret = config.internal_secret.get_secret_value()
+    telegram_bind_state = TelegramBindState()
     registry = AgentRegistry(
         source=config.agent_source,
         database_url=config.database_url,
@@ -103,6 +106,28 @@ def create_app(config: RuntimeConfig) -> FastAPI:
                         exc_info=True,
                     )
 
+        # Telegram bot installations: fetch from the host CMS and mount one
+        # agno Telegram interface per row. The bind interceptor middleware is
+        # registered up-front; we just populate its state here so it knows
+        # which webhook paths + bot tokens are live. Skipped when payload_url
+        # isn't configured (CMS-agnostic deployments don't use Telegram).
+        if config.payload_url:
+            try:
+                installations = await fetch_installations(
+                    payload_url=config.payload_url,
+                    internal_secret=secret,
+                )
+                webhook_paths = mount_telegram_interfaces(app, registry, installations)
+                if webhook_paths:
+                    telegram_bind_state.update(
+                        webhook_paths=webhook_paths,
+                        bot_tokens={i.bot_username: i.bot_token for i in installations},
+                        installation_ids={i.bot_username: i.id for i in installations},
+                    )
+                    logger.info("Telegram interfaces mounted", count=len(installations))
+            except Exception:
+                logger.exception("Telegram interface bootstrap failed — continuing without bots")
+
         listener_task = asyncio.create_task(
             run_reload_listener(
                 reload_registry,
@@ -138,6 +163,17 @@ def create_app(config: RuntimeConfig) -> FastAPI:
     app.add_middleware(SessionMetadataMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(InternalAuthMiddleware, secret=secret, public_paths=config.public_paths)
+    # Bind interceptor is the OUTERMOST middleware (added last → runs first
+    # in the chain) so it can short-circuit /start <token> on Telegram
+    # webhooks before InternalAuth touches them. Telegram itself validates
+    # X-Telegram-Bot-Api-Secret-Token via agno's interface for the
+    # passthrough path.
+    app.add_middleware(
+        TelegramBindMiddleware,
+        payload_url=config.payload_url or "",
+        internal_secret=secret,
+        state=telegram_bind_state,
+    )
     app.add_exception_handler(AgentRuntimeError, agno_agent_builder_exception_handler)
     app.include_router(health_router)
 

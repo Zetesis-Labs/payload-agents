@@ -56,6 +56,15 @@ export function createAgentsCollection(config: ResolvedPluginConfig): Collection
                 type: 'checkbox',
                 defaultValue: true,
                 admin: { description: 'Enable or disable this agent' }
+              },
+              {
+                name: 'allowGuestAccess',
+                type: 'checkbox',
+                defaultValue: false,
+                admin: {
+                  description:
+                    'When enabled, anonymous channel callers (e.g. Telegram users not yet bound to a ZP user) can chat with this agent. Leave off to require a bound user.'
+                }
               }
             ]
           },

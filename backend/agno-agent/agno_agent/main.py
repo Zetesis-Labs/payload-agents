@@ -19,6 +19,7 @@ app = create_app(
         database_url=settings.database_url,
         database_schema=settings.database_schema,
         internal_secret=settings.internal_secret,
+        payload_url=settings.payload_url,
         log_level=settings.log_level,
     )
 )
