@@ -12,20 +12,24 @@ hard-coding the binding.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC
-from typing import Any
+import contextlib
+from datetime import UTC, datetime
 
+import httpx
 import structlog
 from taskiq import AsyncBroker
 
 from payload_documents_worker_builder.clients.llama_parse import (
     LlamaParseClient,
     LlamaParseError,
+    LlamaParseJob,
 )
 from payload_documents_worker_builder.clients.payload import PayloadClient, PayloadError
+from payload_documents_worker_builder.clients.types import ParseContext
 from payload_documents_worker_builder.config import RuntimeConfig
 
 PARSE_DOCUMENT_TASK_NAME = "documents.parse"
+DEFAULT_FILENAME = "upload.bin"
 
 logger = structlog.get_logger("payload_documents_worker_builder.parse_document")
 
@@ -51,73 +55,103 @@ def register_parse_document_task(broker: AsyncBroker, config: RuntimeConfig) -> 
 
 
 async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
-    """Implementation kept outside the closure for testability."""
+    """Orchestrator: each phase is its own coroutine for unit-testability."""
     log = logger.bind(document_id=document_id, collection=config.documents_collection_slug)
     log.info("Parse document task started")
 
-    payload_client = PayloadClient(
-        base_url=str(config.payload_url),
-        api_token=config.payload_service_token.get_secret_value(),
-        internal_secret=config.internal_secret.get_secret_value(),
+    async with (
+        PayloadClient(
+            base_url=str(config.payload_url),
+            internal_secret=config.internal_secret.get_secret_value(),
+        ) as payload,
+        LlamaParseClient(
+            api_key=config.llama_cloud_api_key.get_secret_value(),
+            base_url=str(config.llama_parse_base_url),
+        ) as llama,
+    ):
+        try:
+            await _mark_processing(payload, config, document_id)
+            ctx, file_bytes = await _fetch_inputs(payload, config, document_id, log)
+            job = await _submit_to_llama(llama, ctx, file_bytes, log)
+            await _record_job_id(payload, config, document_id, job)
+            markdown = await _poll_until_done(llama, job.id, config, log)
+            await _writeback_success(payload, config, document_id, markdown, log)
+            log.info("Parse document task succeeded")
+        except (LlamaParseError, PayloadError) as exc:
+            log.exception("Parse document task failed")
+            await _stamp_error(payload, config, document_id, str(exc))
+            raise
+
+
+async def _mark_processing(
+    payload: PayloadClient, config: RuntimeConfig, document_id: str
+) -> None:
+    await payload.submit_parse_result(
+        config.documents_collection_slug,
+        document_id,
+        {"parse_status": "processing", "parse_error": None},
     )
-    llama_client = LlamaParseClient(
-        api_key=config.llama_cloud_api_key.get_secret_value(),
-        base_url=str(config.llama_parse_base_url),
+
+
+async def _fetch_inputs(
+    payload: PayloadClient,
+    config: RuntimeConfig,
+    document_id: str,
+    log: structlog.stdlib.BoundLogger,
+) -> tuple[ParseContext, bytes]:
+    ctx = await payload.fetch_parse_context(config.documents_collection_slug, document_id)
+    log.info("Downloading upload from Payload", filename=_resolve_filename(ctx))
+    file_bytes = await payload.fetch_parse_file(config.documents_collection_slug, document_id)
+    return ctx, file_bytes
+
+
+async def _submit_to_llama(
+    llama: LlamaParseClient,
+    ctx: ParseContext,
+    file_bytes: bytes,
+    log: structlog.stdlib.BoundLogger,
+) -> LlamaParseJob:
+    filename = _resolve_filename(ctx)
+    log.info("Uploading to LlamaParse", filename=filename, size=len(file_bytes))
+    job = await llama.upload(
+        file_bytes=file_bytes,
+        filename=filename,
+        language=ctx.get("language"),
+        parsing_instruction=ctx.get("parsing_instruction"),
+        mode=ctx.get("mode"),
+    )
+    log.info("LlamaParse job created", llama_job_id=job.id)
+    return job
+
+
+async def _record_job_id(
+    payload: PayloadClient, config: RuntimeConfig, document_id: str, job: LlamaParseJob
+) -> None:
+    await payload.submit_parse_result(
+        config.documents_collection_slug,
+        document_id,
+        {"parse_job_id": job.id},
     )
 
-    try:
-        await payload_client.submit_parse_result(
-            config.documents_collection_slug,
-            document_id,
-            {"parse_status": "processing", "parse_error": None},
-        )
 
-        doc = await payload_client.fetch_parse_context(config.documents_collection_slug, document_id)
-        upload_filename = _resolve_filename(doc)
-
-        log.info("Downloading upload from Payload", filename=upload_filename)
-        file_bytes = await payload_client.fetch_parse_file(
-            config.documents_collection_slug, document_id
-        )
-
-        log.info("Uploading to LlamaParse", filename=upload_filename, size=len(file_bytes))
-        job = await llama_client.upload(
-            file_bytes=file_bytes,
-            filename=upload_filename,
-            language=doc.get("language"),
-            parsing_instruction=doc.get("parsing_instruction"),
-            mode=doc.get("mode"),
-        )
-        log.info("LlamaParse job created", llama_job_id=job.id)
-
-        await payload_client.submit_parse_result(
-            config.documents_collection_slug,
-            document_id,
-            {"parse_job_id": job.id, "parse_status": "processing"},
-        )
-
-        markdown = await _poll_until_done(llama_client, job.id, config, log)
-        log.info("Parse complete; writing back to Payload", chars=len(markdown))
-
-        await payload_client.submit_parse_result(
-            config.documents_collection_slug,
-            document_id,
-            {
-                "parsed_text": markdown,
-                "parse_status": "done",
-                "parse_error": None,
-                "parsed_at": _now_iso(),
-            },
-        )
-        log.info("Parse document task succeeded")
-    except (LlamaParseError, PayloadError) as exc:
-        log.exception("Parse document task failed")
-        await _stamp_error(payload_client, config, document_id, str(exc))
-        raise
-    except Exception as exc:  # pragma: no cover — unexpected errors still surface
-        log.exception("Parse document task crashed unexpectedly")
-        await _stamp_error(payload_client, config, document_id, str(exc))
-        raise
+async def _writeback_success(
+    payload: PayloadClient,
+    config: RuntimeConfig,
+    document_id: str,
+    markdown: str,
+    log: structlog.stdlib.BoundLogger,
+) -> None:
+    log.info("Parse complete; writing back to Payload", chars=len(markdown))
+    await payload.submit_parse_result(
+        config.documents_collection_slug,
+        document_id,
+        {
+            "parsed_text": markdown,
+            "parse_status": "done",
+            "parse_error": None,
+            "parsed_at": _now_iso(),
+        },
+    )
 
 
 async def _poll_until_done(
@@ -126,8 +160,8 @@ async def _poll_until_done(
     config: RuntimeConfig,
     log: structlog.stdlib.BoundLogger,
 ) -> str:
-    elapsed = 0.0
-    while elapsed <= config.llama_parse_poll_timeout_s:
+    deadline = asyncio.get_event_loop().time() + config.llama_parse_poll_timeout_s
+    while asyncio.get_event_loop().time() <= deadline:
         job = await client.status(job_id)
         if job.status == "SUCCESS":
             return await client.fetch_markdown(job_id)
@@ -135,45 +169,29 @@ async def _poll_until_done(
             raise LlamaParseError(
                 f"LlamaParse job {job_id} ended in {job.status}: {job.error or 'no detail'}"
             )
-        log.debug("Polling LlamaParse", status=job.status, elapsed_s=elapsed)
+        log.debug("Polling LlamaParse", status=job.status)
         await asyncio.sleep(config.llama_parse_poll_interval_s)
-        elapsed += config.llama_parse_poll_interval_s
     raise LlamaParseError(
         f"LlamaParse job {job_id} timed out after {config.llama_parse_poll_timeout_s}s"
     )
 
 
-def _resolve_filename(doc: dict[str, Any]) -> str:
-    """Pick a filename to send to LlamaParse.
-
-    LlamaParse only cares about the file extension, so any string Payload gave
-    us is fine. Fall back to a generic name if the parse-context projection
-    didn't include one.
-    """
-    filename = doc.get("filename")
-    if isinstance(filename, str) and filename:
-        return filename
-    return "upload.bin"
+def _resolve_filename(ctx: ParseContext) -> str:
+    filename = ctx.get("filename")
+    return filename if isinstance(filename, str) and filename else DEFAULT_FILENAME
 
 
 async def _stamp_error(
-    client: PayloadClient,
-    config: RuntimeConfig,
-    document_id: str,
-    message: str,
+    payload: PayloadClient, config: RuntimeConfig, document_id: str, message: str
 ) -> None:
     """Best-effort error stamp — never raises so we don't shadow the original exception."""
-    try:
-        await client.submit_parse_result(
+    with contextlib.suppress(PayloadError, httpx.HTTPError):
+        await payload.submit_parse_result(
             config.documents_collection_slug,
             document_id,
             {"parse_status": "error", "parse_error": message[:500]},
         )
-    except Exception:
-        logger.exception("Failed to stamp parse_error on document", document_id=document_id)
 
 
 def _now_iso() -> str:
-    from datetime import datetime
-
     return datetime.now(UTC).isoformat()

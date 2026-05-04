@@ -32,9 +32,6 @@ class RuntimeConfig(BaseModel):
     payload_url: HttpUrl = Field(
         description="Base URL for the Payload REST API (e.g. http://app:3000).",
     )
-    payload_service_token: SecretStr = Field(
-        description="Payload API key (Bearer) with write access on the documents collection.",
-    )
     documents_collection_slug: str = Field(
         default="documents",
         description="Payload collection slug for documents. Must expose the `parse_*` fields shipped by `@zetesis/payload-documents`.",

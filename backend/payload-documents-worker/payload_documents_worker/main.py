@@ -17,7 +17,6 @@ _worker = create_app(
         app_name="payload-documents-worker",
         redis_url=_settings.redis_url,
         payload_url=_settings.payload_url,
-        payload_service_token=_settings.payload_service_token,
         documents_collection_slug=_settings.documents_collection_slug,
         llama_cloud_api_key=_settings.llama_cloud_api_key,
         llama_parse_base_url=_settings.llama_parse_base_url,
