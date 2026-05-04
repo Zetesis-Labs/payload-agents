@@ -5,5 +5,6 @@ export {
   type DocumentsPluginConfig,
   type DocumentsPluginOverrides,
   type DocumentsPluginResult,
-  type DocumentsWorkerConfig
+  type DocumentsWorkerConfig,
+  type ResolveFileBinary
 } from './types'
