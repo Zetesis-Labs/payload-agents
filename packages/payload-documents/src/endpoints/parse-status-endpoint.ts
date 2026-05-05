@@ -1,15 +1,9 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 import type { LlamaParseClient } from '../llama-parse/client'
 import type { LlamaParseJobStatus } from '../llama-parse/types'
-import {
-  type DocumentRecord,
-  type EndpointConfig,
-  fetchDocument,
-  getLlamaParseClient,
-  getRouteId,
-  requireAuth,
-  updateDocument
-} from './shared'
+import type { DocumentRecord } from '../plugin/types'
+import { getLlamaParseClient } from './inline-helpers'
+import { type EndpointConfig, fetchDocument, getRouteId, requireAuth, updateDocument } from './shared'
 
 const isTerminal = (status: DocumentRecord['parse_status']): boolean =>
   !status || status === 'idle' || status === 'done' || status === 'error'

@@ -45,12 +45,23 @@ class RequestIdMiddleware:
 
 
 class InternalAuthMiddleware:
-    """Reject requests without a valid ``X-Internal-Secret`` header."""
+    """Reject requests without a valid ``X-Internal-Secret`` header.
+
+    Public paths are matched two ways: exact match for full paths
+    (``/health``, ``/openapi.json``) and prefix match for entries ending in
+    ``/`` (``/telegram/`` lets every per-bot webhook through, since each
+    Telegram interface validates its own ``X-Telegram-Bot-Api-Secret-Token``).
+    """
 
     def __init__(self, app: ASGIApp, *, secret: str, public_paths: tuple[str, ...]) -> None:
         self.app = app
         self._secret = secret
-        self._public_paths = frozenset(public_paths)
+        exact: list[str] = []
+        prefixes: list[str] = []
+        for entry in public_paths:
+            (prefixes if entry.endswith("/") else exact).append(entry)
+        self._public_paths_exact = frozenset(exact)
+        self._public_path_prefixes = tuple(prefixes)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -58,7 +69,9 @@ class InternalAuthMiddleware:
             return
 
         path: str = scope.get("path", "")
-        if path in self._public_paths:
+        if path in self._public_paths_exact or any(
+            path.startswith(p) for p in self._public_path_prefixes
+        ):
             await self.app(scope, receive, send)
             return
 

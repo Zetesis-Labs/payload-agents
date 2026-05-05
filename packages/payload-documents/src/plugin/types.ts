@@ -1,7 +1,28 @@
 import type { CollectionConfig, PayloadRequest } from 'payload'
+import type { LlamaParseMode } from '../llama-parse/types'
 
 export interface DocumentsPluginOverrides {
   collection?: (collection: CollectionConfig) => CollectionConfig
+}
+
+/**
+ * Shape of a document as exposed by the plugin's collection. Matches the
+ * upload-enabled fields Payload returns plus the parse_* fields the plugin
+ * adds. Hosts get autocompletion when receiving this in callbacks.
+ */
+export interface DocumentRecord {
+  id: string | number
+  filename?: string | null
+  url?: string | null
+  mimeType?: string | null
+  language?: string | null
+  parsing_instruction?: string | null
+  mode?: LlamaParseMode | null
+  parse_status?: 'idle' | 'pending' | 'processing' | 'done' | 'error' | null
+  parse_job_id?: string | null
+  parse_error?: string | null
+  parsed_at?: string | null
+  parsed_text?: string | null
 }
 
 /**
@@ -15,7 +36,7 @@ export interface DocumentsPluginOverrides {
  * `parse-file` endpoint isn't registered and the worker has no way to fetch
  * binaries through the plugin.
  */
-export type ResolveFileBinary = (args: { doc: Record<string, unknown>; req: PayloadRequest }) => Promise<{
+export type ResolveFileBinary = (args: { doc: DocumentRecord; req: PayloadRequest }) => Promise<{
   body: BodyInit
   contentType?: string
   contentLength?: number

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import HttpUrl, SecretStr
+from pydantic import HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379"
 
     payload_url: HttpUrl = HttpUrl("http://app:3000")
-    payload_service_token: SecretStr = SecretStr("")
     documents_collection_slug: str = "documents"
 
     llama_cloud_api_key: SecretStr = SecretStr("")
@@ -34,10 +33,10 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    def model_post_init(self, _ctx: object) -> None:
-        if not self.payload_service_token.get_secret_value():
-            raise ValueError("PAYLOAD_SERVICE_TOKEN environment variable is required")
-        if not self.llama_cloud_api_key.get_secret_value():
-            raise ValueError("LLAMA_CLOUD_API_KEY environment variable is required")
-        if not self.internal_secret.get_secret_value():
-            raise ValueError("INTERNAL_SECRET environment variable is required")
+    @field_validator("llama_cloud_api_key", "internal_secret")
+    @classmethod
+    def _require_secret(cls, value: SecretStr, info: object) -> SecretStr:
+        if not value.get_secret_value():
+            field_name = getattr(info, "field_name", "secret")
+            raise ValueError(f"{field_name.upper()} environment variable is required")
+        return value

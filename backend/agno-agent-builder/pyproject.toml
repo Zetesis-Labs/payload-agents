@@ -1,6 +1,6 @@
 [project]
 name = "agno-agent-builder"
-version = "0.1.2"
+version = "0.2.0"
 description = "Parametrizable Agno-based agent runtime — FastAPI factory with pluggable agent sources, multi-tenant headers, and LISTEN/NOTIFY hot reload."
 requires-python = ">=3.12"
 readme = "README.md"
@@ -18,7 +18,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "agno[anthropic,mcp,openai,os,postgres]>=2.6.0",
+    "agno[anthropic,mcp,openai,os,postgres,telegram]>=2.6.0",
+    "cryptography>=42.0",
     "fastapi>=0.115",
     "httpx>=0.28",
     "psycopg[binary]>=3.2",

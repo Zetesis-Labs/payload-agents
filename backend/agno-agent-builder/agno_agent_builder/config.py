@@ -13,7 +13,19 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from agno_agent_builder.sources.base import AgentSource
 
-DEFAULT_PUBLIC_PATHS: tuple[str, ...] = ("/health", "/ready", "/docs", "/openapi.json")
+DEFAULT_PUBLIC_PATHS: tuple[str, ...] = (
+    "/health",
+    "/ready",
+    "/docs",
+    "/openapi.json",
+    # Trailing slash = prefix match. Each channel's interface validates its
+    # own request signature (X-Telegram-Bot-Api-Secret-Token, X-Hub-Signature
+    # for Meta/WhatsApp, Ed25519 for Discord), so the global X-Internal-Secret
+    # is not required on incoming channel webhooks.
+    "/telegram/",
+    "/whatsapp/",
+    "/discord/",
+)
 DEFAULT_RELOAD_CHANNEL = "agent_reload"
 DEFAULT_RESYNC_INTERVAL_S = 300.0
 DEFAULT_BOOT_MAX_RETRIES = 10
@@ -31,6 +43,9 @@ class RuntimeConfig(BaseModel):
     mcp_url: str
     database_url: str
     internal_secret: SecretStr
+    payload_url: str | None = (
+        None  # Required for channel loaders (telegram/whatsapp/discord); optional for CMS-agnostic deployments
+    )
     database_schema: str = "agno"
     log_level: str = "INFO"
     reload_channel: str = DEFAULT_RELOAD_CHANNEL

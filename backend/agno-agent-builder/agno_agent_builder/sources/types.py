@@ -23,3 +23,4 @@ class AgentConfig(BaseModel):
     taxonomy_slugs: list[str] = []
     search_collections: list[str] = []
     tool_call_limit: int | None = None
+    allow_guest_access: bool = False

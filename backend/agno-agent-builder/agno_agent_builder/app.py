@@ -15,6 +15,13 @@ from agno.agent.remote import RemoteAgent
 from agno.os import AgentOS
 from fastapi import APIRouter, Depends, FastAPI, Header
 
+from agno_agent_builder.channels import (
+    ChannelBinding,
+    ChannelLoader,
+    DiscordChannelLoader,
+    TelegramChannelLoader,
+    WhatsAppChannelLoader,
+)
 from agno_agent_builder.config import RuntimeConfig
 from agno_agent_builder.db import EngineHolder
 from agno_agent_builder.dependencies import get_registry
@@ -24,6 +31,7 @@ from agno_agent_builder.exceptions import (
     agno_agent_builder_exception_handler,
 )
 from agno_agent_builder.health import router as health_router
+from agno_agent_builder.identity_bind_middleware import IdentityBindMiddleware, IdentityBindState
 from agno_agent_builder.logging import configure_logging, get_logger
 from agno_agent_builder.middleware import (
     InternalAuthMiddleware,
@@ -47,6 +55,12 @@ def create_app(config: RuntimeConfig) -> FastAPI:
     logger = get_logger(config.app_name)
 
     secret = config.internal_secret.get_secret_value()
+    bind_state = IdentityBindState()
+    channel_loaders: list[ChannelLoader] = [
+        TelegramChannelLoader(),
+        WhatsAppChannelLoader(),
+        DiscordChannelLoader(),
+    ]
     registry = AgentRegistry(
         source=config.agent_source,
         database_url=config.database_url,
@@ -103,6 +117,37 @@ def create_app(config: RuntimeConfig) -> FastAPI:
                         exc_info=True,
                     )
 
+        # Channel installations: fetch each channel's installations from the
+        # host CMS and mount one inbound interface per row. The bind
+        # interceptor middleware is registered up-front; we populate its
+        # state here so it knows which webhook paths + reply callbacks are
+        # live. Skipped when payload_url isn't configured (CMS-agnostic
+        # deployments don't use these channels).
+        if config.payload_url:
+            all_bindings: list[ChannelBinding] = []
+            for loader in channel_loaders:
+                try:
+                    installations = await loader.fetch(
+                        payload_url=config.payload_url, internal_secret=secret
+                    )
+                    if not installations:
+                        continue
+                    bindings = await loader.mount(app, registry, installations)
+                    all_bindings.extend(bindings)
+                    logger.info(
+                        "Channel mounted",
+                        channel=loader.channel,
+                        installations=len(installations),
+                        bindings=len(bindings),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Channel bootstrap failed — continuing without it",
+                        channel=loader.channel,
+                    )
+            if all_bindings:
+                bind_state.update(all_bindings)
+
         listener_task = asyncio.create_task(
             run_reload_listener(
                 reload_registry,
@@ -138,6 +183,19 @@ def create_app(config: RuntimeConfig) -> FastAPI:
     app.add_middleware(SessionMetadataMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(InternalAuthMiddleware, secret=secret, public_paths=config.public_paths)
+    # Bind interceptor is the OUTERMOST middleware (added last → runs first
+    # in the chain) so it can short-circuit `/start <token>` (Telegram),
+    # `connect <token>` (WhatsApp), and `/connect <token>` (Discord) before
+    # the channel-specific routers see them. Each channel's extractor
+    # validates its own request signature inline — see channels.discord.loader
+    # for the Ed25519 path; Telegram/WhatsApp signatures are still validated
+    # by agno's own interface for non-bind passthrough requests.
+    app.add_middleware(
+        IdentityBindMiddleware,
+        payload_url=config.payload_url or "",
+        internal_secret=secret,
+        state=bind_state,
+    )
     app.add_exception_handler(AgentRuntimeError, agno_agent_builder_exception_handler)
     app.include_router(health_router)
 

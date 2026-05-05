@@ -1,5 +1,5 @@
 import type { Endpoint, PayloadRequest } from 'payload'
-import { type EndpointConfig, getRouteId, type WorkerEndpointConfig } from './shared'
+import { type EndpointConfig, fetchInternalDocument, getRouteId, requireInternalSecret } from './shared'
 
 /**
  * Internal binary endpoint: streams the upload attached to a document back to
@@ -11,14 +11,6 @@ import { type EndpointConfig, getRouteId, type WorkerEndpointConfig } from './sh
  * `X-Internal-Secret`, document loaded with `overrideAccess: true`, only
  * registered when worker mode is enabled AND the host wired a resolver.
  */
-
-const requireInternalSecret = (req: PayloadRequest, worker: WorkerEndpointConfig): Response | null => {
-  const headerSecret = req.headers?.get?.('x-internal-secret')
-  if (!headerSecret || headerSecret !== worker.internalSecret) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  return null
-}
 
 export const createParseFileEndpoint = (config: EndpointConfig): Endpoint => ({
   path: '/:id/parse-file',
@@ -36,22 +28,11 @@ export const createParseFileEndpoint = (config: EndpointConfig): Endpoint => ({
     if (idOrError instanceof Response) return idOrError
     const id = idOrError
 
-    let doc: Record<string, unknown>
-    try {
-      doc = (await req.payload.findByID({
-        collection: config.collectionSlug,
-        id,
-        depth: 0,
-        overrideAccess: true,
-        req
-      })) as Record<string, unknown>
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Document not found'
-      return Response.json({ error: message }, { status: 404 })
-    }
+    const docOrError = await fetchInternalDocument(req, config.collectionSlug, id)
+    if (docOrError instanceof Response) return docOrError
 
     try {
-      const file = await worker.resolveFileBinary({ doc, req })
+      const file = await worker.resolveFileBinary({ doc: docOrError, req })
       const headers: Record<string, string> = {
         'Content-Type': file.contentType ?? 'application/octet-stream'
       }

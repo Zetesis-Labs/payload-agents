@@ -1,5 +1,6 @@
 import type { Endpoint, PayloadRequest } from 'payload'
-import { type DocumentRecord, type EndpointConfig, getRouteId, type WorkerEndpointConfig } from './shared'
+import type { DocumentRecord } from '../plugin/types'
+import { type EndpointConfig, fetchInternalDocument, getRouteId, requireInternalSecret } from './shared'
 
 /**
  * Internal read endpoint paired with `parse-result-endpoint`. Returns only the
@@ -8,9 +9,7 @@ import { type DocumentRecord, type EndpointConfig, getRouteId, type WorkerEndpoi
  *
  * Same trust model as the write endpoint: gated by `X-Internal-Secret`, scoped
  * to a hard-coded projection of fields, calls Payload's local API with
- * `overrideAccess: true`. Lets host apps keep the documents collection's read
- * access locked down (multi-tenant filters, role gates, etc.) without poking
- * a service-account bypass into the access function.
+ * `overrideAccess: true`.
  *
  * Only registered when worker mode is enabled.
  */
@@ -25,21 +24,14 @@ const PROJECTION = [
   'mode'
 ] as const satisfies ReadonlyArray<keyof DocumentRecord>
 
-type ContextField = (typeof PROJECTION)[number]
-type ParseContext = Pick<DocumentRecord, ContextField>
+type ParseContext = Pick<DocumentRecord, (typeof PROJECTION)[number]>
 
-const requireInternalSecret = (req: PayloadRequest, worker: WorkerEndpointConfig): Response | null => {
-  const headerSecret = req.headers?.get?.('x-internal-secret')
-  if (!headerSecret || headerSecret !== worker.internalSecret) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  return null
-}
-
-const projectContext = (doc: Record<string, unknown>): ParseContext => {
-  const out = {} as Record<string, unknown>
+const projectContext = (doc: DocumentRecord): ParseContext => {
+  const out: Partial<ParseContext> = {}
   for (const key of PROJECTION) {
-    if (key in doc) out[key] = doc[key]
+    if (key in doc) {
+      ;(out as Record<string, unknown>)[key] = doc[key]
+    }
   }
   return out as ParseContext
 }
@@ -59,18 +51,9 @@ export const createParseContextEndpoint = (config: EndpointConfig): Endpoint => 
     if (idOrError instanceof Response) return idOrError
     const id = idOrError
 
-    try {
-      const doc = await req.payload.findByID({
-        collection: config.collectionSlug,
-        id,
-        depth: 0,
-        overrideAccess: true,
-        req
-      })
-      return Response.json(projectContext(doc as Record<string, unknown>))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Document not found'
-      return Response.json({ error: message }, { status: 404 })
-    }
+    const docOrError = await fetchInternalDocument(req, config.collectionSlug, id)
+    if (docOrError instanceof Response) return docOrError
+
+    return Response.json(projectContext(docOrError))
   }
 })

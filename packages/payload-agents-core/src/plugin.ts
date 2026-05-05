@@ -6,6 +6,7 @@
 
 import type { Config, Plugin } from 'payload'
 import { createAgentsCollection } from './collections/agents'
+import { createAgentsInternalListHandler } from './endpoints/agents-internal-list'
 import { createAgentsListHandler } from './endpoints/agents-list'
 import { createChatHandler } from './endpoints/chat'
 import { createSessionDeleteHandler, createSessionGetHandler, createSessionPatchHandler } from './endpoints/session'
@@ -58,8 +59,18 @@ export function agentPlugin(userConfig: AgentPluginConfig): Plugin {
     assertCollectionExists(incomingConfig, config.mediaCollectionSlug, 'mediaCollectionSlug')
     assertCollectionExists(incomingConfig, config.taxonomyCollectionSlug, 'taxonomyCollectionSlug')
 
-    // Create the agents collection
+    // Create the agents collection + register the internal-list endpoint on
+    // it (X-Internal-Secret + overrideAccess; replaces the old runtime-secret
+    // bypass that lived in the host's collection access functions).
     const agentsCollection = createAgentsCollection(config)
+    agentsCollection.endpoints = [
+      ...(agentsCollection.endpoints ?? []),
+      {
+        path: '/internal/list',
+        method: 'get' as const,
+        handler: createAgentsInternalListHandler(config)
+      }
+    ]
 
     // Register endpoints on the collection
     const endpoints = [

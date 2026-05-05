@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     )
 
     payload_url: str = "http://app:3000"
-    payload_service_token: str = ""
 
     mcp_url: str = "http://app:3030/mcp"
 
