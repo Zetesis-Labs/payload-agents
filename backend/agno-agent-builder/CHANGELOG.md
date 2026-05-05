@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.2...agno-agent-builder-v0.1.3) (2026-05-05)
+
+
+### Features
+
+* **agno-agent-builder:** channel-agnostic loader + WhatsApp + Discord ([#57](https://github.com/Zetesis-Labs/PayloadAgents/issues/57)) ([25766b5](https://github.com/Zetesis-Labs/PayloadAgents/commit/25766b57ed5912d97e3141e8f6d87b2a78c57445))
+
 ## [0.1.2](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.1...agno-agent-builder-v0.1.2) (2026-04-30)
 
 
