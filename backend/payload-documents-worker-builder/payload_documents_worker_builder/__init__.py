@@ -36,4 +36,4 @@ __all__ = [
     "register_parse_document_task",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
