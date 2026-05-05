@@ -1,5 +1,104 @@
 # @zetesis/payload-documents
 
+## 0.4.0
+
+### Minor Changes
+
+- [#52](https://github.com/Zetesis-Labs/PayloadAgents/pull/52) [`af819b1`](https://github.com/Zetesis-Labs/PayloadAgents/commit/af819b1c48ab1a5d0c422fbba2614d623993f01b) Thanks [@Fiser12](https://github.com/Fiser12)! - Add internal read + binary + write endpoints for the documents worker.
+
+  In worker mode the plugin now exposes three dedicated endpoints the worker
+  calls instead of going through the standard REST API for the document:
+
+  - `GET /:id/parse-context` — returns a hardcoded projection of the fields
+    the worker needs to drive the parse: `id, url, filename, mimeType,
+language, parsing_instruction, mode`.
+  - `GET /:id/parse-file` — streams the upload binary back to the worker.
+    Storage knowledge stays in the host: the plugin defers the actual fetch
+    to a `worker.resolveFileBinary` callback supplied at plugin construction
+    (S3/R2 hosts wire it to `s3.send(new GetObjectCommand(...))`; local-fs
+    hosts read from disk; etc.). Endpoint is only registered when the
+    resolver is provided.
+  - `POST /:id/parse-result` — accepts a hardcoded whitelist of writeable
+    fields: `parsed_text, parse_status, parse_error, parse_job_id,
+parsed_at`.
+
+  All three are only registered when `worker: { url, internalSecret }` is
+  configured (parse-file additionally needs `resolveFileBinary`), all three
+  authenticate with `X-Internal-Secret` (matched against the same
+  `worker.internalSecret` the kicker validates), and all three call Payload's
+  local API with `overrideAccess: true`.
+
+  This lets host apps keep the documents collection's read + update access
+  honestly locked down (multi-tenant filters, admin-only writes, etc.) AND
+  keep upload URLs gated by Payload — no service-account bypass needs to be
+  poked into collection access, no public/signed file URLs need to be
+  exposed to bypass it. Trust between the two services lives in three small,
+  auditable handlers instead of being scattered across collection access
+  controls.
+
+  Pairs with `payload-documents-worker-builder`'s new `fetch_parse_context()`,
+  `fetch_parse_file()`, and `submit_parse_result()` client methods. Hosts
+  on worker mode that want the secure binary path bump the package and the
+  worker library together AND wire `worker.resolveFileBinary` in their
+  plugin config; hosts that opt to leave it unset keep the previous behavior
+  (worker fetches `doc.url` directly with its API token, which only works
+  when the host's storage adapter exposes the upload via a URL the worker
+  can reach without Payload-side access control).
+
+### Patch Changes
+
+- [#57](https://github.com/Zetesis-Labs/PayloadAgents/pull/57) [`25766b5`](https://github.com/Zetesis-Labs/PayloadAgents/commit/25766b57ed5912d97e3141e8f6d87b2a78c57445) Thanks [@Fiser12](https://github.com/Fiser12)! - Cleanup pass on the documents-worker code paths introduced in 0.4.0.
+
+  Plugin (TypeScript):
+
+  - Extracts the `requireInternalSecret` helper to `endpoints/shared.ts` so the
+    three internal endpoints (`parse-context`, `parse-result`, `parse-file`)
+    share one definition instead of three verbatim copies.
+  - Adds `fetchInternalDocument` for the `findByID` + `overrideAccess: true` +
+    try/catch pattern the read endpoints all repeat; consolidated into one
+    `loadDocument` underneath `fetchDocument` and `fetchInternalDocument`.
+  - Moves `fetchUploadedFile` and `getLlamaParseClient` out of `shared.ts` into
+    a new `endpoints/inline-helpers.ts` — they're only used by the inline
+    parse + parse-status paths, not by the worker endpoints.
+  - `DocumentRecord` moves to `plugin/types.ts` so `ResolveFileBinary.doc` can
+    use it instead of `Record<string, unknown>` (host callbacks now get
+    autocompletion). Drops the duplicate internal `WorkerEndpointConfig` in
+    favour of the public `DocumentsWorkerConfig`.
+  - `parse-endpoint.ts` no longer ships the now-invalid `'default'` mode
+    fallback to LlamaParse; passes `undefined` (the API picks its own default).
+  - Drops a dead JSDoc-density block on the loopback URL rewrite by extracting
+    it to a private helper in `inline-helpers.ts`.
+
+  No behavioural changes for the public surface (`createDocumentsPlugin`,
+  `buildDocumentsCollection`, the published types).
+
+- [#52](https://github.com/Zetesis-Labs/PayloadAgents/pull/52) [`f93eb5f`](https://github.com/Zetesis-Labs/PayloadAgents/commit/f93eb5fb581e7e5db91a48f20154c09a8d5388a6) Thanks [@Fiser12](https://github.com/Fiser12)! - Update the documents collection's `mode` field to LlamaParse's current
+  `parse_mode` enum.
+
+  LlamaParse renamed the `fast` / `default` / `premium` enum to:
+
+  - `parse_page_without_llm` (no LLM, OCR only — replaces `fast`)
+  - `parse_page_with_llm` (balanced — replaces `default`, new default value)
+  - `parse_page_with_lvm` (vision — replaces `premium`)
+  - `parse_page_with_agent` / `parse_page_with_layout_agent` (per-page agentic)
+  - `parse_document_with_llm` / `parse_document_with_lvm` / `parse_document_with_agent`
+    (whole-document context)
+
+  The plugin's collection schema, `LlamaParseMode` type, and the inline LlamaParse
+  client (`parse_mode` form field instead of the old `fast_mode` / `premium_mode`
+  booleans) all switch to the new enum together.
+
+  Hosts on Postgres need a one-shot data migration to rewrite existing rows
+  with the legacy values onto the new enum before the column type can be
+  swapped. ZetesisPortal ships such a migration alongside the bump
+  (`20260504_*_rename_documents_mode_llamaparse.ts`); other hosts should
+  mirror that mapping (`fast → parse_page_without_llm`, `default →
+parse_page_with_llm`, `premium → parse_page_with_lvm`).
+
+- [#57](https://github.com/Zetesis-Labs/PayloadAgents/pull/57) [`25766b5`](https://github.com/Zetesis-Labs/PayloadAgents/commit/25766b57ed5912d97e3141e8f6d87b2a78c57445) Thanks [@Fiser12](https://github.com/Fiser12)! - Re-export the `ResolveFileBinary` type from the package root and from
+  `./plugin`. It was declared in `src/plugin/types.ts` but never re-exported,
+  so consumers couldn't type their `resolveFileBinary` callback against it.
+
 ## 0.3.0
 
 ### Minor Changes
