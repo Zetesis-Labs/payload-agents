@@ -41,10 +41,11 @@ class BindExtraction:
     token: str
     external_id: str
     external_username: str | None = None
-    """Channel-native chat id (Telegram chat_id, Discord channel_id, WhatsApp
-    sender phone) used by the reply path. Optional because not every channel
-    needs it (Telegram does, WhatsApp uses the phone twice)."""
     reply_target: str | int | None = None
+    """Channel-native chat id (Telegram chat_id, Discord interaction_token,
+    WhatsApp sender phone) used by the reply path. Optional because not
+    every channel needs a separate target — when None the middleware falls
+    back to `external_id`."""
 
 
 ReplyCallback = Callable[[str | int, str], Awaitable[None]]

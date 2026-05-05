@@ -5,6 +5,8 @@ bind config so the `IdentityBindMiddleware` can intercept `/start <token>`.
 
 from __future__ import annotations
 
+import hmac
+import os
 from typing import Any
 
 import httpx
@@ -113,7 +115,28 @@ def _parse(doc: dict[str, Any]) -> ChannelInstallation:
     )
 
 
-def _extract_telegram_token(_body: bytes, _headers: Any, update: dict[str, Any]) -> BindExtraction | None:
+def _verify_telegram_secret(headers: Any) -> bool:
+    """Validate Telegram's `X-Telegram-Bot-Api-Secret-Token` against the
+    global `TELEGRAM_WEBHOOK_SECRET_TOKEN` env var. agno's Telegram
+    interface does this on the passthrough path but the bind middleware
+    short-circuits before agno runs, so the same check has to live here
+    or a leaked binding token + the public webhook URL could be exploited.
+    Dev mode (APP_ENV=development) bypasses, mirroring agno's behaviour.
+    """
+    if os.getenv("APP_ENV", "").lower() == "development":
+        return True
+    expected = os.getenv("TELEGRAM_WEBHOOK_SECRET_TOKEN")
+    if not expected:
+        return False
+    received = headers.get("x-telegram-bot-api-secret-token") if hasattr(headers, "get") else None
+    if not isinstance(received, str):
+        return False
+    return hmac.compare_digest(received, expected)
+
+
+def _extract_telegram_token(_body: bytes, headers: Any, update: dict[str, Any]) -> BindExtraction | None:
+    if not _verify_telegram_secret(headers):
+        return None
     message = update.get("message") or {}
     text = message.get("text")
     if not isinstance(text, str):

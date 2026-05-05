@@ -12,6 +12,9 @@ text payload and short-circuits.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
 from typing import Any
 
 import httpx
@@ -84,7 +87,7 @@ class WhatsAppChannelLoader:
                 ChannelBinding(
                     channel=CHANNEL,
                     installation_id=install.id,
-                    webhook_path=prefix,
+                    webhook_path=f"{prefix}/webhook",
                     extract_token=_extract_whatsapp_token,
                     reply=_make_whatsapp_replier(phone_id=phone_id, access_token=access_token),
                 )
@@ -130,12 +133,40 @@ def _parse(doc: dict[str, Any]) -> ChannelInstallation:
     )
 
 
-def _extract_whatsapp_token(_body: bytes, _headers: Any, update: dict[str, Any]) -> BindExtraction | None:
-    """Walk Meta's webhook payload looking for the first text message that
-    starts with `connect <token>`. Inbound webhook shape (simplified):
+def _verify_whatsapp_signature(body: bytes, header: str | None) -> bool:
+    """Validate Meta's `X-Hub-Signature-256` against `WHATSAPP_APP_SECRET`.
 
+    Mirrors agno's own check (which only runs on the passthrough router, not
+    on the bind middleware short-circuit). Without this, an attacker who
+    knows the public webhook URL and a leaked `connect <token>` value could
+    forge a `from` phone and bind any token to an arbitrary phone.
+
+    The `WHATSAPP_SKIP_SIGNATURE_VALIDATION=true` escape hatch matches
+    agno's local-dev behaviour.
+    """
+    if os.getenv("WHATSAPP_SKIP_SIGNATURE_VALIDATION", "").lower() == "true":
+        return True
+    secret = os.getenv("WHATSAPP_APP_SECRET")
+    if not secret:
+        return False
+    if not header or not header.startswith("sha256="):
+        return False
+    expected = header.removeprefix("sha256=")
+    digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(digest, expected)
+
+
+def _extract_whatsapp_token(body: bytes, headers: Any, update: dict[str, Any]) -> BindExtraction | None:
+    """Walk Meta's webhook payload looking for the first text message that
+    starts with `connect <token>`. Verifies the request signature first so
+    a forged POST cannot bind arbitrary phones to leaked tokens.
+
+    Inbound webhook shape (simplified):
       {entry: [{changes: [{value: {messages: [{from, text: {body}}]}}]}]}
     """
+    sig_header = headers.get("x-hub-signature-256") if hasattr(headers, "get") else None
+    if not _verify_whatsapp_signature(body, sig_header):
+        return None
     entries = update.get("entry") or []
     for entry in entries:
         changes = entry.get("changes") or []

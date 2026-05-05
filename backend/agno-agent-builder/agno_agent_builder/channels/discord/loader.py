@@ -75,7 +75,13 @@ class DiscordChannelLoader:
                     webhook_path=f"{prefix}/interactions",
                     extract_token=_make_discord_extractor(public_key=public_key),
                     reply=_make_discord_replier(application_id=application_id),
-                    immediate_ack_body=b'{"type":5}',
+                    # Deferred channel-message-with-source + ephemeral flag
+                    # so the ack itself (and the follow-up bind reply) are
+                    # only visible to the invoking user. Without flags=64
+                    # the bind reply ("Connected to user@example.com")
+                    # leaks the bound email into the public channel where
+                    # `/connect <token>` was invoked.
+                    immediate_ack_body=b'{"type":5,"data":{"flags":64}}',
                 )
             )
             logger.info(

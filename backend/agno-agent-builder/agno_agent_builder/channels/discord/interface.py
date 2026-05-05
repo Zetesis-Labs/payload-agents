@@ -29,6 +29,7 @@ Operator step (one-time per bot):
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -38,6 +39,12 @@ from agno.agent import Agent
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from agno_agent_builder.channels.discord.verification import verify_discord_signature
+
+# Discord interaction tokens are valid for 15 minutes. Cap arun() below that
+# so a slow agent run results in a clean error follow-up instead of the
+# silent "Bot is thinking..." that lingers when the token has expired and
+# the PATCH @original 404s.
+DISCORD_AGENT_RUN_TIMEOUT_S = 14 * 60
 
 logger = structlog.get_logger("agno_agent_builder.channels.discord.interface")
 
@@ -131,8 +138,13 @@ class DiscordInterface:
             logger.error("Discord interaction missing token; cannot follow up")
             return
         try:
-            response = await self._agent.arun(message)
+            response = await asyncio.wait_for(
+                self._agent.arun(message), timeout=DISCORD_AGENT_RUN_TIMEOUT_S
+            )
             content = _stringify_agent_response(response)
+        except TimeoutError:
+            logger.warning("Discord agent run exceeded 14m, follow-up will likely 404")
+            content = "Took too long to respond — please try again."
         except Exception:
             logger.exception("Discord agent invocation failed")
             content = "Sorry, something went wrong while processing your message."
