@@ -13,6 +13,13 @@
       "changelog-path": "CHANGELOG.md",
       "release-type": "python",
       "extra-files": []
+    },
+    "backend/payload-documents-worker-builder": {
+      "package-name": "payload-documents-worker-builder",
+      "component": "payload-documents-worker-builder",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "python",
+      "extra-files": []
     }
   }
 }

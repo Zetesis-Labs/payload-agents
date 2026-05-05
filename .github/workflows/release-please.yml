@@ -15,6 +15,8 @@ jobs:
     outputs:
       agno_agent_builder_released: ${{ steps.release.outputs['backend/agno-agent-builder--release_created'] }}
       agno_agent_builder_tag: ${{ steps.release.outputs['backend/agno-agent-builder--tag_name'] }}
+      payload_documents_worker_builder_released: ${{ steps.release.outputs['backend/payload-documents-worker-builder--release_created'] }}
+      payload_documents_worker_builder_tag: ${{ steps.release.outputs['backend/payload-documents-worker-builder--tag_name'] }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
@@ -33,3 +35,14 @@ jobs:
     with:
       package: agno-agent-builder
       ref: ${{ needs.release-please.outputs.agno_agent_builder_tag }}
+
+  publish-payload-documents-worker-builder:
+    needs: release-please
+    if: needs.release-please.outputs.payload_documents_worker_builder_released == 'true'
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/publish-python.yml
+    with:
+      package: payload-documents-worker-builder
+      ref: ${{ needs.release-please.outputs.payload_documents_worker_builder_tag }}
