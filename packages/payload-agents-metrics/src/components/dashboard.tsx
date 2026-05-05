@@ -3,7 +3,7 @@
 import { type Message, Thread, useAssistantRuntime } from '@zetesis/chat-agent'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ComponentType } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -17,6 +17,7 @@ import {
   YAxis
 } from 'recharts'
 import { z } from 'zod'
+import type { ApiKeySource } from '../lib/build-where'
 import { cn } from '../lib/cn'
 
 /* ── Schemas + types ─────────────────────────────────────────────────── */
@@ -181,8 +182,6 @@ const tooltipStyle: React.CSSProperties = {
   color: 'var(--card-foreground)'
 }
 
-const inputCls = 'h-9 rounded-md border border-input bg-background px-3 text-sm'
-
 /** Convert the start of a `YYYY-MM-DD` day to UTC ISO. */
 function dayStartIso(day: string): string {
   return new Date(`${day}T00:00:00Z`).toISOString()
@@ -196,7 +195,13 @@ function dayEndExclusiveIso(day: string): string {
 }
 
 const ALL_GROUPS_MT: GroupBy[] = ['tenant', 'agent', 'user', 'model', 'apiKeySource', 'apiKeyFingerprint', 'day']
-const ALL_GROUPS_ST: GroupBy[] = ['agent', 'user', 'model', 'apiKeySource', 'apiKeyFingerprint', 'day']
+const ALL_GROUPS_ST: GroupBy[] = ALL_GROUPS_MT.filter(g => g !== 'tenant')
+
+type ApiKeySourceFilter = ApiKeySource | ''
+
+function isApiKeySourceFilter(v: string): v is ApiKeySourceFilter {
+  return v === '' || v === 'agent' || v === 'user'
+}
 const GROUP_LABELS: Record<GroupBy, string> = {
   tenant: 'Tenant',
   agent: 'Agent',
@@ -239,14 +244,14 @@ export function LlmUsageDashboard({
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 flex flex-wrap gap-4 mb-6">
         <FilterField label="From">
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className={inputCls} />
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
         </FilterField>
         <FilterField label="To">
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} className={inputCls} />
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} />
         </FilterField>
         {multiTenant && canPickTenant && (
           <FilterField label="Tenant">
-            <select value={tenantId} onChange={e => setTenantId(e.target.value)} className={inputCls}>
+            <select value={tenantId} onChange={e => setTenantId(e.target.value)}>
               <option value="">All</option>
               {availableTenants.map(t => (
                 <option key={String(t.id)} value={String(t.id)}>
@@ -256,33 +261,38 @@ export function LlmUsageDashboard({
             </select>
           </FilterField>
         )}
-        <FilterField label="Agent">
-          <input
-            type="text"
+        <div className="flex flex-1 gap-4 min-w-0">
+          <ComboboxFilter
+            label="Agent"
             value={agentSlug}
-            onChange={e => setAgentSlug(e.target.value)}
-            placeholder="slug"
-            className={cn(inputCls, 'w-24')}
+            onChange={setAgentSlug}
+            basePath={basePath}
+            field="agent"
+            tenantId={tenantId}
+            placeholder="Search agent…"
+            className="flex-1 min-w-0"
           />
-        </FilterField>
-        <FilterField label="Model">
-          <input
-            type="text"
+          <ComboboxFilter
+            label="Model"
             value={modelFilter}
-            onChange={e => setModelFilter(e.target.value)}
-            placeholder="o4-mini"
-            className={cn(inputCls, 'w-24')}
+            onChange={setModelFilter}
+            basePath={basePath}
+            field="model"
+            tenantId={tenantId}
+            placeholder="Search model…"
+            className="flex-1 min-w-0"
           />
-        </FilterField>
-        <FilterField label="User ID">
-          <input
-            type="text"
+          <ComboboxFilter
+            label="User"
             value={userIdFilter}
-            onChange={e => setUserIdFilter(e.target.value)}
-            placeholder="ID"
-            className={cn(inputCls, 'w-16')}
+            onChange={setUserIdFilter}
+            basePath={basePath}
+            field="user"
+            tenantId={tenantId}
+            placeholder="Search user…"
+            className="flex-1 min-w-0"
           />
-        </FilterField>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -698,7 +708,7 @@ function OverviewTab(props: {
   const allGroups = props.multiTenant ? ALL_GROUPS_MT : ALL_GROUPS_ST
   const defaultGroup: GroupBy = props.multiTenant ? 'tenant' : 'agent'
   const [groupBy, setGroupBy] = useState<GroupBy[]>([defaultGroup])
-  const [apiKeySource, setApiKeySource] = useState<'' | 'agent' | 'user'>('')
+  const [apiKeySource, setApiKeySource] = useState<ApiKeySourceFilter>('')
   const [bucketsPage, setBucketsPage] = useState(1)
   const [data, setData] = useState<AggregateResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -799,8 +809,9 @@ function OverviewTab(props: {
         ))}
         <select
           value={apiKeySource}
-          onChange={e => setApiKeySource(e.target.value as '' | 'agent' | 'user')}
-          className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+          onChange={e => {
+            if (isApiKeySourceFilter(e.target.value)) setApiKeySource(e.target.value)
+          }}
         >
           <option value="">API key: All</option>
           <option value="agent">Agent</option>
@@ -928,6 +939,157 @@ function OverviewTab(props: {
 }
 
 /* ── Shared ──────────────────────────────────────────────────────────── */
+
+function ComboboxFilter({
+  label,
+  value,
+  onChange,
+  basePath,
+  field,
+  tenantId,
+  placeholder,
+  className
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  basePath: string
+  field: 'agent' | 'model' | 'user'
+  tenantId?: string
+  placeholder?: string
+  className?: string
+}) {
+  const [query, setQuery] = useState(value)
+  const [options, setOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [hasMore, setHasMore] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const skipNextDebounceRef = useRef(false)
+
+  useEffect(() => {
+    if (!value) setQuery('')
+  }, [value])
+
+  useEffect(() => {
+    return () => abortRef.current?.abort()
+  }, [])
+
+  const fetchOptions = useCallback(
+    (q: string) => {
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+      setLoading(true)
+      const params = new URLSearchParams({ field, q })
+      if (tenantId) params.set('tenantId', tenantId)
+      fetch(`/api${basePath}/filter-options?${params.toString()}`, {
+        credentials: 'include',
+        signal: controller.signal
+      })
+        .then(r => r.json())
+        .then((data: { options?: Array<{ label: string; value: string }>; hasMore?: boolean }) => {
+          if (controller.signal.aborted) return
+          setOptions(data.options ?? [])
+          setHasMore(data.hasMore ?? false)
+          setOpen(true)
+        })
+        .catch(err => {
+          if (err?.name === 'AbortError') return
+          setOptions([])
+        })
+        .finally(() => {
+          if (controller.signal.aborted) return
+          setLoading(false)
+        })
+    },
+    [field, basePath, tenantId]
+  )
+
+  useEffect(() => {
+    if (skipNextDebounceRef.current) {
+      skipNextDebounceRef.current = false
+      return
+    }
+    if (query.length < 1) return
+    const timeout = setTimeout(() => fetchOptions(query), 250)
+    return () => clearTimeout(timeout)
+  }, [query, fetchOptions])
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (!containerRef.current) return
+      if (!(e.target instanceof Node)) return
+      if (containerRef.current.contains(e.target)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  function select(opt: { label: string; value: string }) {
+    skipNextDebounceRef.current = true
+    onChange(opt.value)
+    setQuery(opt.label)
+    setOpen(false)
+  }
+
+  function clear() {
+    onChange('')
+    setQuery('')
+    setOptions([])
+    setOpen(false)
+  }
+
+  return (
+    <div className={cn('flex flex-col gap-1 text-xs', className)} ref={containerRef}>
+      <span className="text-muted-foreground">{label}</span>
+      <div className="relative w-full">
+        <div className="flex items-center w-full">
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onFocus={() => fetchOptions(query)}
+            placeholder={placeholder}
+            className="combobox-input min-w-0"
+          />
+          {(value || query) && (
+            <button
+              type="button"
+              onClick={clear}
+              className="absolute right-2 text-muted-foreground hover:text-foreground"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {open && (options.length > 0 || loading) && (
+          <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md text-xs">
+            {loading && <div className="px-3 py-2 text-muted-foreground">Loading…</div>}
+            {!loading &&
+              options.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className="w-full text-left px-3 py-2 hover:bg-muted transition-colors block"
+                  onClick={() => select(opt)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            {!loading && hasMore && (
+              <div className="border-t border-border px-3 py-2 text-muted-foreground italic">
+                Refine your search to see more results
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function KpiCard({ label, value }: { label: string; value: string }) {
   return (

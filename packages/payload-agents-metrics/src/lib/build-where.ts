@@ -1,5 +1,7 @@
 import { type SQL, sql } from 'drizzle-orm'
 
+export type ApiKeySource = 'agent' | 'user'
+
 export interface BaseFilters {
   from?: string
   to?: string
@@ -7,7 +9,7 @@ export interface BaseFilters {
   tenantId?: number | string
   agentSlug?: string
   userId?: number | string
-  apiKeySource?: 'agent' | 'user'
+  apiKeySource?: ApiKeySource
   model?: string
   apiKeyFingerprint?: string
 }

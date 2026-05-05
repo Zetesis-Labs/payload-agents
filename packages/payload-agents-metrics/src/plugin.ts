@@ -1,6 +1,7 @@
 import type { Config, Plugin } from 'payload'
 import { createLlmUsageEventsCollection } from './collections/llm-usage-events'
 import { createAggregateHandler } from './endpoints/aggregate'
+import { createFilterOptionsHandler } from './endpoints/filter-options'
 import { createIngestHandler } from './endpoints/ingest'
 import { createSessionDetailHandler } from './endpoints/session-detail'
 import { createSessionsHandler } from './endpoints/sessions'
@@ -61,7 +62,8 @@ export function metricsPlugin(userConfig: MetricsPluginConfig): MetricsPluginRes
       { path: `${basePath}/ingest`, method: 'post' as const, handler: createIngestHandler(config) },
       { path: `${basePath}/aggregate`, method: 'get' as const, handler: createAggregateHandler(config) },
       { path: `${basePath}/sessions`, method: 'get' as const, handler: createSessionsHandler(config) },
-      { path: `${basePath}/session`, method: 'get' as const, handler: createSessionDetailHandler(config) }
+      { path: `${basePath}/session`, method: 'get' as const, handler: createSessionDetailHandler(config) },
+      { path: `${basePath}/filter-options`, method: 'get' as const, handler: createFilterOptionsHandler(config) }
     ]
 
     return {
