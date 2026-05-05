@@ -69,7 +69,9 @@ class InternalAuthMiddleware:
             return
 
         path: str = scope.get("path", "")
-        if path in self._public_paths_exact or any(path.startswith(p) for p in self._public_path_prefixes):
+        if path in self._public_paths_exact or any(
+            path.startswith(p) for p in self._public_path_prefixes
+        ):
             await self.app(scope, receive, send)
             return
 

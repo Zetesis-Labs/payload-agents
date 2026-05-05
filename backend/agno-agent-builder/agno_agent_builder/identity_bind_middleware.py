@@ -109,7 +109,11 @@ class IdentityBindMiddleware:
             logger.exception("Identity bind call failed", channel=binding.channel)
             reply_text = "Something went wrong while linking your account. Please try again."
 
-        target = extraction.reply_target if extraction.reply_target is not None else extraction.external_id
+        target = (
+            extraction.reply_target
+            if extraction.reply_target is not None
+            else extraction.external_id
+        )
         try:
             await binding.reply(target, reply_text)
         except Exception:
@@ -179,7 +183,9 @@ def _headers_dict(scope: dict[str, Any]) -> dict[str, str]:
     return out
 
 
-async def _respond(send: Callable[[dict[str, Any]], Awaitable[None]], *, status: int, body: bytes) -> None:
+async def _respond(
+    send: Callable[[dict[str, Any]], Awaitable[None]], *, status: int, body: bytes
+) -> None:
     await send(
         {
             "type": "http.response.start",

@@ -60,14 +60,18 @@ class WhatsAppChannelLoader:
         try:
             from agno.os.interfaces.whatsapp import Whatsapp
         except ImportError:
-            logger.warning("agno's WhatsApp interface not available; WhatsApp bots will not be loaded")
+            logger.warning(
+                "agno's WhatsApp interface not available; WhatsApp bots will not be loaded"
+            )
             return []
 
         bindings: list[ChannelBinding] = []
         for install in installations:
             agent = registry.get(install.agent_slug)
             if agent is None:
-                logger.warning("WhatsApp installation references missing agent", agent=install.agent_slug)
+                logger.warning(
+                    "WhatsApp installation references missing agent", agent=install.agent_slug
+                )
                 continue
             phone_id = install.extras["phone_number_id"]
             access_token = install.extras["access_token"]
@@ -156,7 +160,9 @@ def _verify_whatsapp_signature(body: bytes, header: str | None) -> bool:
     return hmac.compare_digest(digest, expected)
 
 
-def _extract_whatsapp_token(body: bytes, headers: Any, update: dict[str, Any]) -> BindExtraction | None:
+def _extract_whatsapp_token(
+    body: bytes, headers: Any, update: dict[str, Any]
+) -> BindExtraction | None:
     """Walk Meta's webhook payload looking for the first text message that
     starts with `connect <token>`. Verifies the request signature first so
     a forged POST cannot bind arbitrary phones to leaked tokens.

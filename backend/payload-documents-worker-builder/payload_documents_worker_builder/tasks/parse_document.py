@@ -83,9 +83,7 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
             raise
 
 
-async def _mark_processing(
-    payload: PayloadClient, config: RuntimeConfig, document_id: str
-) -> None:
+async def _mark_processing(payload: PayloadClient, config: RuntimeConfig, document_id: str) -> None:
     await payload.submit_parse_result(
         config.documents_collection_slug,
         document_id,

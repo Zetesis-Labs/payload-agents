@@ -43,7 +43,9 @@ class RuntimeConfig(BaseModel):
     mcp_url: str
     database_url: str
     internal_secret: SecretStr
-    payload_url: str | None = None  # Required for channel loaders (telegram/whatsapp/discord); optional for CMS-agnostic deployments
+    payload_url: str | None = (
+        None  # Required for channel loaders (telegram/whatsapp/discord); optional for CMS-agnostic deployments
+    )
     database_schema: str = "agno"
     log_level: str = "INFO"
     reload_channel: str = DEFAULT_RELOAD_CHANNEL

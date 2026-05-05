@@ -73,7 +73,9 @@ class DiscordInterface:
         router = APIRouter(prefix=self._prefix, tags=["Discord"])
 
         @router.post("/interactions", operation_id=f"discord_interactions_{self._application_id}")
-        async def interactions(request: Request, background_tasks: BackgroundTasks) -> dict[str, Any]:
+        async def interactions(
+            request: Request, background_tasks: BackgroundTasks
+        ) -> dict[str, Any]:
             body = await request.body()
             sig = request.headers.get("X-Signature-Ed25519")
             ts = request.headers.get("X-Signature-Timestamp")
@@ -129,7 +131,9 @@ class DiscordInterface:
         if not message_text:
             return {"type": 4, "data": {"content": "No message provided.", "flags": 64}}
 
-        background_tasks.add_task(self._run_agent_and_followup, interaction=interaction, message=message_text)
+        background_tasks.add_task(
+            self._run_agent_and_followup, interaction=interaction, message=message_text
+        )
         return {"type": 5}
 
     async def _run_agent_and_followup(self, *, interaction: dict[str, Any], message: str) -> None:

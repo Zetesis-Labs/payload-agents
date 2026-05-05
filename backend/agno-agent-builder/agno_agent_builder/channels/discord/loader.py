@@ -52,7 +52,9 @@ class DiscordChannelLoader:
         for install in installations:
             agent = registry.get(install.agent_slug)
             if agent is None:
-                logger.warning("Discord installation references missing agent", agent=install.agent_slug)
+                logger.warning(
+                    "Discord installation references missing agent", agent=install.agent_slug
+                )
                 continue
             application_id = install.extras["application_id"]
             public_key = install.extras["public_key"]
@@ -136,7 +138,9 @@ def _make_discord_extractor(*, public_key: str) -> Any:
         ts = headers.get("x-signature-timestamp") if hasattr(headers, "get") else None
         if not isinstance(sig, str) or not isinstance(ts, str):
             return None
-        if not verify_discord_signature(public_key_hex=public_key, timestamp=ts, body=body, signature_hex=sig):
+        if not verify_discord_signature(
+            public_key_hex=public_key, timestamp=ts, body=body, signature_hex=sig
+        ):
             return None
         return _parse_discord_token(update)
 
@@ -146,8 +150,8 @@ def _make_discord_extractor(*, public_key: str) -> Any:
 def _parse_discord_token(update: dict[str, Any]) -> BindExtraction | None:
     """Discord `/connect <token>` slash command. Interaction shape:
 
-      {type: 2, data: {name: "connect", options: [{name: "token", value: "..."}]},
-       member: {user: {id, username}}, ...}
+    {type: 2, data: {name: "connect", options: [{name: "token", value: "..."}]},
+     member: {user: {id, username}}, ...}
     """
     if update.get("type") != 2:
         return None

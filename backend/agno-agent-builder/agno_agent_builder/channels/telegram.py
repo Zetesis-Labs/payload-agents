@@ -59,7 +59,9 @@ class TelegramChannelLoader:
         for install in installations:
             agent = registry.get(install.agent_slug)
             if agent is None:
-                logger.warning("Telegram installation references missing agent", agent=install.agent_slug)
+                logger.warning(
+                    "Telegram installation references missing agent", agent=install.agent_slug
+                )
                 continue
             bot_username = install.extras["bot_username"]
             bot_token = install.extras["bot_token"]
@@ -134,7 +136,9 @@ def _verify_telegram_secret(headers: Any) -> bool:
     return hmac.compare_digest(received, expected)
 
 
-def _extract_telegram_token(_body: bytes, headers: Any, update: dict[str, Any]) -> BindExtraction | None:
+def _extract_telegram_token(
+    _body: bytes, headers: Any, update: dict[str, Any]
+) -> BindExtraction | None:
     if not _verify_telegram_secret(headers):
         return None
     message = update.get("message") or {}
