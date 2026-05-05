@@ -1,5 +1,50 @@
 # @zetesis/payload-agents-core
 
+## 0.4.0
+
+### Minor Changes
+
+- [#57](https://github.com/Zetesis-Labs/PayloadAgents/pull/57) [`25766b5`](https://github.com/Zetesis-Labs/PayloadAgents/commit/25766b57ed5912d97e3141e8f6d87b2a78c57445) Thanks [@Fiser12](https://github.com/Fiser12)! - Add the `internal/list` endpoint and migrate the apiKey decryption gate
+  off the `X-Runtime-Secret` request header.
+
+  **New endpoint** (registered on the agents collection):
+
+  `GET /api/<collectionSlug>/internal/list` — gated by `X-Internal-Secret`,
+  returns active agents with their tenant + taxonomies populated and the
+  `apiKey` field decrypted. Calls Payload's local API with
+  `overrideAccess: true` and `req.context.internalAgentRead = true` so the
+  host's collection access (and any populated relations like `tenants`) can
+  stay honestly user-scoped — the bypass branches that previously had to
+  live in the host's access functions are no longer needed.
+
+  **Hook change**: `createDecryptAfterReadHook` no longer checks for an
+  `X-Runtime-Secret` request header. Decryption now keys off
+  `req.context.internalAgentRead === true` (set by the new endpoint),
+  plus the existing `payloadAPI === 'local'` and superadmin checks.
+
+  **Migration for hosts**:
+
+  1. Bump this package + the `agno-agent-builder` Python lib together. The
+     Python source class (`PayloadAgentSource`) now hits the new endpoint
+     automatically — no caller changes if you used keyword args.
+  2. Drop the `X-Runtime-Secret` bypass branches from your `agents` and
+     `tenants` collection `read` access functions; they're no longer
+     reachable.
+
+  The `runtimeSecret` plugin config field stays the same value (it's
+  still the shared secret with the agent runtime); only the inbound
+  header name and the decryption-gate mechanism change.
+
+- [#57](https://github.com/Zetesis-Labs/PayloadAgents/pull/57) [`25766b5`](https://github.com/Zetesis-Labs/PayloadAgents/commit/25766b57ed5912d97e3141e8f6d87b2a78c57445) Thanks [@Fiser12](https://github.com/Fiser12)! - Add `Agent.allowGuestAccess` checkbox so hosts can mark agents as
+  guest-accessible from external channels (e.g. Telegram users not yet
+  bound to a CMS user). Defaults to `false` — backwards compatible.
+
+  Pairs with the Telegram bot wiring in `agno-agent-builder` (same release).
+  Hosts that wire a per-tenant `TelegramBotInstallations` collection and the
+  matching internal endpoints can expose any active agent through Telegram;
+  the `allowGuestAccess` flag lets them limit which agents the bot will
+  serve to anonymous Telegram chats.
+
 ## 0.3.3
 
 ### Patch Changes
