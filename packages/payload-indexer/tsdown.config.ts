@@ -4,7 +4,7 @@ export default defineConfig({
   entry: ['src/index.ts', 'src/client/index.ts'],
   format: ['esm'],
   dts: {
-    resolve: true,
+    resolve: true
   },
   sourcemap: true,
   clean: true,
@@ -17,15 +17,8 @@ export default defineConfig({
   // the package is consumed from node_modules.
   inputOptions: {
     transform: {
-      jsx: { runtime: 'automatic' },
-    },
+      jsx: { runtime: 'automatic' }
+    }
   },
-  external: [
-    'payload',
-    '@payloadcms/richtext-lexical',
-    '@payloadcms/ui',
-    'next',
-    'react',
-    'react-dom',
-  ],
+  external: ['payload', '@payloadcms/richtext-lexical', '@payloadcms/ui', 'next', 'react', 'react-dom']
 })

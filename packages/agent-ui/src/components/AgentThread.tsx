@@ -1,16 +1,9 @@
 'use client'
 
-import {
-  ComposerPrimitive,
-  MessagePrimitive,
-  ThreadPrimitive,
-  useMessageRuntime,
-  useThreadRuntime
-} from '@assistant-ui/react'
+import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useMessage, useThreadRuntime } from '@assistant-ui/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ArrowUpIcon, Sparkles, SquareIcon } from 'lucide-react'
 import { type FC, useEffect, useState } from 'react'
-import type { Source, ToolCall } from '../lib/types'
 import { useAgentChat } from '../runtime/AgentChatProvider'
 import { LimitAlert } from './LimitAlert'
 import { MarkdownText } from './MarkdownText'
@@ -191,7 +184,7 @@ const UserMessage: FC = () => (
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
     >
-      <MessagePrimitive.Content
+      <MessagePrimitive.Parts
         components={{
           Text: ({ text }) => <span className="whitespace-pre-wrap font-medium">{text}</span>
         }}
@@ -201,12 +194,10 @@ const UserMessage: FC = () => (
 )
 
 const AssistantMessage: FC = () => {
-  const messageRuntime = useMessageRuntime()
-  const { generateHref, LinkComponent } = useAgentChat()
-  const state = messageRuntime.getState()
-  const metadata = state.metadata as { custom?: { sources?: Source[]; toolCalls?: ToolCall[] } } | undefined
-  const sources = metadata?.custom?.sources ?? []
-  const toolCalls = metadata?.custom?.toolCalls ?? []
+  const messageId = useMessage(state => state.id)
+  const { generateHref, LinkComponent, sourcesByMessageId, toolCallsByMessageId } = useAgentChat()
+  const sources = sourcesByMessageId[messageId] ?? []
+  const toolCalls = toolCallsByMessageId[messageId] ?? []
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
@@ -216,7 +207,7 @@ const AssistantMessage: FC = () => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       >
-        <MessagePrimitive.Content
+        <MessagePrimitive.Parts
           components={{
             Text: MarkdownText
           }}

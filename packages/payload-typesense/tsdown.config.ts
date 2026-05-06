@@ -4,20 +4,12 @@ export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm'],
   dts: {
-    resolve: true,
+    resolve: true
   },
   sourcemap: true,
   clean: true,
   treeshake: true,
   outDir: 'dist',
   tsconfig: './tsconfig.json',
-  external: [
-    '@zetesis/payload-indexer',
-    'payload',
-    '@payloadcms/richtext-lexical',
-    'next',
-    'react',
-    'react-dom',
-  ],
+  external: ['@zetesis/payload-indexer', 'payload', '@payloadcms/richtext-lexical', 'next', 'react', 'react-dom']
 })
-

@@ -4,17 +4,12 @@ export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm'],
   dts: {
-    resolve: true,
+    resolve: true
   },
   sourcemap: true,
   clean: true,
   treeshake: true,
   outDir: 'dist',
   tsconfig: './tsconfig.json',
-  external: [
-    'payload',
-    'drizzle-orm',
-    'node:crypto',
-    '@toon-format/toon',
-  ],
+  external: ['payload', 'drizzle-orm', 'node:crypto', '@toon-format/toon']
 })

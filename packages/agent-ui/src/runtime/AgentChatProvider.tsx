@@ -1,33 +1,29 @@
 'use client'
 
-import {
-  type AppendMessage,
-  AssistantRuntimeProvider,
-  type ThreadMessageLike,
-  useExternalStoreRuntime
-} from '@assistant-ui/react'
-import {
-  createContext,
-  type FC,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react'
+import { HttpAgent } from '@ag-ui/client'
+import { AssistantRuntimeProvider, type ThreadMessageLike } from '@assistant-ui/react'
+import { useAgUiRuntime } from '@assistant-ui/react-ag-ui'
+import { createContext, type FC, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { LinkComponent, Source, ToolCall, UsageSnapshot } from '../lib/types'
 
 /**
- * Provider that turns a same-origin AG-UI endpoint into an assistant-ui
- * runtime. We do not use `@ag-ui/client`'s `HttpAgent` directly: it
- * auto-generates a threadId on first run, which our BFF would then
- * have to validate as an existing session — fragile, and the dist
- * shape varies across versions. Instead we POST `RunAgentInput` and
- * parse the SSE stream ourselves; AG-UI events are plain JSON and the
- * surface we consume is small (RUN_*, TEXT_MESSAGE_*, TOOL_CALL_*,
- * CUSTOM `usage`).
+ * AgentChatProvider — wires an AG-UI compliant endpoint into an
+ * assistant-ui v0.12 runtime via the official `@assistant-ui/react-ag-ui`
+ * adapter. The transport is `@ag-ui/client`'s `HttpAgent`, subclassed to
+ * inject `forwardedProps.agentSlug` on every run so the portal BFF can
+ * route to the correct agent without leaking that field outside the AG-UI
+ * `RunAgentInput` shape.
+ *
+ * Sources and tool-call results that the agent produces in its
+ * `TOOL_CALL_RESULT` payloads are observed via `agent.subscribe` and
+ * exposed through this context so the consuming components can render
+ * citations / tool inspection without traversing assistant-ui internals.
+ *
+ * Custom events:
+ *   - `usage` (from BFF)              → setUsage, drives the budget bar.
+ *   - `agno_run_completed` (from BFF) → forwarded for downstream
+ *     telemetry; the canonical ledger is updated server-side, this is
+ *     just for clients that want to react to it.
  */
 
 export interface AgentChatContextValue {
@@ -38,6 +34,10 @@ export interface AgentChatContextValue {
   agentName?: string
   generateHref?: GenerateHref
   LinkComponent?: LinkComponent
+  /** Sources extracted from `TOOL_CALL_RESULT`s, keyed by AG-UI message id. */
+  sourcesByMessageId: Record<string, Source[]>
+  /** Tool calls observed for each message, keyed by AG-UI message id. */
+  toolCallsByMessageId: Record<string, ToolCall[]>
 }
 
 const AgentChatContext = createContext<AgentChatContextValue | null>(null)
@@ -58,20 +58,73 @@ export interface AgentChatProviderProps {
   LinkComponent?: LinkComponent
   initialThreadId?: string
   initialMessages?: ThreadMessageLike[]
+  /** Extra headers forwarded with every request (e.g. embed JWT). */
+  headers?: Record<string, string>
   children: ReactNode
 }
 
-interface InternalToolCall extends ToolCall {
-  argsBuffer: string
-}
-
-interface DraftAssistant {
+/** Minimal message shape the HttpAgent accepts at construction time. */
+interface AGUIMessage {
   id: string
-  text: string
-  toolCalls: Map<string, InternalToolCall>
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  content: string
 }
 
-const newId = () => Math.random().toString(36).slice(2)
+function toAGUIMessages(messages: ThreadMessageLike[] | undefined): AGUIMessage[] | undefined {
+  if (!messages?.length) return undefined
+  let i = 0
+  return messages.map(m => {
+    const text = Array.isArray(m.content)
+      ? m.content
+          .map(c => (typeof c === 'object' && c && 'text' in c ? String((c as { text: unknown }).text ?? '') : ''))
+          .join('')
+      : typeof m.content === 'string'
+        ? m.content
+        : ''
+    return {
+      id: m.id ?? `loaded-${++i}`,
+      role: (m.role === 'user' ? 'user' : 'assistant') as AGUIMessage['role'],
+      content: text
+    }
+  })
+}
+
+/**
+ * `HttpAgent` subclass that injects portal-specific fields into every
+ * `RunAgentInput` without breaking the AG-UI wire format.
+ */
+class PortalAgent extends HttpAgent {
+  readonly _portalAgentSlug: string
+
+  constructor(config: {
+    url: string
+    headers?: Record<string, string>
+    agentSlug: string
+    threadId?: string
+    initialMessages?: AGUIMessage[]
+  }) {
+    super({
+      url: config.url,
+      headers: config.headers,
+      threadId: config.threadId,
+      initialMessages: config.initialMessages as never
+    })
+    this._portalAgentSlug = config.agentSlug
+  }
+
+  protected prepareRunAgentInput(
+    parameters?: Parameters<HttpAgent['runAgent']>[0]
+  ): ReturnType<HttpAgent['prepareRunAgentInput']> {
+    const input = (
+      HttpAgent.prototype as unknown as { prepareRunAgentInput: HttpAgent['prepareRunAgentInput'] }
+    ).prepareRunAgentInput.call(this, parameters)
+    const existing = (input as { forwardedProps?: Record<string, unknown> }).forwardedProps ?? {}
+    return {
+      ...input,
+      forwardedProps: { ...existing, agentSlug: this._portalAgentSlug }
+    }
+  }
+}
 
 export const AgentChatProvider: FC<AgentChatProviderProps> = ({
   endpoint,
@@ -81,23 +134,33 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
   LinkComponent,
   initialThreadId,
   initialMessages,
+  headers,
   children
 }) => {
-  const [messages, setMessages] = useState<ThreadMessageLike[]>(initialMessages ?? [])
-  const [isRunning, setIsRunning] = useState(false)
   const [usage, setUsage] = useState<UsageSnapshot | null>(null)
   const [limitError, setLimitError] = useState<string | null>(null)
   const [threadId, setThreadId] = useState<string | null>(initialThreadId ?? null)
-  const abortRef = useRef<AbortController | null>(null)
-  const draftRef = useRef<DraftAssistant | null>(null)
+  const [sourcesByMessageId, setSourcesByMessageId] = useState<Record<string, Source[]>>({})
+  const [toolCallsByMessageId, setToolCallsByMessageId] = useState<Record<string, ToolCall[]>>({})
+  const toolBufferRef = useRef<Map<string, ToolCall & { argsBuffer: string; messageId?: string }>>(new Map())
 
-  // Eager-load the daily usage snapshot so the budget bar renders
-  // before the user sends the first message. The endpoint mirrors the
-  // shape of the `CUSTOM usage` event the BFF emits later.
+  const agent = useMemo(
+    () =>
+      new PortalAgent({
+        url: endpoint,
+        headers,
+        agentSlug,
+        threadId: initialThreadId,
+        initialMessages: toAGUIMessages(initialMessages)
+      }),
+    [endpoint, headers, agentSlug, initialThreadId, initialMessages]
+  )
+
+  // Eager-load the daily budget snapshot.
   useEffect(() => {
     let cancelled = false
     const usageUrl = endpoint.endsWith('/') ? `${endpoint}usage` : `${endpoint}/usage`
-    fetch(usageUrl)
+    fetch(usageUrl, headers ? { headers } : undefined)
       .then(r => (r.ok ? (r.json() as Promise<UsageSnapshot>) : null))
       .then(data => {
         if (!cancelled && data) setUsage(data)
@@ -106,203 +169,90 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
     return () => {
       cancelled = true
     }
-  }, [endpoint])
+  }, [endpoint, headers])
 
-  const flushDraft = useCallback(() => {
-    const d = draftRef.current
-    if (!d) return
-    const tools: ToolCall[] = Array.from(d.toolCalls.values()).map(tc => ({
-      id: tc.id,
-      name: tc.name,
-      args: tc.args,
-      result: tc.result,
-      sources: tc.sources,
-      isLoading: tc.isLoading
-    }))
-    const sources = collectSources(tools)
-    setMessages(prev => {
-      const next = [...prev]
-      const idx = next.findIndex(m => m.id === d.id)
-      const updated: ThreadMessageLike = {
-        id: d.id,
-        role: 'assistant',
-        content: d.text ? [{ type: 'text', text: d.text }] : [],
-        metadata: { custom: { sources, toolCalls: tools } }
-      }
-      if (idx >= 0) next[idx] = updated
-      else next.push(updated)
-      return next
-    })
-  }, [])
-
-  const handleEvent = useCallback(
-    (event: AGUIEvent) => {
-      switch (event.type) {
-        case 'RUN_STARTED': {
-          if (typeof event.threadId === 'string') setThreadId(event.threadId)
-          break
-        }
-        case 'TEXT_MESSAGE_START': {
-          break
-        }
-        case 'TEXT_MESSAGE_CONTENT': {
-          const d = draftRef.current
-          if (!d) return
-          if (typeof event.delta === 'string') d.text += event.delta
-          flushDraft()
-          break
-        }
-        case 'TEXT_MESSAGE_END':
-          flushDraft()
-          break
-        case 'TOOL_CALL_START': {
-          const id = String(event.toolCallId ?? '')
-          const name = String(event.toolCallName ?? '')
-          if (!id) return
-          const d = draftRef.current
-          if (!d) return
-          d.toolCalls.set(id, { id, name, argsBuffer: '', isLoading: true })
-          flushDraft()
-          break
-        }
-        case 'TOOL_CALL_ARGS': {
-          const id = String(event.toolCallId ?? '')
-          const tc = draftRef.current?.toolCalls.get(id)
-          if (!tc) return
-          if (typeof event.delta === 'string') tc.argsBuffer += event.delta
-          try {
-            tc.args = JSON.parse(tc.argsBuffer) as Record<string, unknown>
-          } catch {
-            /* still streaming */
-          }
-          break
-        }
-        case 'TOOL_CALL_END': {
-          const id = String(event.toolCallId ?? '')
-          const tc = draftRef.current?.toolCalls.get(id)
-          if (!tc) return
-          tc.isLoading = false
-          flushDraft()
-          break
-        }
-        case 'TOOL_CALL_RESULT': {
-          const id = String(event.toolCallId ?? '')
-          const tc = draftRef.current?.toolCalls.get(id)
-          if (!tc) return
-          const content = typeof event.content === 'string' ? event.content : undefined
-          tc.result = content
-          tc.sources = extractSources(content)
-          tc.isLoading = false
-          flushDraft()
-          break
-        }
-        case 'CUSTOM': {
-          if (event.name === 'usage' && event.value && typeof event.value === 'object') {
-            setUsage(event.value as UsageSnapshot)
-          }
-          break
-        }
-        case 'RUN_ERROR': {
-          const msg = typeof event.message === 'string' ? event.message : 'Run failed'
-          setLimitError(msg)
-          break
-        }
-        case 'RUN_FINISHED':
-          break
-      }
-    },
-    [flushDraft]
-  )
-
-  const onNew = useCallback(
-    async (message: AppendMessage) => {
-      const userText = message.content.map(c => (c.type === 'text' ? c.text : '')).join('')
-      if (!userText.trim()) return
-
-      const userMessage: ThreadMessageLike = {
-        id: newId(),
-        role: 'user',
-        content: [{ type: 'text', text: userText }]
-      }
-      const assistantId = newId()
-      draftRef.current = { id: assistantId, text: '', toolCalls: new Map() }
-
-      setMessages(prev => [...prev, userMessage, { id: assistantId, role: 'assistant', content: [] }])
-      setIsRunning(true)
-      setLimitError(null)
-
-      const abort = new AbortController()
-      abortRef.current = abort
-
-      const aguiMessages = [...messages.map(toAGUIMessage), { id: userMessage.id, role: 'user', content: userText }]
-
-      // AG-UI `RunAgentInput` marks `state`, `tools` and `context` as
-      // required — even when empty. Always send them.
-      const body: Record<string, unknown> = {
-        runId: newId(),
-        messages: aguiMessages,
-        state: {},
-        tools: [],
-        context: [],
-        forwardedProps: { agentSlug }
-      }
-      if (threadId) body.threadId = threadId
-
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-          body: JSON.stringify(body),
-          signal: abort.signal
+  // Subscribe to agent events for our portal-specific concerns.
+  useEffect(() => {
+    const sub = agent.subscribe({
+      onRunStartedEvent: ({ event }) => {
+        const tid = (event as { threadId?: string }).threadId
+        if (typeof tid === 'string') setThreadId(tid)
+      },
+      onToolCallStartEvent: ({ event }) => {
+        const e = event as { toolCallId: string; toolCallName: string; parentMessageId?: string }
+        toolBufferRef.current.set(e.toolCallId, {
+          id: e.toolCallId,
+          name: e.toolCallName,
+          messageId: e.parentMessageId,
+          argsBuffer: '',
+          isLoading: true
         })
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => '')
-          throw new Error(`HTTP ${res.status}: ${text || 'request failed'}`)
+      },
+      onToolCallArgsEvent: ({ event }) => {
+        const e = event as { toolCallId: string; delta: string }
+        const buf = toolBufferRef.current.get(e.toolCallId)
+        if (!buf) return
+        buf.argsBuffer += e.delta
+        try {
+          buf.args = JSON.parse(buf.argsBuffer) as Record<string, unknown>
+        } catch {
+          /* still streaming */
         }
-        if (!res.body) throw new Error('Empty response body')
-
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          let frameEnd = buffer.indexOf('\n\n')
-          while (frameEnd !== -1) {
-            const frame = buffer.slice(0, frameEnd)
-            buffer = buffer.slice(frameEnd + 2)
-            frameEnd = buffer.indexOf('\n\n')
-            const ev = parseFrame(frame)
-            if (ev) handleEvent(ev)
+      },
+      onToolCallEndEvent: ({ event }) => {
+        const e = event as { toolCallId: string }
+        const buf = toolBufferRef.current.get(e.toolCallId)
+        if (!buf) return
+        buf.isLoading = false
+      },
+      onToolCallResultEvent: ({ event }) => {
+        const e = event as { toolCallId: string; messageId?: string; content?: string }
+        const buf = toolBufferRef.current.get(e.toolCallId)
+        if (!buf) return
+        buf.result = typeof e.content === 'string' ? e.content : undefined
+        buf.sources = extractSources(buf.result)
+        buf.isLoading = false
+        const mid = e.messageId ?? buf.messageId ?? '__current__'
+        setToolCallsByMessageId(prev => {
+          const list = prev[mid] ? [...prev[mid]] : []
+          const idx = list.findIndex(tc => tc.id === buf.id)
+          const sanitised: ToolCall = {
+            id: buf.id,
+            name: buf.name,
+            args: buf.args,
+            result: buf.result,
+            sources: buf.sources,
+            isLoading: false
           }
+          if (idx >= 0) list[idx] = sanitised
+          else list.push(sanitised)
+          return { ...prev, [mid]: list }
+        })
+        const newSources = buf.sources
+        if (newSources && newSources.length > 0) {
+          setSourcesByMessageId(prev => ({
+            ...prev,
+            [mid]: dedupSources([...(prev[mid] ?? []), ...newSources])
+          }))
         }
-      } catch (err) {
-        if ((err as { name?: string }).name === 'AbortError') return
-        setLimitError(err instanceof Error ? err.message : 'Run failed')
-      } finally {
-        setIsRunning(false)
-        draftRef.current = null
-        abortRef.current = null
+      },
+      onCustomEvent: ({ event }) => {
+        const e = event as { name?: string; value?: unknown }
+        if (e.name === 'usage' && e.value && typeof e.value === 'object') {
+          setUsage(e.value as UsageSnapshot)
+        }
+      },
+      onRunErrorEvent: ({ event }) => {
+        const msg = (event as { message?: string }).message
+        setLimitError(typeof msg === 'string' && msg ? msg : 'Run failed')
       }
-    },
-    [agentSlug, endpoint, handleEvent, messages, threadId]
-  )
+    })
+    return () => sub.unsubscribe()
+  }, [agent])
 
-  const onCancel = useCallback(() => {
-    abortRef.current?.abort()
-    setIsRunning(false)
-    draftRef.current = null
-  }, [])
-
-  const runtime = useExternalStoreRuntime<ThreadMessageLike>({
-    isRunning,
-    messages,
-    onNew,
-    onCancel,
-    convertMessage: m => m
+  const runtime = useAgUiRuntime({
+    agent,
+    onError: err => setLimitError(err instanceof Error ? err.message : 'Run failed')
   })
 
   const contextValue = useMemo<AgentChatContextValue>(
@@ -313,9 +263,11 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
       threadId,
       agentName,
       generateHref,
-      LinkComponent
+      LinkComponent,
+      sourcesByMessageId,
+      toolCallsByMessageId
     }),
-    [usage, limitError, threadId, agentName, generateHref, LinkComponent]
+    [usage, limitError, threadId, agentName, generateHref, LinkComponent, sourcesByMessageId, toolCallsByMessageId]
   )
 
   return (
@@ -325,52 +277,19 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
   )
 }
 
-interface AGUIEvent {
-  type: string
-  threadId?: string
-  delta?: string
-  toolCallId?: string
-  toolCallName?: string
-  content?: string
-  message?: string
-  name?: string
-  value?: unknown
-  [key: string]: unknown
-}
-
-function parseFrame(frame: string): AGUIEvent | null {
-  for (const raw of frame.split('\n')) {
-    if (raw.startsWith('data: ')) {
-      try {
-        return JSON.parse(raw.slice(6)) as AGUIEvent
-      } catch {
-        return null
-      }
-    }
-  }
-  return null
-}
-
-function toAGUIMessage(m: ThreadMessageLike): { id: string; role: string; content: string } {
-  const text = Array.isArray(m.content)
-    ? m.content
-        .map(c => (typeof c === 'object' && c && 'text' in c ? String((c as { text: unknown }).text ?? '') : ''))
-        .join('')
-    : typeof m.content === 'string'
-      ? m.content
-      : ''
-  return { id: m.id ?? newId(), role: m.role, content: text }
-}
-
-function extractSources(result: unknown): Source[] {
-  if (typeof result !== 'string' || !result.trim()) return []
+function extractSources(result: unknown): Source[] | undefined {
+  if (typeof result !== 'string' || !result.trim()) return undefined
   let parsed: unknown
   try {
     parsed = JSON.parse(result)
   } catch {
-    return []
+    return undefined
   }
-  const list = isObject(parsed) && Array.isArray(parsed.sources) ? parsed.sources : []
+  if (!parsed || typeof parsed !== 'object') return undefined
+  const list = Array.isArray((parsed as { sources?: unknown }).sources)
+    ? (parsed as { sources: unknown[] }).sources
+    : []
+  if (list.length === 0) return undefined
   return list.filter(isObject).map(s => ({
     id: String(s.id ?? ''),
     title: String(s.title ?? ''),
@@ -389,17 +308,14 @@ function extractSources(result: unknown): Source[] {
   }))
 }
 
-function collectSources(tools: ToolCall[]): Source[] {
-  const out: Source[] = []
+function dedupSources(sources: Source[]): Source[] {
   const seen = new Set<string>()
-  for (const t of tools) {
-    if (!t.sources) continue
-    for (const s of t.sources) {
-      const key = `${s.id}:${s.slug}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      out.push(s)
-    }
+  const out: Source[] = []
+  for (const s of sources) {
+    const key = `${s.id}:${s.slug}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(s)
   }
   return out
 }
