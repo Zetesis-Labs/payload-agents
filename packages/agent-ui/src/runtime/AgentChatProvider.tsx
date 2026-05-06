@@ -1,8 +1,13 @@
 'use client'
 
 import { HttpAgent } from '@ag-ui/client'
-import { AssistantRuntimeProvider, type ThreadMessageLike } from '@assistant-ui/react'
+import {
+  AssistantRuntimeProvider,
+  ExportedMessageRepository,
+  type ThreadMessageLike
+} from '@assistant-ui/react'
 import { useAgUiRuntime } from '@assistant-ui/react-ag-ui'
+import type { ThreadHistoryAdapter } from '@assistant-ui/core'
 import { createContext, type FC, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { LinkComponent, Source, ToolCall, UsageSnapshot } from '../lib/types'
 
@@ -250,9 +255,26 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
     return () => sub.unsubscribe()
   }, [agent])
 
+  // Hydrate the runtime with the loaded thread's messages via the
+  // official history adapter; the runtime calls `load()` once on mount
+  // and seeds its message store with whatever we return. Without this
+  // adapter, `initialMessages` passed to HttpAgent at construction
+  // never reach the assistant-ui store.
+  const historyAdapter = useMemo<ThreadHistoryAdapter | undefined>(() => {
+    if (!initialMessages?.length) return undefined
+    const repo = ExportedMessageRepository.fromArray(initialMessages)
+    return {
+      load: async () => repo,
+      append: async () => {
+        /* no-op: every run is persisted server-side by the runtime */
+      }
+    }
+  }, [initialMessages])
+
   const runtime = useAgUiRuntime({
     agent,
-    onError: err => setLimitError(err instanceof Error ? err.message : 'Run failed')
+    onError: err => setLimitError(err instanceof Error ? err.message : 'Run failed'),
+    adapters: historyAdapter ? { history: historyAdapter } : undefined
   })
 
   const contextValue = useMemo<AgentChatContextValue>(
