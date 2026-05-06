@@ -1,21 +1,21 @@
 'use client'
 
 import {
-  AssistantRuntimeProvider,
-  useExternalStoreRuntime,
   type AppendMessage,
-  type ThreadMessageLike
+  AssistantRuntimeProvider,
+  type ThreadMessageLike,
+  useExternalStoreRuntime
 } from '@assistant-ui/react'
 import {
   createContext,
+  type FC,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type FC,
-  type ReactNode
+  useState
 } from 'react'
 import type { LinkComponent, Source, ToolCall, UsageSnapshot } from '../lib/types'
 
@@ -48,10 +48,7 @@ export function useAgentChat(): AgentChatContextValue {
   return ctx
 }
 
-export type GenerateHref = (props: {
-  type: string
-  value: { id: number; slug?: string | null }
-}) => string
+export type GenerateHref = (props: { type: string; value: { id: number; slug?: string | null } }) => string
 
 export interface AgentChatProviderProps {
   endpoint: string
@@ -219,9 +216,7 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
 
   const onNew = useCallback(
     async (message: AppendMessage) => {
-      const userText = message.content
-        .map(c => (c.type === 'text' ? c.text : ''))
-        .join('')
+      const userText = message.content.map(c => (c.type === 'text' ? c.text : '')).join('')
       if (!userText.trim()) return
 
       const userMessage: ThreadMessageLike = {
@@ -232,21 +227,14 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
       const assistantId = newId()
       draftRef.current = { id: assistantId, text: '', toolCalls: new Map() }
 
-      setMessages(prev => [
-        ...prev,
-        userMessage,
-        { id: assistantId, role: 'assistant', content: [] }
-      ])
+      setMessages(prev => [...prev, userMessage, { id: assistantId, role: 'assistant', content: [] }])
       setIsRunning(true)
       setLimitError(null)
 
       const abort = new AbortController()
       abortRef.current = abort
 
-      const aguiMessages = [
-        ...messages.map(toAGUIMessage),
-        { id: userMessage.id, role: 'user', content: userText }
-      ]
+      const aguiMessages = [...messages.map(toAGUIMessage), { id: userMessage.id, role: 'user', content: userText }]
 
       // AG-UI `RunAgentInput` marks `state`, `tools` and `context` as
       // required — even when empty. Always send them.
@@ -389,11 +377,7 @@ function extractSources(result: unknown): Source[] {
     slug: String(s.slug ?? ''),
     type: String(s.type ?? 'document'),
     chunkIndex:
-      typeof s.chunkIndex === 'number'
-        ? s.chunkIndex
-        : typeof s.chunk_index === 'number'
-          ? s.chunk_index
-          : undefined,
+      typeof s.chunkIndex === 'number' ? s.chunkIndex : typeof s.chunk_index === 'number' ? s.chunk_index : undefined,
     content: typeof s.content === 'string' ? s.content : undefined,
     excerpt: typeof s.excerpt === 'string' ? s.excerpt : undefined,
     relevanceScore:

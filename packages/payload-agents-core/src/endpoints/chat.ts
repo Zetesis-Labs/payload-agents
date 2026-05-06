@@ -180,9 +180,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     // threadId before they ever talk to us. Treat an unrecognised threadId
     // as "fresh chat, mint a real session id" rather than 403 — only
     // honour it when ownership validates against our own format.
-    const ownsThread = chatId
-      ? await config.validateSessionOwnership(chatId, { user, payload, req })
-      : false
+    const ownsThread = chatId ? await config.validateSessionOwnership(chatId, { user, payload, req }) : false
     const sessionId = ownsThread
       ? (chatId as string)
       : await config.buildSessionId({

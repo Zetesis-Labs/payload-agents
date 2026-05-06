@@ -9,7 +9,7 @@ import {
 } from '@assistant-ui/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ArrowUpIcon, Sparkles, SquareIcon } from 'lucide-react'
-import { useContext, useEffect, useState, type FC } from 'react'
+import { type FC, useEffect, useState } from 'react'
 import type { Source, ToolCall } from '../lib/types'
 import { useAgentChat } from '../runtime/AgentChatProvider'
 import { LimitAlert } from './LimitAlert'
@@ -35,11 +35,7 @@ export const AgentThread: FC<AgentThreadProps> = ({ welcomeTitle, welcomeSubtitl
       <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto px-4 pt-4">
         <ThreadPrimitive.Empty>
           {welcomeTitle && welcomeSubtitle && (
-            <ThreadWelcome
-              title={welcomeTitle}
-              subtitle={welcomeSubtitle}
-              suggestedQuestions={suggestedQuestions}
-            />
+            <ThreadWelcome title={welcomeTitle} subtitle={welcomeSubtitle} suggestedQuestions={suggestedQuestions} />
           )}
         </ThreadPrimitive.Empty>
         <ThreadPrimitive.Messages
@@ -145,9 +141,7 @@ const TypingIndicator: FC = () => {
                 <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
                 <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
               </div>
-              <span className="text-sm text-muted-foreground">
-                {agentName ?? 'El asistente'} está pensando...
-              </span>
+              <span className="text-sm text-muted-foreground">{agentName ?? 'El asistente'} está pensando...</span>
             </div>
           </div>
         </motion.div>
@@ -228,9 +222,7 @@ const AssistantMessage: FC = () => {
           }}
         />
         {toolCalls.length > 0 && <ToolCalls toolCalls={toolCalls} />}
-        {sources.length > 0 && (
-          <Sources sources={sources} generateHref={generateHref} LinkComponent={LinkComponent} />
-        )}
+        {sources.length > 0 && <Sources sources={sources} generateHref={generateHref} LinkComponent={LinkComponent} />}
       </motion.div>
     </MessagePrimitive.Root>
   )

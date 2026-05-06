@@ -3,20 +3,23 @@
  *
  * The portal BFF is a thin proxy in front of the agent-runtime: every
  * AG-UI event the runtime emits is forwarded to the browser unchanged.
- * On top of that we inject two CUSTOM events of our own:
+ * On top of that we inject `CUSTOM usage` events of our own so the UI
+ * can render the budget bar:
  *
- *   - `usage` (prepended): a snapshot of the user's daily token budget
- *     as it stood when the request was authorised. Lets the UI render
- *     the budget bar before any token arrives.
- *   - `usage` (appended): the same snapshot updated with the run's
- *     estimated cost so the bar reflects the spend immediately.
+ *   - prepended at run start: snapshot of the user's daily budget as it
+ *     stood when the request was authorised.
+ *   - appended after RUN_FINISHED: same snapshot updated with this
+ *     run's cost.
  *
- * Token cost is estimated from the accumulated text content: AG-UI does
- * not standardise model metrics, so until the runtime emits a CUSTOM
- * metrics event we do not have access to the real input/output token
- * counts here. Estimation is good enough for the UI bar; the canonical
- * ledger lives elsewhere and is updated by the runtime callback.
+ * Run cost comes from the runtime's own `CUSTOM agno_run_completed`
+ * event (real Agno `RunMetrics`: input_tokens, output_tokens,
+ * cache_read_tokens, etc.). When the runtime fails to emit it — older
+ * deployments, malformed events, etc. — we fall back to an estimate
+ * derived from accumulated text content. The fallback keeps the UI
+ * functional but is not authoritative for billing.
  */
+
+import { effectiveTokensFromMetrics } from './token-usage'
 
 interface UsageSnapshot {
   limit: number
@@ -51,8 +54,10 @@ function usagePayload(usage: UsageSnapshot, extraTokens = 0) {
 
 interface AGUIEvent {
   type: string
+  name?: string
   delta?: string
   runId?: string
+  value?: unknown
   [key: string]: unknown
 }
 
@@ -69,13 +74,38 @@ function tryParseEvent(frame: string): AGUIEvent | null {
   return null
 }
 
+interface AgnoRunMetrics {
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_tokens?: number
+  reasoning_tokens?: number
+  audio_input_tokens?: number
+  audio_output_tokens?: number
+  details?: unknown
+  duration?: number
+  time_to_first_token?: number
+  [key: string]: unknown
+}
+
+function isAgnoRunMetrics(v: unknown): v is AgnoRunMetrics {
+  return typeof v === 'object' && v !== null
+}
+
+function tokensFromMetrics(metrics: AgnoRunMetrics): number {
+  const input = typeof metrics.input_tokens === 'number' ? metrics.input_tokens : 0
+  const output = typeof metrics.output_tokens === 'number' ? metrics.output_tokens : 0
+  const cache = typeof metrics.cache_read_tokens === 'number' ? metrics.cache_read_tokens : 0
+  return effectiveTokensFromMetrics({ input_tokens: input, output_tokens: output, cache_read_tokens: cache })
+}
+
 /**
  * Wrap the runtime's AG-UI byte stream:
  *   1. Emit `CUSTOM usage` snapshot up front.
  *   2. Forward every upstream byte unchanged.
- *   3. Tally accumulated text deltas to estimate token cost.
- *   4. On `RUN_FINISHED`, emit an updated `CUSTOM usage` and fire the
- *      onRunCompleted callback with an estimation payload.
+ *   3. Capture the runtime's `CUSTOM agno_run_completed` (real metrics).
+ *   4. After the stream ends, emit an updated `CUSTOM usage` and fire
+ *      the onRunCompleted callback with the real metrics (or an
+ *      estimate if the runtime didn't provide them).
  */
 export function passthroughAguiStream(
   upstreamBody: ReadableStream<Uint8Array>,
@@ -90,6 +120,7 @@ export function passthroughAguiStream(
       let runId: string | undefined
       let finished = false
       let buffer = ''
+      let realMetrics: AgnoRunMetrics | undefined
 
       controller.enqueue(customEvent('usage', usagePayload(usage)))
 
@@ -102,6 +133,10 @@ export function passthroughAguiStream(
           runId = ev.runId
         } else if (ev.type === 'RUN_FINISHED') {
           finished = true
+        } else if (ev.type === 'CUSTOM' && ev.name === 'agno_run_completed' && isAgnoRunMetrics(ev.value)) {
+          const v = ev.value as { metrics?: unknown; run_id?: unknown }
+          if (isAgnoRunMetrics(v.metrics)) realMetrics = v.metrics
+          if (typeof v.run_id === 'string') runId = v.run_id
         }
       }
 
@@ -123,20 +158,24 @@ export function passthroughAguiStream(
           observeFrame(buffer)
         }
 
-        const estimatedTokens = Math.ceil(accumulatedChars / 4)
+        const runTokens = realMetrics ? tokensFromMetrics(realMetrics) : Math.ceil(accumulatedChars / 4)
 
         if (finished) {
-          controller.enqueue(customEvent('usage', usagePayload(usage, estimatedTokens)))
+          controller.enqueue(customEvent('usage', usagePayload(usage, runTokens)))
         }
 
         controller.close()
 
         if (onRunCompleted) {
+          const metricsPayload: Record<string, unknown> = realMetrics
+            ? { ...realMetrics, source: 'agno_run_completed' }
+            : {
+                estimated_output_chars: accumulatedChars,
+                estimated_tokens: runTokens,
+                source: 'estimate'
+              }
           try {
-            onRunCompleted({
-              metrics: { estimated_output_chars: accumulatedChars, estimated_tokens: estimatedTokens },
-              runId
-            })
+            onRunCompleted({ metrics: metricsPayload, runId })
           } catch {
             /* fire-and-forget */
           }

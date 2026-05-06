@@ -1,12 +1,17 @@
-"""AG-UI multi-agent endpoint.
+"""AG-UI multi-agent endpoint with metrics-precision wrapper.
 
-Exposes ``POST /agents/{slug}/agui`` accepting a standard AG-UI
-``RunAgentInput`` body and streaming back the AG-UI event protocol.
+Exposes ``POST /agents/{slug}/agui`` that accepts a standard AG-UI
+``RunAgentInput`` body and streams back the AG-UI event protocol, plus
+a portal-specific ``CUSTOM agno_run_completed`` event after
+``RUN_FINISHED`` carrying the real Agno ``RunMetrics``.
 
-The stock ``agno.os.interfaces.agui.AGUI`` interface is per-agent (one
-router per agent). This runtime is multi-tenant and reloads agents at
-runtime via Postgres NOTIFY, so we need a single mount point that looks
-the agent up by slug on each request.
+Why the wrapper:
+    The stock ``agno.os.interfaces.agui.router.run_agent`` consumes
+    Agno's own event stream and emits AG-UI events. Agno emits a
+    ``RunCompletedEvent`` with full token metrics, but those never
+    leak through the AG-UI translation. We tee the upstream stream to
+    capture metrics, then surface them as a CUSTOM event the BFF
+    consumes for the daily-token ledger.
 
 Authentication is handled by ``InternalAuthMiddleware`` upstream — every
 request must carry the shared ``X-Internal-Secret``. The portal's BFF
@@ -15,11 +20,24 @@ applies user-level access control before forwarding here.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 
-from ag_ui.core import EventType, RunAgentInput, RunErrorEvent
+from ag_ui.core import (
+    BaseEvent,
+    CustomEvent,
+    EventType,
+    RunAgentInput,
+    RunErrorEvent,
+    RunStartedEvent,
+)
 from ag_ui.encoder import EventEncoder
-from agno.os.interfaces.agui.router import run_agent
+from agno.os.interfaces.agui.utils import (
+    async_stream_agno_response_as_agui_events,
+    extract_agui_user_input,
+    validate_agui_state,
+)
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -46,9 +64,9 @@ def build_agui_router() -> APIRouter:
 
         async def generate() -> AsyncIterator[str]:
             try:
-                async for event in run_agent(agent, run_input):
+                async for event in _run_with_metrics(agent, run_input):
                     yield encoder.encode(event)
-            except Exception as exc:
+            except Exception as exc:  # pragma: no cover — defensive
                 logger.exception("AG-UI run failed", slug=slug, thread_id=run_input.thread_id)
                 yield encoder.encode(
                     RunErrorEvent(type=EventType.RUN_ERROR, message=str(exc))
@@ -65,3 +83,77 @@ def build_agui_router() -> APIRouter:
         )
 
     return router
+
+
+async def _run_with_metrics(agent: Any, run_input: RunAgentInput) -> AsyncIterator[BaseEvent]:
+    """Run the agent and emit AG-UI events plus a final CUSTOM
+    ``agno_run_completed`` event with Agno's real ``RunMetrics``.
+
+    Mirrors ``agno.os.interfaces.agui.router.run_agent`` but tees the
+    response stream so we can intercept Agno's ``RunCompletedEvent`` —
+    the only place where token metrics live — without losing any of
+    the AG-UI translation.
+    """
+    run_id = run_input.run_id or str(uuid.uuid4())
+
+    try:
+        user_input = extract_agui_user_input(run_input.messages or [])
+
+        yield RunStartedEvent(
+            type=EventType.RUN_STARTED, thread_id=run_input.thread_id, run_id=run_id
+        )
+
+        forwarded_user_id = None
+        if run_input.forwarded_props and isinstance(run_input.forwarded_props, dict):
+            forwarded_user_id = run_input.forwarded_props.get("user_id")
+
+        session_state = validate_agui_state(run_input.state, run_input.thread_id)
+
+        response_stream = agent.arun(  # type: ignore[attr-defined]
+            input=user_input,
+            session_id=run_input.thread_id,
+            stream=True,
+            stream_events=True,
+            user_id=forwarded_user_id,
+            session_state=session_state,
+            run_id=run_id,
+        )
+
+        captured: dict[str, Any] = {}
+
+        async def teed() -> AsyncIterator[Any]:
+            async for upstream_event in response_stream:
+                # Agno's own RunCompletedEvent carries `metrics` — capture
+                # it for the trailing CUSTOM event. The exact name used
+                # by Agno is "RunCompleted"; we match defensively.
+                event_name = getattr(upstream_event, "event", None)
+                if event_name in {"RunCompleted", "run_completed"}:
+                    metrics = getattr(upstream_event, "metrics", None)
+                    if metrics is not None:
+                        try:
+                            captured["metrics"] = metrics.to_dict()
+                        except Exception:
+                            logger.exception("Failed to serialise RunMetrics")
+                yield upstream_event
+
+        async for event in async_stream_agno_response_as_agui_events(
+            response_stream=teed(),  # type: ignore[arg-type]
+            thread_id=run_input.thread_id,
+            run_id=run_id,
+        ):
+            yield event
+
+        if "metrics" in captured:
+            yield CustomEvent(
+                type=EventType.CUSTOM,
+                name="agno_run_completed",
+                value={
+                    "metrics": captured["metrics"],
+                    "run_id": run_id,
+                    "thread_id": run_input.thread_id,
+                },
+            )
+
+    except Exception as exc:
+        logger.exception("Agent run failed", thread_id=run_input.thread_id)
+        yield RunErrorEvent(type=EventType.RUN_ERROR, message=str(exc))

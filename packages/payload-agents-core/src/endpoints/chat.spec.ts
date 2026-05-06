@@ -10,9 +10,9 @@ function fakeReq(body: () => unknown | Promise<unknown>): ChatHandlerReq {
 
 describe('RunAgentInputSchema', () => {
   it('accepts a minimal AG-UI body (just threadId + forwardedProps.agentSlug)', () => {
-    expect(
-      RunAgentInputSchema.safeParse({ threadId: 't1', forwardedProps: { agentSlug: 'support' } }).success
-    ).toBe(true)
+    expect(RunAgentInputSchema.safeParse({ threadId: 't1', forwardedProps: { agentSlug: 'support' } }).success).toBe(
+      true
+    )
   })
 
   it('accepts a full AG-UI body with messages, runId and forwardedProps', () => {

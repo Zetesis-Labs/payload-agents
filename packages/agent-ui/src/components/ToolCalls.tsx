@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronRight, Loader2, Wrench } from 'lucide-react'
-import { useState, type FC } from 'react'
+import { type FC, useState } from 'react'
 import type { ToolCall } from '../lib/types'
 
 interface ToolCallsProps {

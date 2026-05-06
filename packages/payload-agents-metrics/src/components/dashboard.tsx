@@ -1,6 +1,12 @@
 'use client'
 
-import { MarkdownText, Sources, ToolCalls, type Source as AgentSource, type ToolCall as AgentToolCall } from '@zetesis/agent-ui'
+import {
+  type Source as AgentSource,
+  type ToolCall as AgentToolCall,
+  MarkdownText,
+  Sources,
+  ToolCalls
+} from '@zetesis/agent-ui'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ComponentType } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -18,6 +24,7 @@ interface Message {
   sources?: AgentSource[]
   toolCalls?: AgentToolCall[]
 }
+
 import {
   Bar,
   BarChart,
@@ -695,13 +702,10 @@ function ReadOnlyThread({
   }>
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto bg-background p-4">
-      {messages.map((m, idx) => (
+      {messages.map(m => (
         <div
-          key={`${m.timestamp.getTime()}-${idx}`}
-          className={cn(
-            'flex w-full',
-            m.role === 'user' ? 'justify-end' : 'justify-start'
-          )}
+          key={`${m.role}-${m.timestamp.getTime()}-${m.content.slice(0, 32)}`}
+          className={cn('flex w-full', m.role === 'user' ? 'justify-end' : 'justify-start')}
         >
           <div
             className={cn(
@@ -711,7 +715,11 @@ function ReadOnlyThread({
                 : 'max-w-[85%] rounded-bl-md border-l-4 border-l-primary/30 bg-card text-card-foreground'
             )}
           >
-            {m.role === 'assistant' ? <MarkdownText text={m.content} /> : <span className="whitespace-pre-wrap">{m.content}</span>}
+            {m.role === 'assistant' ? (
+              <MarkdownText text={m.content} />
+            ) : (
+              <span className="whitespace-pre-wrap">{m.content}</span>
+            )}
             {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls toolCalls={m.toolCalls} />}
             {m.sources && m.sources.length > 0 && (
               <Sources sources={m.sources} generateHref={generateHref} LinkComponent={Anchor} />

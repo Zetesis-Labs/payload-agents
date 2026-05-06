@@ -1,7 +1,7 @@
 'use client'
 
 import { Loader2, MessageSquare, Pencil, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useState, type FC } from 'react'
+import { type FC, useCallback, useEffect, useState } from 'react'
 import { cn } from '../lib/utils'
 import { useAgentChat } from '../runtime/AgentChatProvider'
 
@@ -114,7 +114,7 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
                   if (e.key === 'Escape') setEditing(null)
                 }}
                 className="flex-1 rounded border border-input bg-background px-2 py-1 text-xs"
-                autoFocus
+                ref={el => el?.focus()}
               />
             ) : (
               <button

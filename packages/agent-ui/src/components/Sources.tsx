@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, ChevronRight, ExternalLink, FileText } from 'lucide-react'
-import { useState, type FC } from 'react'
+import { type FC, useState } from 'react'
 import { DefaultLink, type LinkComponent, type Source } from '../lib/types'
 import type { GenerateHref } from '../runtime/AgentChatProvider'
 import { MarkdownText } from './MarkdownText'
@@ -19,6 +19,18 @@ interface ParsedChunk {
   text: string
   section?: string
   path?: string
+}
+
+function dedupSources(sources: Source[]): Source[] {
+  const seen = new Set<string>()
+  const out: Source[] = []
+  for (const s of sources) {
+    const key = `${s.id}:${s.slug}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(s)
+  }
+  return out
 }
 
 function parseChunkContent(content: string | undefined): ParsedChunk {
@@ -41,13 +53,8 @@ export const Sources: FC<SourcesProps> = ({ sources, generateHref, LinkComponent
     <div className="mt-3 border-t border-border/40 pt-3">
       <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Fuentes</p>
       <div className="flex flex-col gap-2">
-        {sources.map((s, i) => (
-          <SourceRow
-            key={`${s.id}:${s.slug}:${i}`}
-            source={s}
-            generateHref={generateHref}
-            LinkComponent={LinkComponent}
-          />
+        {dedupSources(sources).map(s => (
+          <SourceRow key={`${s.id}:${s.slug}`} source={s} generateHref={generateHref} LinkComponent={LinkComponent} />
         ))}
       </div>
     </div>
@@ -88,9 +95,7 @@ const SourceRow: FC<SourceRowProps> = ({ source, generateHref, LinkComponent }) 
           <span className="inline-block w-3.5" />
         )}
         <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className="flex-1 truncate font-medium text-foreground">
-          {source.title || source.slug || source.id}
-        </span>
+        <span className="flex-1 truncate font-medium text-foreground">{source.title || source.slug || source.id}</span>
         {typeof source.relevanceScore === 'number' && (
           <RelevanceBar score={1 - Math.min(Math.max(source.relevanceScore, 0), 1)} />
         )}
@@ -119,9 +124,7 @@ const SourceRow: FC<SourceRowProps> = ({ source, generateHref, LinkComponent }) 
                       {parsed.section}
                     </span>
                   )}
-                  {parsed.path && (
-                    <span className="rounded-full bg-muted px-2 py-0.5">{parsed.path}</span>
-                  )}
+                  {parsed.path && <span className="rounded-full bg-muted px-2 py-0.5">{parsed.path}</span>}
                 </div>
               )}
               <div className="max-h-48 overflow-y-auto">
