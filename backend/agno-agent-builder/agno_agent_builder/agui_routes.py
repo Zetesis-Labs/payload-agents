@@ -136,11 +136,19 @@ async def _run_with_metrics(agent: Any, run_input: RunAgentInput) -> AsyncIterat
                             logger.exception("Failed to serialise RunMetrics")
                 yield upstream_event
 
+        # Hold the terminal RUN_FINISHED so we can slot the metrics
+        # CUSTOM event in BEFORE it. AG-UI's verifyEvents requires every
+        # event to sit strictly between RUN_STARTED and RUN_FINISHED;
+        # anything emitted after RUN_FINISHED breaks downstream clients.
+        held_terminal: BaseEvent | None = None
         async for event in async_stream_agno_response_as_agui_events(
             response_stream=teed(),  # type: ignore[arg-type]
             thread_id=run_input.thread_id,
             run_id=run_id,
         ):
+            if event.type == EventType.RUN_FINISHED:
+                held_terminal = event
+                continue
             yield event
 
         if "metrics" in captured:
@@ -153,6 +161,9 @@ async def _run_with_metrics(agent: Any, run_input: RunAgentInput) -> AsyncIterat
                     "thread_id": run_input.thread_id,
                 },
             )
+
+        if held_terminal is not None:
+            yield held_terminal
 
     except Exception as exc:
         logger.exception("Agent run failed", thread_id=run_input.thread_id)

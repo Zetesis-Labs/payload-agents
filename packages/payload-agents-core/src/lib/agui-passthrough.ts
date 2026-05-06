@@ -3,20 +3,28 @@
  *
  * The portal BFF is a thin proxy in front of the agent-runtime: every
  * AG-UI event the runtime emits is forwarded to the browser unchanged.
- * On top of that we inject `CUSTOM usage` events of our own so the UI
- * can render the budget bar:
+ * On top of that we inject a single `CUSTOM usage` event of our own so
+ * the UI can keep the budget bar in sync with the daily ledger.
  *
- *   - prepended at run start: snapshot of the user's daily budget as it
- *     stood when the request was authorised.
- *   - appended after RUN_FINISHED: same snapshot updated with this
- *     run's cost.
+ * Ordering is load-bearing: AG-UI's `verifyEvents` (the SDK's runtime
+ * check on the client side) requires the first event of any run to be
+ * `RUN_STARTED` and the last to be `RUN_FINISHED`/`RUN_ERROR`. Anything
+ * before the first or after the last is rejected. So we:
  *
- * Run cost comes from the runtime's own `CUSTOM agno_run_completed`
- * event (real Agno `RunMetrics`: input_tokens, output_tokens,
- * cache_read_tokens, etc.). When the runtime fails to emit it — older
- * deployments, malformed events, etc. — we fall back to an estimate
- * derived from accumulated text content. The fallback keeps the UI
- * functional but is not authoritative for billing.
+ *   1. Forward every upstream event as soon as we see it, EXCEPT
+ *   2. Hold the terminal `RUN_FINISHED` frame.
+ *   3. Capture the runtime's `CUSTOM agno_run_completed` event during
+ *      the body so we get real `RunMetrics`.
+ *   4. Right before releasing the held `RUN_FINISHED`, slot in our own
+ *      `CUSTOM usage` event with this run's spend folded in.
+ *
+ * The provider eager-loads `/usage` on mount, so the bar paints before
+ * the first message — no need to prepend a usage event at the start.
+ *
+ * Estimation (`chars/4`) is a fallback used only when the runtime fails
+ * to emit `agno_run_completed`. The fallback is tagged `source:
+ * "estimate"` in the onRunCompleted payload so the canonical ledger
+ * never confuses real metrics with guesses.
  */
 
 import { effectiveTokensFromMetrics } from './token-usage'
@@ -33,7 +41,7 @@ export type OnStreamRunCompleted = (data: { metrics: Record<string, unknown>; ru
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-function customEvent(name: string, value: unknown): Uint8Array {
+function customEventBytes(name: string, value: unknown): Uint8Array {
   const payload = {
     type: 'CUSTOM',
     timestamp: Date.now(),
@@ -61,7 +69,7 @@ interface AGUIEvent {
   [key: string]: unknown
 }
 
-function tryParseEvent(frame: string): AGUIEvent | null {
+function parseFrame(frame: string): AGUIEvent | null {
   for (const raw of frame.split('\n')) {
     if (raw.startsWith('data: ')) {
       try {
@@ -98,15 +106,6 @@ function tokensFromMetrics(metrics: AgnoRunMetrics): number {
   return effectiveTokensFromMetrics({ input_tokens: input, output_tokens: output, cache_read_tokens: cache })
 }
 
-/**
- * Wrap the runtime's AG-UI byte stream:
- *   1. Emit `CUSTOM usage` snapshot up front.
- *   2. Forward every upstream byte unchanged.
- *   3. Capture the runtime's `CUSTOM agno_run_completed` (real metrics).
- *   4. After the stream ends, emit an updated `CUSTOM usage` and fire
- *      the onRunCompleted callback with the real metrics (or an
- *      estimate if the runtime didn't provide them).
- */
 export function passthroughAguiStream(
   upstreamBody: ReadableStream<Uint8Array>,
   usage: UsageSnapshot,
@@ -118,21 +117,16 @@ export function passthroughAguiStream(
     async start(controller) {
       let accumulatedChars = 0
       let runId: string | undefined
-      let finished = false
-      let buffer = ''
       let realMetrics: AgnoRunMetrics | undefined
+      let buffer = ''
+      let heldTerminal: Uint8Array | null = null
 
-      controller.enqueue(customEvent('usage', usagePayload(usage)))
-
-      const observeFrame = (frame: string) => {
-        const ev = tryParseEvent(frame)
+      const observe = (ev: AGUIEvent | null) => {
         if (!ev || typeof ev.type !== 'string') return
         if (ev.type === 'TEXT_MESSAGE_CONTENT' && typeof ev.delta === 'string') {
           accumulatedChars += ev.delta.length
         } else if (ev.type === 'RUN_STARTED' && typeof ev.runId === 'string') {
           runId = ev.runId
-        } else if (ev.type === 'RUN_FINISHED') {
-          finished = true
         } else if (ev.type === 'CUSTOM' && ev.name === 'agno_run_completed' && isAgnoRunMetrics(ev.value)) {
           const v = ev.value as { metrics?: unknown; run_id?: unknown }
           if (isAgnoRunMetrics(v.metrics)) realMetrics = v.metrics
@@ -140,28 +134,44 @@ export function passthroughAguiStream(
         }
       }
 
+      const handleFrame = (frameWithSeparator: string) => {
+        const frameBody = frameWithSeparator.endsWith('\n\n')
+          ? frameWithSeparator.slice(0, -2)
+          : frameWithSeparator
+        const ev = parseFrame(frameBody)
+        if (ev?.type === 'RUN_FINISHED') {
+          heldTerminal = encoder.encode(frameWithSeparator)
+          return
+        }
+        observe(ev)
+        controller.enqueue(encoder.encode(frameWithSeparator))
+      }
+
       try {
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          controller.enqueue(value)
           buffer += decoder.decode(value, { stream: true })
           let frameEnd = buffer.indexOf('\n\n')
           while (frameEnd !== -1) {
-            observeFrame(buffer.slice(0, frameEnd))
+            const frame = buffer.slice(0, frameEnd + 2)
             buffer = buffer.slice(frameEnd + 2)
+            handleFrame(frame)
             frameEnd = buffer.indexOf('\n\n')
           }
         }
 
+        // Trailing frame without `\n\n` (rare, defensive).
         if (buffer.trim()) {
-          observeFrame(buffer)
+          handleFrame(`${buffer}\n\n`)
         }
 
-        const runTokens = realMetrics ? tokensFromMetrics(realMetrics) : Math.ceil(accumulatedChars / 4)
-
-        if (finished) {
-          controller.enqueue(customEvent('usage', usagePayload(usage, runTokens)))
+        // Slot the usage CUSTOM in just before the held RUN_FINISHED so
+        // it lands inside the legal window for AG-UI's verifyEvents.
+        if (heldTerminal) {
+          const runTokens = realMetrics ? tokensFromMetrics(realMetrics) : Math.ceil(accumulatedChars / 4)
+          controller.enqueue(customEventBytes('usage', usagePayload(usage, runTokens)))
+          controller.enqueue(heldTerminal)
         }
 
         controller.close()
@@ -171,7 +181,7 @@ export function passthroughAguiStream(
             ? { ...realMetrics, source: 'agno_run_completed' }
             : {
                 estimated_output_chars: accumulatedChars,
-                estimated_tokens: runTokens,
+                estimated_tokens: Math.ceil(accumulatedChars / 4),
                 source: 'estimate'
               }
           try {
