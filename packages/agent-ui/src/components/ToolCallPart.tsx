@@ -1,6 +1,7 @@
 'use client'
 
 import type { ToolCallMessagePartComponent } from '@assistant-ui/react'
+import { decode as decodeToon } from '@toon-format/toon'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronRight, Loader2, Wrench } from 'lucide-react'
 import { type FC, useState } from 'react'
@@ -113,38 +114,67 @@ function formatResult(result: unknown): string {
   }
 }
 
+/**
+ * Tool results from the Typesense RAG handler are encoded with TOON
+ * (Token-Oriented Object Notation) — compact for LLM prompts but not
+ * JSON. Try TOON first, fall back to JSON for tools that emit plain
+ * JSON. Empty result (or unrecognised format) → no sources.
+ */
 function extractSources(result: unknown): Source[] {
   if (!result) return []
   let parsed: unknown = result
+
   if (typeof result === 'string') {
     try {
-      parsed = JSON.parse(result)
+      parsed = decodeToon(result)
     } catch {
-      return []
+      try {
+        parsed = JSON.parse(result)
+      } catch {
+        return []
+      }
     }
   }
+
   if (!parsed || typeof parsed !== 'object') return []
-  const list = Array.isArray((parsed as { sources?: unknown }).sources) ? (parsed as { sources: unknown[] }).sources : []
-  return list
+
+  // TOON shape: top-level array of chunk hits OR { hits: [...] }.
+  // JSON shape: { sources: [...] }.
+  const candidates =
+    Array.isArray(parsed)
+      ? parsed
+      : Array.isArray((parsed as { hits?: unknown }).hits)
+        ? ((parsed as { hits: unknown[] }).hits)
+        : Array.isArray((parsed as { sources?: unknown }).sources)
+          ? ((parsed as { sources: unknown[] }).sources)
+          : []
+
+  return candidates
     .filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
     .map(s => ({
-      id: String(s.id ?? ''),
-      title: String(s.title ?? ''),
-      slug: String(s.slug ?? ''),
-      type: String(s.type ?? 'document'),
+      id: String(s.chunk_id ?? s.id ?? ''),
+      title: String(s.document_title ?? s.title ?? ''),
+      slug: String(s.document_slug ?? s.slug ?? ''),
+      type: typeof s.collection === 'string' ? s.collection.replace(/_chunk$/, '') : String(s.type ?? 'document'),
       chunkIndex:
-        typeof s.chunkIndex === 'number'
-          ? s.chunkIndex
-          : typeof s.chunk_index === 'number'
-            ? s.chunk_index
+        typeof s.chunk_index === 'number'
+          ? s.chunk_index
+          : typeof s.chunkIndex === 'number'
+            ? s.chunkIndex
             : undefined,
-      content: typeof s.content === 'string' ? s.content : undefined,
+      content:
+        typeof s.chunk_text === 'string'
+          ? s.chunk_text
+          : typeof s.content === 'string'
+            ? s.content
+            : undefined,
       excerpt: typeof s.excerpt === 'string' ? s.excerpt : undefined,
       relevanceScore:
-        typeof s.relevanceScore === 'number'
-          ? s.relevanceScore
-          : typeof s.relevance_score === 'number'
-            ? s.relevance_score
+        typeof s.relevance_score === 'number'
+          ? s.relevance_score
+          : typeof s.relevanceScore === 'number'
+            ? s.relevanceScore
             : undefined
     }))
+    .filter(s => s.id !== '')
 }

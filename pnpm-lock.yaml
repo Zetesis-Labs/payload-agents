@@ -160,6 +160,9 @@ importers:
       '@tailwindcss/typography':
         specifier: ^0.5.19
         version: 0.5.19(tailwindcss@4.2.2)
+      '@toon-format/toon':
+        specifier: ^2.1.0
+        version: 2.1.0
       clsx:
         specifier: ^2.0.0
         version: 2.1.1
