@@ -1,13 +1,9 @@
 'use client'
 
 import { HttpAgent } from '@ag-ui/client'
-import {
-  AssistantRuntimeProvider,
-  ExportedMessageRepository,
-  type ThreadMessageLike
-} from '@assistant-ui/react'
-import { useAgUiRuntime } from '@assistant-ui/react-ag-ui'
 import type { ThreadHistoryAdapter } from '@assistant-ui/core'
+import { AssistantRuntimeProvider, ExportedMessageRepository, type ThreadMessageLike } from '@assistant-ui/react'
+import { useAgUiRuntime } from '@assistant-ui/react-ag-ui'
 import { createContext, type FC, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import type { LinkComponent, UsageSnapshot } from '../lib/types'
 
@@ -116,7 +112,7 @@ class PortalAgent extends HttpAgent {
     this._portalAgentSlug = config.agentSlug
   }
 
-  protected prepareRunAgentInput(
+  protected override prepareRunAgentInput(
     parameters?: Parameters<HttpAgent['runAgent']>[0]
   ): ReturnType<HttpAgent['prepareRunAgentInput']> {
     const input = (

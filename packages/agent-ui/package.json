@@ -59,6 +59,7 @@
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.52",
+    "@assistant-ui/core": "^0.1.17",
     "@assistant-ui/react": "^0.12.28",
     "@assistant-ui/react-ag-ui": "^0.0.27",
     "@tailwindcss/typography": "^0.5.19",
