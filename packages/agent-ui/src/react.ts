@@ -7,7 +7,7 @@ export { LimitAlert } from './components/LimitAlert'
 export { MarkdownText, type MarkdownTextProps } from './components/MarkdownText'
 export { Sources } from './components/Sources'
 export { TokenUsageBar } from './components/TokenUsageBar'
-export { ToolCalls } from './components/ToolCalls'
+export { buildToolCallPart } from './components/ToolCallPart'
 // Types
 export type { LinkComponent, LinkComponentProps, Source, ToolCall, UsageSnapshot } from './lib/types'
 export { DefaultLink } from './lib/types'

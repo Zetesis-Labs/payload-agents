@@ -1,15 +1,14 @@
 'use client'
 
-import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useMessage, useThreadRuntime } from '@assistant-ui/react'
+import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useThreadRuntime } from '@assistant-ui/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ArrowUpIcon, Sparkles, SquareIcon } from 'lucide-react'
-import { type FC, useEffect, useState } from 'react'
+import { type FC, useEffect, useMemo, useState } from 'react'
 import { useAgentChat } from '../runtime/AgentChatProvider'
 import { LimitAlert } from './LimitAlert'
 import { MarkdownText } from './MarkdownText'
-import { Sources } from './Sources'
 import { TokenUsageBar } from './TokenUsageBar'
-import { ToolCalls } from './ToolCalls'
+import { buildToolCallPart } from './ToolCallPart'
 
 export interface AgentThreadProps {
   welcomeTitle?: string
@@ -194,10 +193,8 @@ const UserMessage: FC = () => (
 )
 
 const AssistantMessage: FC = () => {
-  const messageId = useMessage(state => state.id)
-  const { generateHref, LinkComponent, sourcesByMessageId, toolCallsByMessageId } = useAgentChat()
-  const sources = sourcesByMessageId[messageId] ?? []
-  const toolCalls = toolCallsByMessageId[messageId] ?? []
+  const { generateHref, LinkComponent } = useAgentChat()
+  const ToolCallPart = useMemo(() => buildToolCallPart({ generateHref, LinkComponent }), [generateHref, LinkComponent])
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
@@ -209,11 +206,10 @@ const AssistantMessage: FC = () => {
       >
         <MessagePrimitive.Parts
           components={{
-            Text: MarkdownText
+            Text: MarkdownText,
+            tools: { Fallback: ToolCallPart }
           }}
         />
-        {toolCalls.length > 0 && <ToolCalls toolCalls={toolCalls} />}
-        {sources.length > 0 && <Sources sources={sources} generateHref={generateHref} LinkComponent={LinkComponent} />}
       </motion.div>
     </MessagePrimitive.Root>
   )

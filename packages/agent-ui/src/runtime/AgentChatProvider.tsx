@@ -8,8 +8,8 @@ import {
 } from '@assistant-ui/react'
 import { useAgUiRuntime } from '@assistant-ui/react-ag-ui'
 import type { ThreadHistoryAdapter } from '@assistant-ui/core'
-import { createContext, type FC, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import type { LinkComponent, Source, ToolCall, UsageSnapshot } from '../lib/types'
+import { createContext, type FC, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
+import type { LinkComponent, UsageSnapshot } from '../lib/types'
 
 /**
  * AgentChatProvider — wires an AG-UI compliant endpoint into an
@@ -19,10 +19,10 @@ import type { LinkComponent, Source, ToolCall, UsageSnapshot } from '../lib/type
  * route to the correct agent without leaking that field outside the AG-UI
  * `RunAgentInput` shape.
  *
- * Sources and tool-call results that the agent produces in its
- * `TOOL_CALL_RESULT` payloads are observed via `agent.subscribe` and
- * exposed through this context so the consuming components can render
- * citations / tool inspection without traversing assistant-ui internals.
+ * Tool calls and their results travel through assistant-ui's native
+ * tool-call message parts: register a part component via
+ * `MessagePrimitive.Parts components.tools.Fallback` to render them.
+ * Sources are parsed from the tool result inside the part renderer.
  *
  * Custom events:
  *   - `usage` (from BFF)              → setUsage, drives the budget bar.
@@ -39,10 +39,6 @@ export interface AgentChatContextValue {
   agentName?: string
   generateHref?: GenerateHref
   LinkComponent?: LinkComponent
-  /** Sources extracted from `TOOL_CALL_RESULT`s, keyed by AG-UI message id. */
-  sourcesByMessageId: Record<string, Source[]>
-  /** Tool calls observed for each message, keyed by AG-UI message id. */
-  toolCallsByMessageId: Record<string, ToolCall[]>
 }
 
 const AgentChatContext = createContext<AgentChatContextValue | null>(null)
@@ -145,9 +141,6 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
   const [usage, setUsage] = useState<UsageSnapshot | null>(null)
   const [limitError, setLimitError] = useState<string | null>(null)
   const [threadId, setThreadId] = useState<string | null>(initialThreadId ?? null)
-  const [sourcesByMessageId, setSourcesByMessageId] = useState<Record<string, Source[]>>({})
-  const [toolCallsByMessageId, setToolCallsByMessageId] = useState<Record<string, ToolCall[]>>({})
-  const toolBufferRef = useRef<Map<string, ToolCall & { argsBuffer: string; messageId?: string }>>(new Map())
 
   const agent = useMemo(
     () =>
@@ -176,70 +169,16 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
     }
   }, [endpoint, headers])
 
-  // Subscribe to agent events for our portal-specific concerns.
+  // Subscribe to portal-specific events. Standard AG-UI events
+  // (text, tool calls, run lifecycle) are handled by the runtime
+  // adapter — we only need RUN_STARTED for the threadId echo, our
+  // own CUSTOM events for the usage bar, and RUN_ERROR for the
+  // budget-cap alert.
   useEffect(() => {
     const sub = agent.subscribe({
       onRunStartedEvent: ({ event }) => {
         const tid = (event as { threadId?: string }).threadId
         if (typeof tid === 'string') setThreadId(tid)
-      },
-      onToolCallStartEvent: ({ event }) => {
-        const e = event as { toolCallId: string; toolCallName: string; parentMessageId?: string }
-        toolBufferRef.current.set(e.toolCallId, {
-          id: e.toolCallId,
-          name: e.toolCallName,
-          messageId: e.parentMessageId,
-          argsBuffer: '',
-          isLoading: true
-        })
-      },
-      onToolCallArgsEvent: ({ event }) => {
-        const e = event as { toolCallId: string; delta: string }
-        const buf = toolBufferRef.current.get(e.toolCallId)
-        if (!buf) return
-        buf.argsBuffer += e.delta
-        try {
-          buf.args = JSON.parse(buf.argsBuffer) as Record<string, unknown>
-        } catch {
-          /* still streaming */
-        }
-      },
-      onToolCallEndEvent: ({ event }) => {
-        const e = event as { toolCallId: string }
-        const buf = toolBufferRef.current.get(e.toolCallId)
-        if (!buf) return
-        buf.isLoading = false
-      },
-      onToolCallResultEvent: ({ event }) => {
-        const e = event as { toolCallId: string; messageId?: string; content?: string }
-        const buf = toolBufferRef.current.get(e.toolCallId)
-        if (!buf) return
-        buf.result = typeof e.content === 'string' ? e.content : undefined
-        buf.sources = extractSources(buf.result)
-        buf.isLoading = false
-        const mid = e.messageId ?? buf.messageId ?? '__current__'
-        setToolCallsByMessageId(prev => {
-          const list = prev[mid] ? [...prev[mid]] : []
-          const idx = list.findIndex(tc => tc.id === buf.id)
-          const sanitised: ToolCall = {
-            id: buf.id,
-            name: buf.name,
-            args: buf.args,
-            result: buf.result,
-            sources: buf.sources,
-            isLoading: false
-          }
-          if (idx >= 0) list[idx] = sanitised
-          else list.push(sanitised)
-          return { ...prev, [mid]: list }
-        })
-        const newSources = buf.sources
-        if (newSources && newSources.length > 0) {
-          setSourcesByMessageId(prev => ({
-            ...prev,
-            [mid]: dedupSources([...(prev[mid] ?? []), ...newSources])
-          }))
-        }
       },
       onCustomEvent: ({ event }) => {
         const e = event as { name?: string; value?: unknown }
@@ -285,11 +224,9 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
       threadId,
       agentName,
       generateHref,
-      LinkComponent,
-      sourcesByMessageId,
-      toolCallsByMessageId
+      LinkComponent
     }),
-    [usage, limitError, threadId, agentName, generateHref, LinkComponent, sourcesByMessageId, toolCallsByMessageId]
+    [usage, limitError, threadId, agentName, generateHref, LinkComponent]
   )
 
   return (
@@ -297,51 +234,4 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
       <AssistantRuntimeProvider runtime={runtime}>{children}</AssistantRuntimeProvider>
     </AgentChatContext.Provider>
   )
-}
-
-function extractSources(result: unknown): Source[] | undefined {
-  if (typeof result !== 'string' || !result.trim()) return undefined
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(result)
-  } catch {
-    return undefined
-  }
-  if (!parsed || typeof parsed !== 'object') return undefined
-  const list = Array.isArray((parsed as { sources?: unknown }).sources)
-    ? (parsed as { sources: unknown[] }).sources
-    : []
-  if (list.length === 0) return undefined
-  return list.filter(isObject).map(s => ({
-    id: String(s.id ?? ''),
-    title: String(s.title ?? ''),
-    slug: String(s.slug ?? ''),
-    type: String(s.type ?? 'document'),
-    chunkIndex:
-      typeof s.chunkIndex === 'number' ? s.chunkIndex : typeof s.chunk_index === 'number' ? s.chunk_index : undefined,
-    content: typeof s.content === 'string' ? s.content : undefined,
-    excerpt: typeof s.excerpt === 'string' ? s.excerpt : undefined,
-    relevanceScore:
-      typeof s.relevanceScore === 'number'
-        ? s.relevanceScore
-        : typeof s.relevance_score === 'number'
-          ? s.relevance_score
-          : undefined
-  }))
-}
-
-function dedupSources(sources: Source[]): Source[] {
-  const seen = new Set<string>()
-  const out: Source[] = []
-  for (const s of sources) {
-    const key = `${s.id}:${s.slug}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(s)
-  }
-  return out
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null
 }
