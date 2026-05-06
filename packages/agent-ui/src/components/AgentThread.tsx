@@ -1,9 +1,10 @@
 'use client'
 
-import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useThreadRuntime } from '@assistant-ui/react'
-import { AnimatePresence, motion } from 'framer-motion'
+import type { ToolCallMessagePart } from '@assistant-ui/core'
+import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useMessage } from '@assistant-ui/react'
+import { motion } from 'framer-motion'
 import { ArrowRight, ArrowUpIcon, Sparkles, SquareIcon } from 'lucide-react'
-import { type FC, useEffect, useMemo, useState } from 'react'
+import { type FC, useMemo } from 'react'
 import { useAgentChat } from '../runtime/AgentChatProvider'
 import { LimitAlert } from './LimitAlert'
 import { MarkdownText } from './MarkdownText'
@@ -36,7 +37,6 @@ export const AgentThread: FC<AgentThreadProps> = ({ welcomeTitle, welcomeSubtitl
             AssistantMessage
           }}
         />
-        <TypingIndicator />
       </ThreadPrimitive.Viewport>
       <div className="sticky bottom-0 border-t border-border bg-gradient-to-t from-background via-background to-background/80 backdrop-blur-sm">
         <TokenUsageBar />
@@ -103,44 +103,16 @@ const ThreadWelcome: FC<ThreadWelcomeProps> = ({ title, subtitle, suggestedQuest
   </motion.div>
 )
 
-const TypingIndicator: FC = () => {
-  const threadRuntime = useThreadRuntime()
-  const [isRunning, setIsRunning] = useState(false)
-  const { agentName } = useAgentChat()
-
-  useEffect(() => {
-    const unsubscribe = threadRuntime.subscribe(() => {
-      setIsRunning(threadRuntime.getState().isRunning)
-    })
-    setIsRunning(threadRuntime.getState().isRunning)
-    return unsubscribe
-  }, [threadRuntime])
-
-  return (
-    <AnimatePresence>
-      {isRunning && (
-        <motion.div
-          className="flex justify-start py-4 w-full"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="max-w-[85%] rounded-2xl rounded-bl-md border-l-4 border-l-primary/30 bg-card/80 backdrop-blur-sm px-5 py-4 text-card-foreground shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
-                <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
-                <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
-              </div>
-              <span className="text-sm text-muted-foreground">{agentName ?? 'El asistente'} está pensando...</span>
-            </div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
+const InlineThinking: FC<{ agentName: string }> = ({ agentName }) => (
+  <div className="flex items-center gap-3 text-muted-foreground">
+    <div className="flex items-center gap-1">
+      <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
+      <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
+      <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
+    </div>
+    <span className="text-sm">{agentName} está pensando...</span>
+  </div>
+)
 
 const Composer: FC = () => (
   <ComposerPrimitive.Root className="flex w-full items-end max-w-4xl mx-auto">
@@ -192,9 +164,30 @@ const UserMessage: FC = () => (
   </MessagePrimitive.Root>
 )
 
+const NOOP = () => {}
+
 const AssistantMessage: FC = () => {
-  const { generateHref, LinkComponent } = useAgentChat()
-  const ToolCallPart = useMemo(() => buildToolCallPart({ generateHref, LinkComponent }), [generateHref, LinkComponent])
+  const { generateHref, LinkComponent, agentName } = useAgentChat()
+  const ToolCallPart = useMemo(
+    () => buildToolCallPart({ generateHref, LinkComponent }),
+    [generateHref, LinkComponent]
+  )
+
+  // Read content + status manually so we can render text first and
+  // tool-calls below — `MessagePrimitive.Parts` would render in the
+  // order they arrived (tool calls usually come before the final
+  // assistant text).
+  const content = useMessage(state => state.content)
+  const isRunning = useMessage(state => state.status?.type === 'running')
+
+  const textParts: { idx: number; text: string }[] = []
+  const toolParts: { idx: number; part: ToolCallMessagePart }[] = []
+  content.forEach((part, idx) => {
+    if (part.type === 'text') textParts.push({ idx, text: part.text })
+    else if (part.type === 'tool-call') toolParts.push({ idx, part })
+  })
+
+  const hasText = textParts.some(p => p.text.trim() !== '')
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
@@ -204,12 +197,33 @@ const AssistantMessage: FC = () => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       >
-        <MessagePrimitive.Parts
-          components={{
-            Text: MarkdownText,
-            tools: { Fallback: ToolCallPart }
-          }}
-        />
+        {textParts.map(({ idx, text }) => (
+          <MarkdownText key={`text-${idx}`} text={text} />
+        ))}
+
+        {isRunning && !hasText && <InlineThinking agentName={agentName ?? 'El asistente'} />}
+
+        {toolParts.map(({ idx, part }) => (
+          <ToolCallPart
+            key={`tool-${part.toolCallId ?? idx}`}
+            type="tool-call"
+            toolCallId={part.toolCallId}
+            toolName={part.toolName}
+            args={part.args}
+            argsText={part.argsText}
+            result={part.result}
+            isError={part.isError}
+            artifact={part.artifact}
+            interrupt={part.interrupt}
+            status={
+              part.result === undefined && !part.isError
+                ? { type: 'running' as const }
+                : { type: 'complete' as const }
+            }
+            addResult={NOOP}
+            resume={NOOP}
+          />
+        ))}
       </motion.div>
     </MessagePrimitive.Root>
   )
