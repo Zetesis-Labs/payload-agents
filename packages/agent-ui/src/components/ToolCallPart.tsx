@@ -5,28 +5,23 @@ import { decode as decodeToon } from '@toon-format/toon'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronRight, Loader2, Wrench } from 'lucide-react'
 import { type FC, useState } from 'react'
-import type { LinkComponent, Source } from '../lib/types'
-import type { GenerateHref } from '../runtime/AgentChatProvider'
-import { Sources } from './Sources'
-
-interface ToolCallPartFactoryOptions {
-  generateHref?: GenerateHref
-  LinkComponent?: LinkComponent
-}
+import type { Source } from '../lib/types'
 
 /**
- * Build a `MessagePrimitive.Parts` `tools.Fallback` component bound to
- * the host's link/href helpers. The factory is needed because
- * assistant-ui constructs the part component without our context — so
- * we close over the helpers here and return a fully ready component.
+ * Build a `MessagePrimitive.Parts` `tools.Fallback` component.
+ *
+ * The card shows the tool name and disclosure toggles for Input/Output.
+ * Sources are NOT rendered inside the card — `AssistantMessage` collects
+ * sources from every tool-call part of the message, dedups them, and
+ * renders a single citations block at the bottom (matches the legacy
+ * pre-AG-UI UX).
  */
-export function buildToolCallPart({ generateHref, LinkComponent }: ToolCallPartFactoryOptions = {}): ToolCallMessagePartComponent {
+export function buildToolCallPart(): ToolCallMessagePartComponent {
   const ToolCallPart: ToolCallMessagePartComponent = ({ toolName, args, result, status, isError }) => {
     const [showInput, setShowInput] = useState(false)
     const [showOutput, setShowOutput] = useState(false)
 
     const isRunning = status?.type === 'running' || status?.type === 'requires-action'
-    const sources = extractSources(result)
     const argsText = formatArgs(args)
     const resultText = formatResult(result)
 
@@ -57,12 +52,6 @@ export function buildToolCallPart({ generateHref, LinkComponent }: ToolCallPartF
           {showInput && argsText && <CollapsiblePre>{argsText}</CollapsiblePre>}
           {showOutput && resultText && <CollapsiblePre>{resultText}</CollapsiblePre>}
         </AnimatePresence>
-
-        {sources.length > 0 && (
-          <div className="border-t border-border/40 px-3 py-2">
-            <Sources sources={sources} generateHref={generateHref} LinkComponent={LinkComponent} />
-          </div>
-        )}
       </div>
     )
   }
@@ -120,7 +109,7 @@ function formatResult(result: unknown): string {
  * JSON. Try TOON first, fall back to JSON for tools that emit plain
  * JSON. Empty result (or unrecognised format) → no sources.
  */
-function extractSources(result: unknown): Source[] {
+export function extractSources(result: unknown): Source[] {
   if (!result) return []
   let parsed: unknown = result
 

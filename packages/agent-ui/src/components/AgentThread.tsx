@@ -5,11 +5,13 @@ import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useMessage } from
 import { motion } from 'framer-motion'
 import { ArrowRight, ArrowUpIcon, Sparkles, SquareIcon } from 'lucide-react'
 import { type FC, useMemo } from 'react'
+import type { Source } from '../lib/types'
 import { useAgentChat } from '../runtime/AgentChatProvider'
 import { LimitAlert } from './LimitAlert'
 import { MarkdownText } from './MarkdownText'
+import { Sources } from './Sources'
 import { TokenUsageBar } from './TokenUsageBar'
-import { buildToolCallPart } from './ToolCallPart'
+import { buildToolCallPart, extractSources } from './ToolCallPart'
 
 export interface AgentThreadProps {
   welcomeTitle?: string
@@ -168,10 +170,7 @@ const NOOP = () => {}
 
 const AssistantMessage: FC = () => {
   const { generateHref, LinkComponent, agentName } = useAgentChat()
-  const ToolCallPart = useMemo(
-    () => buildToolCallPart({ generateHref, LinkComponent }),
-    [generateHref, LinkComponent]
-  )
+  const ToolCallPart = useMemo(() => buildToolCallPart(), [])
 
   // Read content + status manually so we can render text first and
   // tool-calls below — `MessagePrimitive.Parts` would render in the
@@ -188,6 +187,11 @@ const AssistantMessage: FC = () => {
   })
 
   const hasText = textParts.some(p => p.text.trim() !== '')
+
+  // Aggregate every tool-call's sources into a single deduped block so
+  // the user sees one "Fuentes" list per assistant message, not one
+  // per tool call. Matches the pre-migration UX.
+  const aggregatedSources = collectSources(toolParts.map(t => t.part))
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
@@ -224,7 +228,25 @@ const AssistantMessage: FC = () => {
             resume={NOOP}
           />
         ))}
+
+        {aggregatedSources.length > 0 && (
+          <Sources sources={aggregatedSources} generateHref={generateHref} LinkComponent={LinkComponent} />
+        )}
       </motion.div>
     </MessagePrimitive.Root>
   )
+}
+
+function collectSources(toolParts: readonly ToolCallMessagePart[]): Source[] {
+  const out: Source[] = []
+  const seen = new Set<string>()
+  for (const part of toolParts) {
+    for (const s of extractSources(part.result)) {
+      const key = `${s.id}:${s.slug}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(s)
+    }
+  }
+  return out
 }
