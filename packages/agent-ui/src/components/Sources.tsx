@@ -46,7 +46,12 @@ interface DocumentGroup {
 function groupByDocument(sources: Source[]): DocumentGroup[] {
   const map = new Map<string, DocumentGroup>()
   for (const s of sources) {
-    const key = `${s.type}:${s.slug || s.id}`
+    // Group strictly by (type, slug). When slug is missing every
+    // chunk would otherwise become its own group — instead we fall
+    // back to the title so chunks of the same document keep merging
+    // even when the indexer didn't store a slug.
+    const groupingKey = s.slug || s.title || s.id
+    const key = `${s.type}:${groupingKey}`
     let group = map.get(key)
     if (!group) {
       group = {

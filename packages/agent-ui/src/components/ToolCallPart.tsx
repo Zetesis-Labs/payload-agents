@@ -140,30 +140,41 @@ export function extractSources(result: unknown): Source[] {
 
   return candidates
     .filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
-    .map(s => ({
-      id: String(s.chunk_id ?? s.id ?? ''),
-      title: String(s.document_title ?? s.title ?? ''),
-      slug: String(s.document_slug ?? s.slug ?? ''),
-      type: typeof s.collection === 'string' ? s.collection.replace(/_chunk$/, '') : String(s.type ?? 'document'),
-      chunkIndex:
-        typeof s.chunk_index === 'number'
-          ? s.chunk_index
-          : typeof s.chunkIndex === 'number'
-            ? s.chunkIndex
-            : undefined,
-      content:
-        typeof s.chunk_text === 'string'
-          ? s.chunk_text
-          : typeof s.content === 'string'
-            ? s.content
-            : undefined,
-      excerpt: typeof s.excerpt === 'string' ? s.excerpt : undefined,
-      relevanceScore:
-        typeof s.relevance_score === 'number'
-          ? s.relevance_score
-          : typeof s.relevanceScore === 'number'
-            ? s.relevanceScore
-            : undefined
-    }))
+    .map(s => {
+      const headers = Array.isArray(s.headers) ? (s.headers as unknown[]) : []
+      const firstHeader = typeof headers[0] === 'string' ? (headers[0] as string) : undefined
+      const rawTitle = String(s.document_title ?? s.title ?? '')
+      const title = rawTitle.trim() || firstHeader || String(s.parent_doc_id ?? s.chunk_id ?? s.id ?? '')
+      // Score from search results is a similarity score (higher is
+      // better); other paths may pass `relevance_score` already
+      // distance-like (lower is better). Normalise to "lower is
+      // better" downstream by remembering the score sense.
+      const score = typeof s.score === 'number' ? 1 - Math.min(Math.max(s.score, 0), 1) : undefined
+      return {
+        id: String(s.chunk_id ?? s.id ?? ''),
+        title,
+        slug: String(s.parent_doc_id ?? s.document_slug ?? s.slug ?? ''),
+        type: typeof s.collection === 'string' ? s.collection.replace(/_chunk$/, '') : String(s.type ?? 'document'),
+        chunkIndex:
+          typeof s.chunk_index === 'number'
+            ? s.chunk_index
+            : typeof s.chunkIndex === 'number'
+              ? s.chunkIndex
+              : undefined,
+        content:
+          typeof s.chunk_text === 'string'
+            ? s.chunk_text
+            : typeof s.content === 'string'
+              ? s.content
+              : undefined,
+        excerpt: typeof s.excerpt === 'string' ? s.excerpt : undefined,
+        relevanceScore:
+          typeof s.relevance_score === 'number'
+            ? s.relevance_score
+            : typeof s.relevanceScore === 'number'
+              ? s.relevanceScore
+              : score
+      }
+    })
     .filter(s => s.id !== '')
 }
