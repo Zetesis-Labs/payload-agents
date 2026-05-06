@@ -39,6 +39,9 @@ export interface AgentChatContextValue {
   agentName?: string
   generateHref?: GenerateHref
   LinkComponent?: LinkComponent
+  /** Increments after every completed run; consumers like the thread
+   *  list use it to refetch when a new conversation has appeared. */
+  runCount: number
 }
 
 const AgentChatContext = createContext<AgentChatContextValue | null>(null)
@@ -141,6 +144,7 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
   const [usage, setUsage] = useState<UsageSnapshot | null>(null)
   const [limitError, setLimitError] = useState<string | null>(null)
   const [threadId, setThreadId] = useState<string | null>(initialThreadId ?? null)
+  const [runCount, setRunCount] = useState(0)
 
   const agent = useMemo(
     () =>
@@ -189,6 +193,9 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
       onRunErrorEvent: ({ event }) => {
         const msg = (event as { message?: string }).message
         setLimitError(typeof msg === 'string' && msg ? msg : 'Run failed')
+      },
+      onRunFinishedEvent: () => {
+        setRunCount(c => c + 1)
       }
     })
     return () => sub.unsubscribe()
@@ -224,9 +231,10 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
       threadId,
       agentName,
       generateHref,
-      LinkComponent
+      LinkComponent,
+      runCount
     }),
-    [usage, limitError, threadId, agentName, generateHref, LinkComponent]
+    [usage, limitError, threadId, agentName, generateHref, LinkComponent, runCount]
   )
 
   return (

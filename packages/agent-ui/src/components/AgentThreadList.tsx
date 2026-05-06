@@ -31,7 +31,7 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
   onSelectThread,
   className
 }) => {
-  const { threadId } = useAgentChat()
+  const { threadId, runCount } = useAgentChat()
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
@@ -56,9 +56,12 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
     }
   }, [sessionsEndpoint])
 
+  // Refresh on mount and after every completed run — new conversations
+  // appear in the list as soon as the server has them, without having
+  // to close and reopen the popover.
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, runCount])
 
   const handleRename = async (id: string, title: string) => {
     try {
