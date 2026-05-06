@@ -200,7 +200,11 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
       threadId: sessionId,
       forwardedProps: {
         ...forwardedRest,
-        user_id: userId
+        // Agno's session store types `user_id: Optional[str]`. Passing
+        // a number here makes `agent.arun(user_id=2)` silently skip
+        // session persistence — the run streams normally but no row
+        // is written, so `/sessions` never shows the new conversation.
+        user_id: String(userId)
       }
     }
 
