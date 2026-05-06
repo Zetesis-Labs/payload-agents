@@ -11,6 +11,7 @@ import { createAgentsListHandler } from './endpoints/agents-list'
 import { createChatHandler } from './endpoints/chat'
 import { createSessionDeleteHandler, createSessionGetHandler, createSessionPatchHandler } from './endpoints/session'
 import { createSessionsListHandler } from './endpoints/sessions'
+import { createUsageHandler } from './endpoints/usage'
 import { defaultBuildSessionId, defaultValidateSessionOwnership } from './lib/session-id'
 import type { AgentPluginConfig, ResolvedPluginConfig } from './types'
 
@@ -103,6 +104,11 @@ export function agentPlugin(userConfig: AgentPluginConfig): Plugin {
         path: `${basePath}/agents`,
         method: 'get' as const,
         handler: createAgentsListHandler(config)
+      },
+      {
+        path: `${basePath}/usage`,
+        method: 'get' as const,
+        handler: createUsageHandler(config)
       }
     ]
 

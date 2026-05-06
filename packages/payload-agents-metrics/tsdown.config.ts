@@ -14,7 +14,7 @@ export default defineConfig({
   external: [
     'payload',
     '@payloadcms/db-postgres',
-    '@zetesis/chat-agent',
+    '@zetesis/agent-ui',
     'drizzle-orm',
     '@toon-format/toon',
     'clsx',

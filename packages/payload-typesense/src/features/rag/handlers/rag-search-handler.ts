@@ -42,8 +42,6 @@ export type RAGChatRequest = {
   userMessage: string
   /** Optional chat/conversation ID for follow-up messages */
   chatId?: string
-  /** Optional selected document IDs to filter search */
-  selectedDocuments?: string[]
 }
 
 /**
@@ -74,7 +72,6 @@ export async function executeRAGSearch(
 
   const requestBody = buildMultiSearchRequestBody({
     userMessage: request.userMessage,
-    selectedDocuments: request.selectedDocuments,
     chatId: request.chatId,
     searchCollections: searchConfig.searchCollections,
     kResults: searchConfig.kResults || 10,

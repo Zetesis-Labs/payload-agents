@@ -18,7 +18,7 @@
     "@payloadcms/next": "^3.81.0",
     "@payloadcms/richtext-lexical": "^3.81.0",
     "@payloadcms/ui": "^3.81.0",
-    "@zetesis/chat-agent": "workspace:*",
+    "@zetesis/agent-ui": "workspace:*",
     "@zetesis/payload-agents-core": "workspace:*",
     "@zetesis/payload-agents-metrics": "workspace:*",
     "@zetesis/payload-documents": "workspace:*",

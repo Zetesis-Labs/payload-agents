@@ -1,6 +1,6 @@
 import type { PayloadHandler } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { ChatRequestSchema, parseChatBody } from './chat'
+import { parseChatBody, RunAgentInputSchema } from './chat'
 
 type ChatHandlerReq = Parameters<PayloadHandler>[0]
 
@@ -8,39 +8,49 @@ function fakeReq(body: () => unknown | Promise<unknown>): ChatHandlerReq {
   return { json: () => Promise.resolve(body()) } as unknown as ChatHandlerReq
 }
 
-describe('ChatRequestSchema', () => {
-  it('accepts a minimal valid body (just message)', () => {
-    expect(ChatRequestSchema.safeParse({ message: 'hi' }).success).toBe(true)
+describe('RunAgentInputSchema', () => {
+  it('accepts a minimal AG-UI body (just threadId + forwardedProps.agentSlug)', () => {
+    expect(
+      RunAgentInputSchema.safeParse({ threadId: 't1', forwardedProps: { agentSlug: 'support' } }).success
+    ).toBe(true)
   })
 
-  it('accepts a full body', () => {
-    const result = ChatRequestSchema.safeParse({ message: 'hi', chatId: 'c1', agentSlug: 'support' })
+  it('accepts a full AG-UI body with messages, runId and forwardedProps', () => {
+    const result = RunAgentInputSchema.safeParse({
+      threadId: 't1',
+      runId: 'r1',
+      messages: [{ role: 'user', content: 'hi' }],
+      state: {},
+      context: [],
+      tools: [],
+      forwardedProps: { agentSlug: 'support', user_id: 42 }
+    })
     expect(result.success).toBe(true)
   })
 
-  it('rejects an empty message', () => {
-    const result = ChatRequestSchema.safeParse({ message: '' })
-    expect(result.success).toBe(false)
+  it('accepts an empty object (auth/agentSlug checks happen in the handler, not the schema)', () => {
+    expect(RunAgentInputSchema.safeParse({}).success).toBe(true)
   })
 
-  it('rejects a missing message', () => {
-    expect(ChatRequestSchema.safeParse({}).success).toBe(false)
-  })
-
-  it('rejects a non-string message', () => {
-    expect(ChatRequestSchema.safeParse({ message: 42 }).success).toBe(false)
-  })
-
-  it('rejects a non-string agentSlug', () => {
-    expect(ChatRequestSchema.safeParse({ message: 'hi', agentSlug: 42 }).success).toBe(false)
+  it('rejects non-array messages', () => {
+    expect(RunAgentInputSchema.safeParse({ messages: 'oops' }).success).toBe(false)
   })
 })
 
 describe('parseChatBody', () => {
   it('returns ok=true with the parsed data on a valid body', async () => {
-    const result = await parseChatBody(fakeReq(() => ({ message: 'hello' })))
+    const result = await parseChatBody(
+      fakeReq(() => ({
+        threadId: 't1',
+        forwardedProps: { agentSlug: 'support' },
+        messages: [{ role: 'user', content: 'hello' }]
+      }))
+    )
     expect(result.ok).toBe(true)
-    if (result.ok) expect(result.data.message).toBe('hello')
+    if (result.ok) {
+      expect(result.data.threadId).toBe('t1')
+      expect(result.data.forwardedProps?.agentSlug).toBe('support')
+    }
   })
 
   it('returns 400 when req.json() throws (malformed JSON)', async () => {
@@ -52,33 +62,20 @@ describe('parseChatBody', () => {
     if (!result.ok) expect(result.response.status).toBe(400)
   })
 
-  it('returns 422 with details when schema fails', async () => {
-    const result = await parseChatBody(fakeReq(() => ({ agentSlug: 'a1' })))
+  it('returns 422 when the body fails schema validation', async () => {
+    const result = await parseChatBody(fakeReq(() => ({ messages: 'not-an-array' })))
     expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.response.status).toBe(422)
-      const body = (await result.response.json()) as { error: string; details: unknown }
-      expect(body.error).toBe('Invalid payload')
-      expect(body.details).toBeDefined()
-    }
+    if (!result.ok) expect(result.response.status).toBe(422)
   })
 
-  it('returns 400 when message is whitespace-only (passes schema, fails trim check)', async () => {
-    const result = await parseChatBody(fakeReq(() => ({ message: '   ' })))
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.response.status).toBe(400)
-      const body = (await result.response.json()) as { error: string }
-      expect(body.error).toBe('Message is required')
-    }
-  })
-
-  it('passes through chatId and agentSlug when present', async () => {
-    const result = await parseChatBody(fakeReq(() => ({ message: 'hi', chatId: 'c1', agentSlug: 'support' })))
+  it('passes through threadId and forwardedProps.agentSlug when present', async () => {
+    const result = await parseChatBody(
+      fakeReq(() => ({ threadId: 'c1', forwardedProps: { agentSlug: 'support' }, messages: [] }))
+    )
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.data.chatId).toBe('c1')
-      expect(result.data.agentSlug).toBe('support')
+      expect(result.data.threadId).toBe('c1')
+      expect(result.data.forwardedProps?.agentSlug).toBe('support')
     }
   })
 })

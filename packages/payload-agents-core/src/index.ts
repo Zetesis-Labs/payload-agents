@@ -18,8 +18,9 @@ export type { MultiTenantSessionStrategy, MultiTenantSessionStrategyOptions } fr
 export { multiTenantSessionStrategy } from './lib/multi-tenant'
 export { runtimeFetch } from './lib/runtime-client'
 export { defaultBuildSessionId, defaultValidateSessionOwnership } from './lib/session-id'
+export type { OnStreamRunCompleted } from './lib/agui-passthrough'
+export { passthroughAguiStream } from './lib/agui-passthrough'
 export { dedupSources, extractSources } from './lib/sources'
-export { translateAgnoStream } from './lib/sse-translator'
 export { effectiveTokensFromMetrics, getTokenUsage } from './lib/token-usage'
 export { agentPlugin } from './plugin'
 // Types

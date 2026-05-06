@@ -17,6 +17,7 @@ from agno.agent.remote import RemoteAgent
 from agno.os import AgentOS
 from fastapi import APIRouter, Depends, FastAPI, Header
 
+from agno_agent_builder.agui_routes import build_agui_router
 from agno_agent_builder.channels import (
     ChannelBinding,
     ChannelLoader,
@@ -240,5 +241,6 @@ def create_app(config: RuntimeConfig) -> FastAPI:
         return ReloadResponse(count=count, slugs=reg.slugs())
 
     app.include_router(internal_router)
+    app.include_router(build_agui_router())
 
     return app

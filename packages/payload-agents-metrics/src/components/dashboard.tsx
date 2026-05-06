@@ -1,9 +1,23 @@
 'use client'
 
-import { type Message, Thread, useAssistantRuntime } from '@zetesis/chat-agent'
+import { MarkdownText, Sources, ToolCalls, type Source as AgentSource, type ToolCall as AgentToolCall } from '@zetesis/agent-ui'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ComponentType } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+/**
+ * Local mirror of the legacy `chat-agent` Message shape. The conversation
+ * trace endpoint of payload-agents-metrics still returns this format; the
+ * dashboard renders it directly without an assistant-ui runtime since the
+ * view is read-only.
+ */
+interface Message {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+  sources?: AgentSource[]
+  toolCalls?: AgentToolCall[]
+}
 import {
   Bar,
   BarChart,
@@ -607,10 +621,13 @@ function SessionSidePanel({
             content: m.content,
             timestamp: new Date(),
             toolCalls: m.toolCalls?.map(tc => ({
-              ...tc,
-              sources: tc.sources?.map(s => ({ ...s, chunkIndex: 0, relevanceScore: 0, content: '' }))
+              id: tc.id,
+              name: tc.name,
+              args: tc.input,
+              result: tc.result,
+              sources: tc.sources
             })),
-            sources: m.sources?.map(s => ({ ...s, chunkIndex: 0, relevanceScore: 0, content: '' }))
+            sources: m.sources
           }))
         )
       })
@@ -651,7 +668,6 @@ function SessionSidePanel({
         ) : (
           <ReadOnlyThread
             messages={messages}
-            setMessages={setMessages}
             conversationId={conversationId}
             generateHref={generateHref}
             LinkComponent={Anchor}
@@ -664,31 +680,46 @@ function SessionSidePanel({
 
 function ReadOnlyThread({
   messages,
-  setMessages,
-  conversationId,
   generateHref,
   LinkComponent
 }: {
   messages: Message[]
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   conversationId: string
   generateHref: (p: { type: string; value: { id: number; slug?: string | null } }) => string
   LinkComponent: ComponentType<{ href: string; children: React.ReactNode; className?: string }> | string
 }) {
-  const runtime = useAssistantRuntime({
-    messages,
-    setMessages,
-    conversationId,
-    setConversationId: () => {},
-    selectedDocuments: [],
-    selectedAgent: null
-  })
+  const Anchor = LinkComponent as ComponentType<{
+    href: string
+    children: React.ReactNode
+    className?: string
+  }>
   return (
-    <Thread
-      runtime={runtime}
-      generateHref={generateHref}
-      LinkComponent={LinkComponent as ComponentType<Record<string, unknown>>}
-    />
+    <div className="flex h-full flex-col gap-4 overflow-y-auto bg-background p-4">
+      {messages.map((m, idx) => (
+        <div
+          key={`${m.timestamp.getTime()}-${idx}`}
+          className={cn(
+            'flex w-full',
+            m.role === 'user' ? 'justify-end' : 'justify-start'
+          )}
+        >
+          <div
+            className={cn(
+              'rounded-2xl px-4 py-3 shadow-sm',
+              m.role === 'user'
+                ? 'max-w-[80%] rounded-br-md bg-primary text-primary-foreground'
+                : 'max-w-[85%] rounded-bl-md border-l-4 border-l-primary/30 bg-card text-card-foreground'
+            )}
+          >
+            {m.role === 'assistant' ? <MarkdownText text={m.content} /> : <span className="whitespace-pre-wrap">{m.content}</span>}
+            {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls toolCalls={m.toolCalls} />}
+            {m.sources && m.sources.length > 0 && (
+              <Sources sources={m.sources} generateHref={generateHref} LinkComponent={Anchor} />
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 

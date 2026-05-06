@@ -13,8 +13,7 @@
       "@zetesis/payload-typesense",
       "@zetesis/payload-indexer",
       "@zetesis/payload-taxonomies",
-      "@zetesis/payload-lexical-blocks-builder",
-      "@zetesis/chat-agent"
+      "@zetesis/payload-lexical-blocks-builder"
     ]
   ],
   "access": "public",
