@@ -182,7 +182,16 @@ export const AgentChatProvider: FC<AgentChatProviderProps> = ({
     const sub = agent.subscribe({
       onRunStartedEvent: ({ event }) => {
         const tid = (event as { threadId?: string }).threadId
-        if (typeof tid === 'string') setThreadId(tid)
+        if (typeof tid !== 'string') return
+        setThreadId(tid)
+        // Sync the agent's own threadId to whatever the server issued
+        // for this run. Without this, every subsequent run sends the
+        // HttpAgent's original random uuid back to the BFF, which then
+        // mints a fresh session id each time — fragmenting one logical
+        // conversation across N persisted Agno sessions.
+        if (agent.threadId !== tid) {
+          agent.threadId = tid
+        }
       },
       onCustomEvent: ({ event }) => {
         const e = event as { name?: string; value?: unknown }
