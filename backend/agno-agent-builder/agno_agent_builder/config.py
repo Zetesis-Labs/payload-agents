@@ -27,6 +27,12 @@ DEFAULT_PUBLIC_PATHS: tuple[str, ...] = (
     "/discord/",
 )
 DEFAULT_RELOAD_CHANNEL = "agent_reload"
+# Channel-installation changes (telegram-bot-installations / whatsapp-installations /
+# discord-installations) trigger a NOTIFY on this channel. The runtime listens
+# and exits non-zero so K8s recreates the pod with the fresh installation set —
+# FastAPI doesn't support runtime route detach for the dynamic per-bot routers
+# the channel loaders mount at boot.
+DEFAULT_CHANNEL_RELOAD_CHANNEL = "channel_reload"
 DEFAULT_RESYNC_INTERVAL_S = 300.0
 DEFAULT_BOOT_MAX_RETRIES = 10
 DEFAULT_BOOT_BACKOFF_BASE = 2.0
@@ -49,6 +55,7 @@ class RuntimeConfig(BaseModel):
     database_schema: str = "agno"
     log_level: str = "INFO"
     reload_channel: str = DEFAULT_RELOAD_CHANNEL
+    channel_reload_channel: str = DEFAULT_CHANNEL_RELOAD_CHANNEL
     resync_interval_s: float = DEFAULT_RESYNC_INTERVAL_S
     boot_max_retries: int = DEFAULT_BOOT_MAX_RETRIES
     boot_backoff_base: float = DEFAULT_BOOT_BACKOFF_BASE

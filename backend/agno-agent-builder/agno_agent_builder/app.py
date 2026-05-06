@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hmac
+import os
+import signal
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, cast
@@ -148,6 +150,17 @@ def create_app(config: RuntimeConfig) -> FastAPI:
             if all_bindings:
                 bind_state.update(all_bindings)
 
+        async def restart_for_channel_change(_payload: str | None) -> None:
+            # FastAPI doesn't support detaching the per-bot routers the channel
+            # loaders mounted at boot, so the cleanest reaction to a channel-
+            # installation change is a process restart — K8s replaces the pod
+            # in a few seconds with the fresh installation set picked up at
+            # boot. SIGTERM gives the shutdown handlers a chance to clean up
+            # the engine + listener tasks; uvicorn turns it into a graceful
+            # exit.
+            logger.info("Channel reload notified — sending SIGTERM to self for clean restart")
+            os.kill(os.getpid(), signal.SIGTERM)
+
         listener_task = asyncio.create_task(
             run_reload_listener(
                 reload_registry,
@@ -155,9 +168,16 @@ def create_app(config: RuntimeConfig) -> FastAPI:
                 channel=config.reload_channel,
             )
         )
+        channel_listener_task = asyncio.create_task(
+            run_reload_listener(
+                restart_for_channel_change,
+                database_url=config.database_url,
+                channel=config.channel_reload_channel,
+            )
+        )
         resync_task = asyncio.create_task(periodic_resync())
         yield
-        for task in (listener_task, resync_task):
+        for task in (listener_task, channel_listener_task, resync_task):
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task

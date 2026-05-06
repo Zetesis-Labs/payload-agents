@@ -86,7 +86,7 @@ requires-dist = [
 
 [[package]]
 name = "agno-agent-builder"
-version = "0.2.0"
+version = "0.1.3"
 source = { editable = "agno-agent-builder" }
 dependencies = [
     { name = "agno", extra = ["anthropic", "mcp", "openai", "os", "postgres", "telegram"] },
@@ -1572,7 +1572,7 @@ requires-dist = [
 
 [[package]]
 name = "payload-documents-worker-builder"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "payload-documents-worker-builder" }
 dependencies = [
     { name = "fastapi" },
