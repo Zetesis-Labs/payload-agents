@@ -7,6 +7,14 @@ import { Check, ChevronDown, ChevronRight, Loader2, Wrench } from 'lucide-react'
 import { type FC, useState } from 'react'
 import type { Source } from '../lib/types'
 
+export interface ToolCallCardProps {
+  toolName: string
+  args?: unknown
+  result?: unknown
+  status?: { type: string }
+  isError?: boolean
+}
+
 /**
  * Build a `MessagePrimitive.Parts` `tools.Fallback` component.
  *
@@ -18,45 +26,45 @@ import type { Source } from '../lib/types'
  */
 export function buildToolCallPart(): ToolCallMessagePartComponent {
   const ToolCallPart: ToolCallMessagePartComponent = ({ toolName, args, result, status, isError }) => {
-    const [showInput, setShowInput] = useState(false)
-    const [showOutput, setShowOutput] = useState(false)
-
-    const isRunning = status?.type === 'running' || status?.type === 'requires-action'
-    const argsText = formatArgs(args)
-    const resultText = formatResult(result)
-
-    return (
-      <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 text-xs">
-        <div className="flex items-center gap-2 px-3 py-2">
-          {isRunning ? (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-          ) : isError ? (
-            <Wrench className="h-3 w-3 text-destructive" />
-          ) : (
-            <Check className="h-3 w-3 text-green-500" />
-          )}
-          <Wrench className="h-3 w-3 text-muted-foreground" />
-          <span className="font-mono font-semibold text-foreground">{toolName}</span>
-        </div>
-
-        <div className="flex gap-3 border-t border-border/40 px-3 py-1.5">
-          {argsText && (
-            <DisclosureButton open={showInput} onClick={() => setShowInput(v => !v)} label="Input" />
-          )}
-          {resultText && (
-            <DisclosureButton open={showOutput} onClick={() => setShowOutput(v => !v)} label="Output" />
-          )}
-        </div>
-
-        <AnimatePresence>
-          {showInput && argsText && <CollapsiblePre>{argsText}</CollapsiblePre>}
-          {showOutput && resultText && <CollapsiblePre>{resultText}</CollapsiblePre>}
-        </AnimatePresence>
-      </div>
-    )
+    return <ToolCallCard toolName={toolName} args={args} result={result} status={status} isError={isError} />
   }
 
   return ToolCallPart
+}
+
+export const ToolCallCard: FC<ToolCallCardProps> = ({ toolName, args, result, status, isError }) => {
+  const [showInput, setShowInput] = useState(false)
+  const [showOutput, setShowOutput] = useState(false)
+
+  const isRunning = status?.type === 'running' || status?.type === 'requires-action'
+  const argsText = formatArgs(args)
+  const resultText = formatResult(result)
+
+  return (
+    <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 text-xs">
+      <div className="flex items-center gap-2 px-3 py-2">
+        {isRunning ? (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+        ) : isError ? (
+          <Wrench className="h-3 w-3 text-destructive" />
+        ) : (
+          <Check className="h-3 w-3 text-green-500" />
+        )}
+        <Wrench className="h-3 w-3 text-muted-foreground" />
+        <span className="font-mono font-semibold text-foreground">{toolName}</span>
+      </div>
+
+      <div className="flex gap-3 border-t border-border/40 px-3 py-1.5">
+        {argsText && <DisclosureButton open={showInput} onClick={() => setShowInput(v => !v)} label="Input" />}
+        {resultText && <DisclosureButton open={showOutput} onClick={() => setShowOutput(v => !v)} label="Output" />}
+      </div>
+
+      <AnimatePresence>
+        {showInput && argsText && <CollapsiblePre>{argsText}</CollapsiblePre>}
+        {showOutput && resultText && <CollapsiblePre>{resultText}</CollapsiblePre>}
+      </AnimatePresence>
+    </div>
+  )
 }
 
 const DisclosureButton: FC<{ open: boolean; onClick: () => void; label: string }> = ({ open, onClick, label }) => (
@@ -71,12 +79,7 @@ const DisclosureButton: FC<{ open: boolean; onClick: () => void; label: string }
 )
 
 const CollapsiblePre: FC<{ children: string }> = ({ children }) => (
-  <motion.div
-    initial={{ height: 0 }}
-    animate={{ height: 'auto' }}
-    exit={{ height: 0 }}
-    className="overflow-hidden"
-  >
+  <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
     <pre className="border-t border-border/40 bg-muted/50 px-3 py-2 overflow-x-auto max-h-64 text-[11px] leading-relaxed text-muted-foreground font-mono whitespace-pre-wrap break-words">
       {children}
     </pre>
@@ -129,52 +132,53 @@ export function extractSources(result: unknown): Source[] {
 
   // TOON shape: top-level array of chunk hits OR { hits: [...] }.
   // JSON shape: { sources: [...] }.
-  const candidates =
-    Array.isArray(parsed)
-      ? parsed
-      : Array.isArray((parsed as { hits?: unknown }).hits)
-        ? ((parsed as { hits: unknown[] }).hits)
-        : Array.isArray((parsed as { sources?: unknown }).sources)
-          ? ((parsed as { sources: unknown[] }).sources)
-          : []
+  const candidates = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as { hits?: unknown }).hits)
+      ? (parsed as { hits: unknown[] }).hits
+      : Array.isArray((parsed as { sources?: unknown }).sources)
+        ? (parsed as { sources: unknown[] }).sources
+        : []
 
   return candidates
     .filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
-    .map(s => {
-      const headers = Array.isArray(s.headers) ? (s.headers as unknown[]) : []
-      const firstHeader = typeof headers[0] === 'string' ? (headers[0] as string) : undefined
-      const rawTitle = String(s.document_title ?? s.title ?? '')
-      const title = rawTitle.trim() || firstHeader || String(s.parent_doc_id ?? s.chunk_id ?? s.id ?? '')
-      // Score from search results is a similarity score (higher is
-      // better); other paths may pass `relevance_score` already
-      // distance-like (lower is better). Normalise to "lower is
-      // better" downstream by remembering the score sense.
-      const score = typeof s.score === 'number' ? 1 - Math.min(Math.max(s.score, 0), 1) : undefined
-      return {
-        id: String(s.chunk_id ?? s.id ?? ''),
-        title,
-        slug: String(s.parent_doc_id ?? s.document_slug ?? s.slug ?? ''),
-        type: typeof s.collection === 'string' ? s.collection.replace(/_chunk$/, '') : String(s.type ?? 'document'),
-        chunkIndex:
-          typeof s.chunk_index === 'number'
-            ? s.chunk_index
-            : typeof s.chunkIndex === 'number'
-              ? s.chunkIndex
-              : undefined,
-        content:
-          typeof s.chunk_text === 'string'
-            ? s.chunk_text
-            : typeof s.content === 'string'
-              ? s.content
-              : undefined,
-        excerpt: typeof s.excerpt === 'string' ? s.excerpt : undefined,
-        relevanceScore:
-          typeof s.relevance_score === 'number'
-            ? s.relevance_score
-            : typeof s.relevanceScore === 'number'
-              ? s.relevanceScore
-              : score
-      }
-    })
+    .map(toSource)
     .filter(s => s.id !== '')
+}
+
+function toSource(s: Record<string, unknown>): Source {
+  const title = sourceTitle(s)
+  return {
+    id: String(s.chunk_id ?? s.id ?? ''),
+    title,
+    slug: String(s.parent_doc_id ?? s.document_slug ?? s.slug ?? ''),
+    type: typeof s.collection === 'string' ? s.collection.replace(/_chunk$/, '') : String(s.type ?? 'document'),
+    chunkIndex: numberValue(s.chunk_index) ?? numberValue(s.chunkIndex),
+    content: stringValue(s.chunk_text) ?? stringValue(s.content),
+    excerpt: stringValue(s.excerpt),
+    relevanceScore: sourceRelevanceScore(s)
+  }
+}
+
+function sourceTitle(s: Record<string, unknown>): string {
+  const headers = Array.isArray(s.headers) ? s.headers : []
+  const firstHeader = typeof headers[0] === 'string' ? headers[0] : undefined
+  const rawTitle = String(s.document_title ?? s.title ?? '')
+  return rawTitle.trim() || firstHeader || String(s.parent_doc_id ?? s.chunk_id ?? s.id ?? '')
+}
+
+function sourceRelevanceScore(s: Record<string, unknown>): number | undefined {
+  if (typeof s.relevance_score === 'number') return s.relevance_score
+  if (typeof s.relevanceScore === 'number') return s.relevanceScore
+  // Search result `score` is similarity (higher is better); sources
+  // use distance-like relevance (lower is better).
+  return typeof s.score === 'number' ? 1 - Math.min(Math.max(s.score, 0), 1) : undefined
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
 }

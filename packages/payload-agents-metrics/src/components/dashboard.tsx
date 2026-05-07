@@ -1,29 +1,9 @@
 'use client'
 
-import {
-  type Source as AgentSource,
-  type ToolCall as AgentToolCall,
-  MarkdownText,
-  Sources,
-  ToolCalls
-} from '@zetesis/agent-ui'
+import { ReadOnlyThread, type ReadOnlyThreadMessage } from '@zetesis/agent-ui'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ComponentType } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-/**
- * Local mirror of the legacy `chat-agent` Message shape. The conversation
- * trace endpoint of payload-agents-metrics still returns this format; the
- * dashboard renders it directly without an assistant-ui runtime since the
- * view is read-only.
- */
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-  sources?: AgentSource[]
-  toolCalls?: AgentToolCall[]
-}
 
 import {
   Bar,
@@ -611,7 +591,7 @@ function SessionSidePanel({
   LinkComponent?: ComponentType<{ href: string; children: React.ReactNode; className?: string }>
   panelTopOffset: string
 }) {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ReadOnlyThreadMessage[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -623,17 +603,20 @@ function SessionSidePanel({
       })
       .then(data => {
         setMessages(
-          data.messages.map(m => ({
+          data.messages.map((m, index) => ({
+            id: `${conversationId}-${index}`,
             role: m.role,
-            content: m.content,
-            timestamp: new Date(),
-            toolCalls: m.toolCalls?.map(tc => ({
-              id: tc.id,
-              name: tc.name,
-              args: tc.input,
-              result: tc.result,
-              sources: tc.sources
-            })),
+            content: [
+              ...(m.content ? ([{ type: 'text', text: m.content }] satisfies ReadOnlyThreadMessage['content']) : []),
+              ...(m.toolCalls?.map(tc => ({
+                type: 'tool-call' as const,
+                toolCallId: tc.id,
+                toolName: tc.name,
+                args: tc.input,
+                result: tc.result,
+                sources: tc.sources
+              })) ?? [])
+            ],
             sources: m.sources
           }))
         )
@@ -647,8 +630,6 @@ function SessionSidePanel({
       `/${type}/${value.slug || value.id}`,
     []
   )
-
-  const Anchor = LinkComponent || 'a'
 
   return (
     <motion.div
@@ -673,61 +654,10 @@ function SessionSidePanel({
         {loading ? (
           <div className="flex h-full items-center justify-center text-muted-foreground">Loading…</div>
         ) : (
-          <ReadOnlyThread
-            messages={messages}
-            conversationId={conversationId}
-            generateHref={generateHref}
-            LinkComponent={Anchor}
-          />
+          <ReadOnlyThread messages={messages} generateHref={generateHref} LinkComponent={LinkComponent} />
         )}
       </div>
     </motion.div>
-  )
-}
-
-function ReadOnlyThread({
-  messages,
-  generateHref,
-  LinkComponent
-}: {
-  messages: Message[]
-  conversationId: string
-  generateHref: (p: { type: string; value: { id: number; slug?: string | null } }) => string
-  LinkComponent: ComponentType<{ href: string; children: React.ReactNode; className?: string }> | string
-}) {
-  const Anchor = LinkComponent as ComponentType<{
-    href: string
-    children: React.ReactNode
-    className?: string
-  }>
-  return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto bg-background p-4">
-      {messages.map(m => (
-        <div
-          key={`${m.role}-${m.timestamp.getTime()}-${m.content.slice(0, 32)}`}
-          className={cn('flex w-full', m.role === 'user' ? 'justify-end' : 'justify-start')}
-        >
-          <div
-            className={cn(
-              'rounded-2xl px-4 py-3 shadow-sm',
-              m.role === 'user'
-                ? 'max-w-[80%] rounded-br-md bg-primary text-primary-foreground'
-                : 'max-w-[85%] rounded-bl-md border-l-4 border-l-primary/30 bg-card text-card-foreground'
-            )}
-          >
-            {m.role === 'assistant' ? (
-              <MarkdownText text={m.content} />
-            ) : (
-              <span className="whitespace-pre-wrap">{m.content}</span>
-            )}
-            {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls toolCalls={m.toolCalls} />}
-            {m.sources && m.sources.length > 0 && (
-              <Sources sources={m.sources} generateHref={generateHref} LinkComponent={Anchor} />
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
   )
 }
 
