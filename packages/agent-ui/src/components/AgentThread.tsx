@@ -147,7 +147,7 @@ const Composer: FC = () => (
 
 const UserMessage: FC = () => (
   <MessagePrimitive.Root className="flex justify-end py-2 w-full">
-    <MessageBubble role="user" className="shadow-md shadow-primary/20 px-4 py-2.5">
+    <MessageBubble variant="user" className="shadow-md shadow-primary/20 px-4 py-2.5">
       <MessagePrimitive.Parts
         components={{
           Text: ({ text }) => <span className="whitespace-pre-wrap font-medium">{text}</span>
@@ -182,11 +182,14 @@ const AssistantMessage: FC = () => {
   // Aggregate every tool-call's sources into a single deduped block so
   // the user sees one "Fuentes" list per assistant message, not one
   // per tool call. Matches the pre-migration UX.
-  const aggregatedSources = collectSources(undefined, toolParts.map(t => t.part))
+  const aggregatedSources = collectSources(
+    undefined,
+    toolParts.map(t => t.part)
+  )
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
-      <MessageBubble role="assistant" className="bg-card/80 backdrop-blur-sm px-5 py-4">
+      <MessageBubble variant="assistant" className="bg-card/80 backdrop-blur-sm px-5 py-4">
         {textParts.map(({ idx, text }) => (
           <MarkdownText key={`text-${idx}`} text={text} />
         ))}
@@ -206,9 +209,7 @@ const AssistantMessage: FC = () => {
             artifact={part.artifact}
             interrupt={part.interrupt}
             status={
-              part.result === undefined && !part.isError
-                ? { type: 'running' as const }
-                : { type: 'complete' as const }
+              part.result === undefined && !part.isError ? { type: 'running' as const } : { type: 'complete' as const }
             }
             addResult={NOOP}
             resume={NOOP}

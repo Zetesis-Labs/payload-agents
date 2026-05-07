@@ -139,9 +139,7 @@ export function passthroughAguiStream(
       }
 
       const handleFrame = (frameWithSeparator: string) => {
-        const frameBody = frameWithSeparator.endsWith('\n\n')
-          ? frameWithSeparator.slice(0, -2)
-          : frameWithSeparator
+        const frameBody = frameWithSeparator.endsWith('\n\n') ? frameWithSeparator.slice(0, -2) : frameWithSeparator
         const ev = parseFrame(frameBody)
         if (ev?.type === 'RUN_FINISHED') {
           heldTerminal = encoder.encode(frameWithSeparator)

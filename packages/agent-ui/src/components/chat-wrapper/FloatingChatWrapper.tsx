@@ -10,7 +10,7 @@ import { AgentChatProvider } from '../../runtime/AgentChatProvider'
 import { AgentThread } from '../AgentThread'
 import { AgentThreadList } from '../AgentThreadList'
 import { AgentSelector } from './AgentSelector'
-import { toThreadMessageLike, type BackendMessage } from './message-adapters'
+import { type BackendMessage, toThreadMessageLike } from './message-adapters'
 import type { ImageComponentProps } from './types'
 import { useChatAgents } from './useChatAgents'
 
@@ -198,7 +198,13 @@ export function FloatingChatWrapper({
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 shrink-0">
                   {agent?.avatar ? (
                     ImageComponent ? (
-                      <ImageComponent src={agent.avatar} alt={agent.name} width={24} height={24} className="rounded-md" />
+                      <ImageComponent
+                        src={agent.avatar}
+                        alt={agent.name}
+                        width={24}
+                        height={24}
+                        className="rounded-md"
+                      />
                     ) : (
                       <img src={agent.avatar} alt={agent.name} width={24} height={24} className="rounded-md" />
                     )

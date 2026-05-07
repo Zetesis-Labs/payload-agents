@@ -14,12 +14,7 @@ export interface AgentThreadListProps {
   className?: string
 }
 
-export const AgentThreadList: FC<AgentThreadListProps> = ({
-  dataSource,
-  agentSlug,
-  onSelectThread,
-  className
-}) => {
+export const AgentThreadList: FC<AgentThreadListProps> = ({ dataSource, agentSlug, onSelectThread, className }) => {
   const { threadId, runCount } = useAgentChat()
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -86,8 +81,9 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
           {editing === session.conversation_id ? (
             <div className="flex items-center gap-2">
               <input
-                // eslint-disable-next-line jsx-a11y/no-autofocus
-                autoFocus
+                ref={el => {
+                  if (el) el.focus()
+                }}
                 className="flex-1 rounded border border-input bg-background px-2 py-1 text-sm outline-none ring-offset-background focus-visible:ring-1 focus-visible:ring-ring"
                 value={draft}
                 onChange={e => setDraft(e.target.value)}

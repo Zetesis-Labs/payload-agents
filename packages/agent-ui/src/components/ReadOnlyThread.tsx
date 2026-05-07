@@ -61,7 +61,7 @@ const ReadOnlyMessage: FC<ReadOnlyMessageProps> = ({ message, generateHref, Link
 
   return (
     <div className={cn('flex w-full', message.role === 'user' ? 'justify-end' : 'justify-start')}>
-      <MessageBubble role={message.role}>
+      <MessageBubble variant={message.role}>
         {message.role === 'assistant' ? renderAssistantText(textParts) : renderUserText(textParts)}
 
         {toolParts.map(part => (

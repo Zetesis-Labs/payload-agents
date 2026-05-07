@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { BookOpen, ChevronDown, ChevronRight, ExternalLink, FileText, Hash } from 'lucide-react'
-import { useState, type ComponentType, type FC } from 'react'
+import { type ComponentType, type FC, useState } from 'react'
 import { DefaultLink, type LinkComponent, type Source } from '../lib/types'
 import type { GenerateHref } from '../runtime/AgentChatProvider'
 import { MarkdownText } from './MarkdownText'
@@ -121,11 +121,7 @@ const DocumentRow: FC<DocumentRowProps> = ({ group, generateHref, LinkComponent 
           </span>
           <ChevronIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         </button>
-        <Link
-          href={href}
-          className="text-muted-foreground hover:text-primary shrink-0"
-          aria-label="Abrir documento"
-        >
+        <Link href={href} className="text-muted-foreground hover:text-primary shrink-0" aria-label="Abrir documento">
           <ExternalLink className="h-3 w-3" />
         </Link>
       </div>
@@ -139,8 +135,8 @@ const DocumentRow: FC<DocumentRowProps> = ({ group, generateHref, LinkComponent 
             className="overflow-hidden"
           >
             <div className="border-t border-border/40 divide-y divide-border/30">
-              {sortedChunks.map((chunk, i) => (
-                <ChunkRow key={`${chunk.id}-${i}`} chunk={chunk} />
+              {sortedChunks.map(chunk => (
+                <ChunkRow key={chunk.id} chunk={chunk} />
               ))}
             </div>
           </motion.div>

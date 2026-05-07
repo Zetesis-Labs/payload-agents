@@ -12,7 +12,7 @@ import { KpiCard } from './KpiCard'
 import { OverviewTab } from './OverviewTab'
 import { SessionCard } from './SessionCard'
 import { SessionSidePanel } from './SessionSidePanel'
-import { SessionsResponseSchema, type SessionsResponse } from './types'
+import { type SessionsResponse, SessionsResponseSchema } from './types'
 
 export interface LlmUsageDashboardProps {
   /** Tenant list for the picker. Omit or pass `[]` for single-tenant setups. */
