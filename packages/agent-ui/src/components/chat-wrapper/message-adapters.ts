@@ -18,8 +18,10 @@ export interface BackendMessage {
   }>
 }
 
-let _msgIdCounter = 0
-export const newMessageId = () => `loaded-${Date.now()}-${++_msgIdCounter}`
+export const newMessageId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `loaded-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 
 export function toThreadMessageLike(m: BackendMessage): ThreadMessageLike {
   const role: ThreadMessageLike['role'] = m.role === 'user' ? 'user' : 'assistant'
