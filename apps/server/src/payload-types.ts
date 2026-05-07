@@ -283,10 +283,6 @@ export interface Agent {
    */
   isActive?: boolean | null;
   /**
-   * When enabled, anonymous channel callers (e.g. Telegram users not yet bound to a ZP user) can chat with this agent. Leave off to require a bound user.
-   */
-  allowGuestAccess?: boolean | null;
-  /**
    * LLM model to use (e.g., openai/gpt-4o, anthropic/claude-sonnet-4-20250514)
    */
   llmModel: string;
@@ -646,7 +642,6 @@ export interface AgentsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
   isActive?: T;
-  allowGuestAccess?: T;
   llmModel?: T;
   apiKey?: T;
   apiKeyFingerprint?: T;
