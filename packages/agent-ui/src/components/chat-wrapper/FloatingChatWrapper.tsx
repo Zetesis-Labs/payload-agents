@@ -1,18 +1,17 @@
 'use client'
 
-import type { ThreadMessageLike } from '@assistant-ui/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bot, History, Maximize2, MessageCircle, Minimize2, Plus, X } from 'lucide-react'
 import type { ComponentType } from 'react'
-import { useEffect, useRef, useState } from 'react'
 
 import { AgentChatProvider } from '../../runtime/AgentChatProvider'
 import { AgentThread } from '../AgentThread'
 import { AgentThreadList } from '../AgentThreadList'
 import { AgentSelector } from './AgentSelector'
-import { toThreadMessageLike } from './message-adapters'
 import type { ImageComponentProps } from './types'
 import { useChatAgents } from './useChatAgents'
+import { useChatThread } from './useChatThread'
+import { usePanelState } from './usePanelState'
 
 function getPanelAnimationState(maximized: boolean) {
   if (maximized) {
@@ -57,18 +56,7 @@ const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidt
 
 const PANEL_SPRING = { type: 'spring' as const, damping: 30, stiffness: 300, mass: 0.8 }
 
-function getPanelInitial(maximized: boolean, isInitialLoad: boolean) {
-  if (isInitialLoad) return getPanelAnimationState(maximized)
-  return isMobileViewport() ? { y: '100%', opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }
-}
-
-function getPanelAnimate(maximized: boolean, shouldAnimate: boolean) {
-  if (shouldAnimate) return getPanelAnimationState(maximized)
-  return isMobileViewport() ? { y: 0, opacity: 1 } : { opacity: 1, scale: 1, y: 0 }
-}
-
-function getPanelExit(shouldAnimate: boolean) {
-  if (!shouldAnimate) return { opacity: 0 }
+function getPanelHiddenState() {
   return isMobileViewport() ? { y: '100%', opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }
 }
 
@@ -103,64 +91,31 @@ export function FloatingChatWrapper({
   LinkComponent,
   ImageComponent
 }: FloatingChatWrapperProps) {
-  const [open, setOpen] = useState(false)
-  const [maximized, setMaximized] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [threadKey, setThreadKey] = useState(0)
-  const [loadedThread, setLoadedThread] = useState<{ id: string; messages: ThreadMessageLike[] } | null>(null)
-  const [isInitialLoad, setIsInitialLoad] = useState(true)
-  const [shouldAnimate, setShouldAnimate] = useState(false)
-  const isFirstMount = useRef(true)
+  const { open, maximized, historyOpen, openPanel, closePanel, toggleMaximized, toggleHistory, closeHistory } =
+    usePanelState()
 
-  const { agents, selectedAgentSlug, setSelectedAgentSlug, agentLoadState } = useChatAgents(hasAccess, dataSource)
-
-  // Solo animar si no es la carga inicial en desktop
-  useEffect(() => {
-    if (isFirstMount.current) {
-      isFirstMount.current = false
-      if (typeof window !== 'undefined' && window.innerWidth >= 1024 && agents.length > 0) {
-        setOpen(true)
-        setIsInitialLoad(true)
-        // Enable animations after a short delay to prevent initial entrance animation
-        const timer = setTimeout(() => {
-          setShouldAnimate(true)
-          setIsInitialLoad(false)
-        }, 500)
-        return () => clearTimeout(timer)
-      } else {
-        setShouldAnimate(true)
-        setIsInitialLoad(false)
-      }
-    }
-  }, [agents.length])
+  const { agents, recentSessions, selectedAgentSlug, setSelectedAgentSlug, agentLoadState } = useChatAgents(
+    hasAccess,
+    dataSource
+  )
 
   const agent = agents.find(a => a.slug === selectedAgentSlug)
 
-  const loadConversation = async (conversationId: string) => {
-    try {
-      const data = await dataSource.getSession(conversationId)
-      const convertedMessages = (data.messages || []).map(toThreadMessageLike)
-
-      setLoadedThread({ id: conversationId, messages: convertedMessages })
-      setHistoryOpen(false)
-    } catch (err) {
-      console.error('[FloatingChatWrapper] loadConversation failed:', err)
-    }
-  }
+  const { loadedThread, threadKey, loadConversation, startNewThread } = useChatThread({
+    open,
+    agent,
+    recentSessions,
+    dataSource,
+    onThreadChanged: closeHistory
+  })
 
   const handleSelectThread = (id: string) => {
     void loadConversation(id)
   }
 
-  const handleNewThread = () => {
-    setLoadedThread(null)
-    setThreadKey(k => k + 1)
-    setHistoryOpen(false)
-  }
-
   const handleSelectAgent = (newSlug: string) => {
     setSelectedAgentSlug(newSlug)
-    handleNewThread() // Force new thread when switching agents
+    startNewThread()
   }
 
   if (agentLoadState === 'empty' || agentLoadState === 'error') return null
@@ -173,12 +128,12 @@ export function FloatingChatWrapper({
       <AnimatePresence>
         {!open && agents.length > 0 && (
           <motion.button
-            initial={isInitialLoad ? false : { opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            transition={shouldAnimate ? { type: 'spring', damping: 25, stiffness: 300 } : { duration: 0 }}
-            onClick={() => setOpen(true)}
-            className="fixed bottom-6 left-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl transition-shadow lg:hidden"
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            onClick={openPanel}
+            className="fixed bottom-6 left-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl hover:shadow-2xl transition-shadow"
             aria-label="Abrir chat"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -191,17 +146,17 @@ export function FloatingChatWrapper({
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={getPanelInitial(maximized, isInitialLoad)}
-            animate={getPanelAnimate(maximized, shouldAnimate)}
-            exit={getPanelExit(shouldAnimate)}
-            transition={shouldAnimate ? PANEL_SPRING : { duration: 0 }}
+            initial={{ ...getPanelAnimationState(maximized), ...getPanelHiddenState() }}
+            animate={{ ...getPanelAnimationState(maximized), opacity: 1, scale: 1, y: 0 }}
+            exit={{ ...getPanelAnimationState(maximized), ...getPanelHiddenState() }}
+            transition={PANEL_SPRING}
             className="fixed z-50 flex flex-col overflow-hidden border-border bg-background shadow-2xl lg:border"
             style={{
               ...getPanelAnimationState(maximized),
-              transition: shouldAnimate ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 py-3 backdrop-blur-sm">
+            <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 py-3 backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 shrink-0">
                   <AgentAvatar avatar={agent?.avatar} name={agent?.name ?? ''} ImageComponent={ImageComponent} />
@@ -226,7 +181,7 @@ export function FloatingChatWrapper({
               <div className="flex items-center gap-1.5">
                 <motion.button
                   type="button"
-                  onClick={handleNewThread}
+                  onClick={startNewThread}
                   className="h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   aria-label="Nuevo chat"
                   whileHover={{ scale: 1.1 }}
@@ -236,7 +191,7 @@ export function FloatingChatWrapper({
                 </motion.button>
                 <motion.button
                   type="button"
-                  onClick={() => setHistoryOpen(o => !o)}
+                  onClick={toggleHistory}
                   className={`h-9 w-9 flex items-center justify-center rounded-md transition-colors ${historyOpen ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
                   aria-label="Historial"
                   whileHover={{ scale: 1.1 }}
@@ -246,7 +201,7 @@ export function FloatingChatWrapper({
                 </motion.button>
                 <motion.button
                   type="button"
-                  onClick={() => setMaximized(m => !m)}
+                  onClick={toggleMaximized}
                   className="hidden lg:flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   aria-label={maximized ? 'Minimizar' : 'Maximizar'}
                   whileHover={{ scale: 1.1 }}
@@ -256,7 +211,7 @@ export function FloatingChatWrapper({
                 </motion.button>
                 <motion.button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={closePanel}
                   className="h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   aria-label="Cerrar chat"
                   whileHover={{ scale: 1.1 }}
@@ -300,7 +255,7 @@ export function FloatingChatWrapper({
                             </span>
                             <button
                               type="button"
-                              onClick={() => setHistoryOpen(false)}
+                              onClick={closeHistory}
                               className="text-muted-foreground hover:text-foreground"
                               aria-label="Cerrar historial"
                             >

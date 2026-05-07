@@ -18,6 +18,7 @@ export function useChatAgents(
   dataSource: AgentChatDataSource
 ): {
   agents: AgentInfo[]
+  recentSessions: SessionSummary[]
   selectedAgentSlug: string | null
   setSelectedAgentSlug: (slug: string | null) => void
   agentLoadState: AgentLoadState
@@ -67,6 +68,7 @@ export function useChatAgents(
 
   return {
     agents: agents ?? [],
+    recentSessions: recentSessions ?? [],
     selectedAgentSlug,
     setSelectedAgentSlug,
     agentLoadState
