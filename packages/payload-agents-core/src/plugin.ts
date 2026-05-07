@@ -9,6 +9,7 @@ import { createAgentsCollection } from './collections/agents'
 import { createAgentsInternalListHandler } from './endpoints/agents-internal-list'
 import { createAgentsListHandler } from './endpoints/agents-list'
 import { createChatHandler } from './endpoints/chat'
+import { createEmbedTicketHandler } from './endpoints/embed-ticket'
 import { createSessionDeleteHandler, createSessionGetHandler, createSessionPatchHandler } from './endpoints/session'
 import { createSessionsListHandler } from './endpoints/sessions'
 import { createUsageHandler } from './endpoints/usage'
@@ -75,6 +76,11 @@ export function agentPlugin(userConfig: AgentPluginConfig): Plugin {
 
     // Register endpoints on the collection
     const endpoints = [
+      {
+        path: `${basePath}/embed/ticket`,
+        method: 'post' as const,
+        handler: createEmbedTicketHandler(config)
+      },
       {
         path: basePath,
         method: 'post' as const,

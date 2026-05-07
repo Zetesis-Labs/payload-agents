@@ -122,12 +122,23 @@ export async function parseChatBody(req: Parameters<PayloadHandler>[0]): Promise
   return { ok: true, data: parsed.data }
 }
 
+import { authenticateEmbedTicket } from '../lib/embed-auth'
+
 export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler {
   return async req => {
-    const { user, payload } = req
+    let { user } = req
+    
+    // Check for embed alternative auth
+    const embedAuth = await authenticateEmbedTicket(req)
+    if (embedAuth) {
+      user = embedAuth.user
+    }
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const payload = req.payload
 
     const body = await parseChatBody(req)
     if (!body.ok) return body.response

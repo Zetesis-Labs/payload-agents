@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@toon-format/toon": "^2.1.0",
+    "jsonwebtoken": "^9.0.3",
     "zod": "^3.23.0"
   },
   "peerDependencies": {
@@ -46,6 +47,7 @@
     "payload": "^3.0.0"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.5.4",
     "payload": "^3.0.0",
     "rimraf": "3.0.2",
