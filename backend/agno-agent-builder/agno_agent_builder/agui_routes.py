@@ -68,9 +68,7 @@ def build_agui_router() -> APIRouter:
                     yield encoder.encode(event)
             except Exception as exc:  # pragma: no cover — defensive
                 logger.exception("AG-UI run failed", slug=slug, thread_id=run_input.thread_id)
-                yield encoder.encode(
-                    RunErrorEvent(type=EventType.RUN_ERROR, message=str(exc))
-                )
+                yield encoder.encode(RunErrorEvent(type=EventType.RUN_ERROR, message=str(exc)))
 
         return StreamingResponse(
             generate(),
