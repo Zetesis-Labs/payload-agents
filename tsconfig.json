@@ -6,7 +6,7 @@
     "baseUrl": "."
   },
   "references": [
-    { "path": "./packages/chat-agent" },
+    { "path": "./packages/agent-ui" },
     { "path": "./packages/payload-indexer" },
     { "path": "./packages/payload-lexical-blocks-builder" },
     { "path": "./packages/payload-taxonomies" },

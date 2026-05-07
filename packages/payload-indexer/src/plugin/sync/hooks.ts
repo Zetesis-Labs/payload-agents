@@ -3,7 +3,7 @@
  * Adapter-agnostic implementation
  */
 
-import type { CollectionConfig } from 'payload'
+import type { CollectionAfterChangeHook, CollectionAfterDeleteHook, CollectionConfig, PayloadRequest } from 'payload'
 import type { IndexerAdapter } from '../../adapter/types'
 import { logger } from '../../core/logging/logger'
 import { recordSyncFailure } from '../../core/metrics/sync-metrics'
@@ -35,25 +35,6 @@ const processTableConfigAfterChange = async (
   await syncDocumentToIndex(adapter, collectionSlug, doc, operation, tableConfig, options)
 }
 
-/**
- * Minimal Payload client surface needed by the hook to repopulate docs.
- * Kept narrow so tests can stub it without importing Payload types.
- */
-interface PayloadFindByIDClient {
-  findByID: (args: {
-    collection: string
-    id: number | string
-    depth?: number
-    overrideAccess?: boolean
-    req?: unknown
-  }) => Promise<unknown>
-}
-
-interface AfterChangeReq {
-  context?: Record<string, unknown>
-  payload?: PayloadFindByIDClient
-}
-
 const resolveSyncDepth = (tableConfigs: TableConfig[]): number =>
   tableConfigs.reduce((max, tableConfig) => (tableConfig.enabled ? Math.max(max, tableConfig.syncDepth ?? 0) : max), 0)
 
@@ -61,7 +42,7 @@ const repopulateDoc = async (
   doc: PayloadDocument,
   collectionSlug: string,
   tableConfigs: TableConfig[],
-  req: AfterChangeReq
+  req: PayloadRequest
 ): Promise<PayloadDocument> => {
   const requestedDepth = resolveSyncDepth(tableConfigs)
   if (requestedDepth === 0 || !req.payload?.findByID) return doc
@@ -98,23 +79,16 @@ const createAfterChangeHook = (
   adapter: IndexerAdapter,
   collectionSlug: string,
   onSyncError?: SyncFeatureConfig['onSyncError']
-) => {
-  return async ({
-    doc,
-    operation,
-    req
-  }: {
-    doc: PayloadDocument
-    operation: 'create' | 'update'
-    req: AfterChangeReq
-  }) => {
+): CollectionAfterChangeHook => {
+  return async ({ doc, operation, req }) => {
     if (req.context?.skipIndexSync) return
 
     const syncOptions: SyncOptions = {
       forceReindex: req.context?.forceReindex === true
     }
 
-    const populatedDoc = await repopulateDoc(doc, collectionSlug, tableConfigs, req)
+    const payloadDoc = doc as PayloadDocument
+    const populatedDoc = await repopulateDoc(payloadDoc, collectionSlug, tableConfigs, req)
 
     try {
       for (const tableConfig of tableConfigs) {
@@ -122,17 +96,17 @@ const createAfterChangeHook = (
       }
     } catch (error) {
       const syncError = error instanceof Error ? error : new Error(String(error))
-      recordSyncFailure(collectionSlug, String(doc.id), syncError.message)
+      recordSyncFailure(collectionSlug, String(payloadDoc.id), syncError.message)
       logger.error('Sync hook failed', syncError, {
         collection: collectionSlug,
-        docId: String(doc.id),
+        docId: String(payloadDoc.id),
         operation
       })
 
       if (onSyncError) {
         await onSyncError(syncError, {
           collectionSlug,
-          docId: String(doc.id),
+          docId: String(payloadDoc.id),
           operation
         })
       }
@@ -146,14 +120,16 @@ const createAfterChangeHook = (
  * Creates the afterDelete hook handler for a collection
  */
 const createAfterDeleteHook = (tableConfigs: TableConfig[], adapter: IndexerAdapter, collectionSlug: string) => {
-  return async ({ doc }: { doc: PayloadDocument; req: unknown }) => {
+  const hook: CollectionAfterDeleteHook = async ({ doc }) => {
+    const payloadDoc = doc as PayloadDocument
     await deleteDocumentFromIndex(
       adapter,
       collectionSlug,
-      doc.id,
+      payloadDoc.id,
       tableConfigs.filter(tableConfig => tableConfig.enabled)
     )
   }
+  return hook
 }
 
 /**

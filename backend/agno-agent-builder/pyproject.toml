@@ -18,6 +18,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "ag-ui-protocol>=0.1.13",
     "agno[anthropic,mcp,openai,os,postgres,telegram]>=2.6.0",
     "cryptography>=42.0",
     "fastapi>=0.115",

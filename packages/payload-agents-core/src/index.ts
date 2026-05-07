@@ -10,6 +10,8 @@ export {
   parseAgnoRuns,
   parseAgnoSession
 } from './lib/agno-schema'
+export type { OnStreamRunCompleted } from './lib/agui-passthrough'
+export { passthroughAguiStream } from './lib/agui-passthrough'
 export type { RunMetrics } from './lib/cost-calculator'
 // Utilities (for advanced consumers)
 export { costBreakdown, effectiveTokens, estimateRunCost } from './lib/cost-calculator'
@@ -19,7 +21,6 @@ export { multiTenantSessionStrategy } from './lib/multi-tenant'
 export { runtimeFetch } from './lib/runtime-client'
 export { defaultBuildSessionId, defaultValidateSessionOwnership } from './lib/session-id'
 export { dedupSources, extractSources } from './lib/sources'
-export { translateAgnoStream } from './lib/sse-translator'
 export { effectiveTokensFromMetrics, getTokenUsage } from './lib/token-usage'
 export { agentPlugin } from './plugin'
 // Types

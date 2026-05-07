@@ -85,9 +85,9 @@ class InternalAuthMiddleware:
         await self.app(scope, receive, send)
 
 
-# Matches `POST /agents/{slug}/runs` — the only AgentOS endpoint that
-# creates or updates an agno session row.
-_RUNS_PATH_RE = re.compile(r"^/agents/[^/]+/runs/?$")
+# Matches the per-agent endpoints that create or update an agno session
+# row: the legacy AgentOS `/runs` route and the AG-UI `/agui` route.
+_RUNS_PATH_RE = re.compile(r"^/agents/[^/]+/(runs|agui)/?$")
 
 
 class SessionMetadataMiddleware:

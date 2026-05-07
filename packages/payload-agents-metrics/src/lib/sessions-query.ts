@@ -47,6 +47,63 @@ function getTable(config: ResolvedMetricsConfig): string {
   return config.collectionSlug.replace(/-/g, '_')
 }
 
+function num(v: unknown): number {
+  return Number(v ?? 0)
+}
+
+function str(v: unknown): string {
+  return String(v ?? '')
+}
+
+function parseRunDates(r: Record<string, unknown>): { firstRunAt: string; lastRunAt: string; durationMs: number } {
+  const firstRunAt = r.first_run_at ? new Date(r.first_run_at as string).toISOString() : ''
+  const lastRunAt = r.last_run_at ? new Date(r.last_run_at as string).toISOString() : ''
+  const durationMs = firstRunAt && lastRunAt ? new Date(lastRunAt).getTime() - new Date(firstRunAt).getTime() : 0
+  return { firstRunAt, lastRunAt, durationMs }
+}
+
+function parseTenantInfo(
+  r: Record<string, unknown>,
+  tenantMap: Map<string, string>
+): { tenantId: number; tenantLabel: string } {
+  if (r.tenant_id == null) return { tenantId: 0, tenantLabel: '' }
+  return {
+    tenantId: Number(r.tenant_id),
+    tenantLabel: tenantMap.get(String(r.tenant_id)) ?? String(r.tenant_id)
+  }
+}
+
+function buildSessionRow(
+  r: Record<string, unknown>,
+  userMap: Map<string, string>,
+  tenantMap: Map<string, string>,
+  firstMessages: Map<string, string>
+): SessionRow {
+  const convId = str(r.conversation_id)
+  const dates = parseRunDates(r)
+  const tenant = parseTenantInfo(r, tenantMap)
+  return {
+    conversationId: convId,
+    agentSlug: str(r.agent_slug),
+    model: str(r.model),
+    userId: num(r.user_id),
+    userLabel: userMap.get(String(r.user_id)) ?? String(r.user_id),
+    tenantId: tenant.tenantId,
+    tenantLabel: tenant.tenantLabel,
+    runs: num(r.runs),
+    totalTokens: num(r.total_tokens),
+    inputTokens: num(r.input_tokens),
+    outputTokens: num(r.output_tokens),
+    costUsd: num(r.cost_usd),
+    firstRunAt: dates.firstRunAt,
+    lastRunAt: dates.lastRunAt,
+    durationMs: dates.durationMs,
+    totalLatencyMs: num(r.total_latency_ms),
+    errors: num(r.errors),
+    firstMessage: firstMessages.get(convId) ?? null
+  }
+}
+
 export async function getSessions(
   payload: BasePayload,
   config: ResolvedMetricsConfig,
@@ -145,33 +202,7 @@ export async function getSessions(
     .map(r => String(r.conversation_id))
   const firstMessages = await batchFetchFirstMessages(db, conversationIds, config.agnoSessionsTable)
 
-  const sessions: SessionRow[] = rawSessions.map(r => {
-    const convId = String(r.conversation_id ?? '')
-    const firstRunAt = r.first_run_at ? new Date(r.first_run_at as string).toISOString() : ''
-    const lastRunAt = r.last_run_at ? new Date(r.last_run_at as string).toISOString() : ''
-    const durationMs = firstRunAt && lastRunAt ? new Date(lastRunAt).getTime() - new Date(firstRunAt).getTime() : 0
-
-    return {
-      conversationId: convId,
-      agentSlug: String(r.agent_slug ?? ''),
-      model: String(r.model ?? ''),
-      userId: Number(r.user_id ?? 0),
-      userLabel: userMap.get(String(r.user_id)) ?? String(r.user_id),
-      tenantId: r.tenant_id == null ? 0 : Number(r.tenant_id),
-      tenantLabel: r.tenant_id == null ? '' : (tenantMap.get(String(r.tenant_id)) ?? String(r.tenant_id)),
-      runs: Number(r.runs ?? 0),
-      totalTokens: Number(r.total_tokens ?? 0),
-      inputTokens: Number(r.input_tokens ?? 0),
-      outputTokens: Number(r.output_tokens ?? 0),
-      costUsd: Number(r.cost_usd ?? 0),
-      firstRunAt,
-      lastRunAt,
-      durationMs,
-      totalLatencyMs: Number(r.total_latency_ms ?? 0),
-      errors: Number(r.errors ?? 0),
-      firstMessage: firstMessages.get(convId) ?? null
-    }
-  })
+  const sessions: SessionRow[] = rawSessions.map(r => buildSessionRow(r, userMap, tenantMap, firstMessages))
 
   return {
     sessions,

@@ -65,14 +65,7 @@ export function buildConversationalUrl(
  * Build multi-search requests for Typesense with hybrid search configuration
  */
 export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
-  const {
-    searchCollections,
-    selectedDocuments,
-    kResults = 10,
-    advancedConfig = {},
-    taxonomySlugs,
-    requireTaxonomies = false
-  } = config
+  const { searchCollections, kResults = 10, advancedConfig = {}, taxonomySlugs, requireTaxonomies = false } = config
 
   return searchCollections.map((collection: string) => {
     const request: TypesenseSearchRequest = {
@@ -84,11 +77,6 @@ export function buildMultiSearchRequests(config: TypesenseQueryConfig) {
     }
 
     const filters: string[] = []
-
-    if (selectedDocuments && selectedDocuments.length > 0) {
-      const documentIds = selectedDocuments.map((id: string) => `"${id}"`).join(',')
-      filters.push(`parent_doc_id:[${documentIds}]`)
-    }
 
     if (taxonomySlugs && taxonomySlugs.length > 0) {
       const taxFilter = taxonomySlugs.map((s: string) => `"${s}"`).join(',')

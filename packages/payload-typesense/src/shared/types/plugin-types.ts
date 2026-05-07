@@ -176,8 +176,6 @@ export interface TypesenseRAGSearchResult {
 export interface TypesenseQueryConfig {
   /** User's message/query */
   userMessage: string
-  /** Optional: Filter by selected document IDs */
-  selectedDocuments?: string[]
   /** Optional: Conversation ID for follow-up */
   chatId?: string
   /** Collections to search */

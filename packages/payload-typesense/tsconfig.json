@@ -3,8 +3,6 @@
   "compilerOptions": {
     "rootDir": "./src"
   },
-  "references": [
-    { "path": "../payload-indexer" }
-  ],
+  "references": [{ "path": "../payload-indexer" }],
   "include": ["src/**/*"]
 }

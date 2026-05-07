@@ -55,6 +55,53 @@ const resolveJob = async (
   return handleProcessing(args)
 }
 
+async function handleWorkerMode(req: PayloadRequest, config: EndpointConfig, id: string): Promise<Response> {
+  const docOrError = await fetchDocument(req, config.collectionSlug, id)
+  if (docOrError instanceof Response) return docOrError
+  const status = docOrError.parse_status ?? 'idle'
+  const body: { status: string; error?: string } = { status }
+  if (status === 'error' && docOrError.parse_error) body.error = docOrError.parse_error
+  return Response.json(body)
+}
+
+async function pollLlamaParseStatus(args: ResolveArgs): Promise<Response> {
+  try {
+    const job = await args.client.getJobStatus(args.jobId)
+    return await resolveJob(args, job.status, job.error_message)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'LlamaParse status check failed'
+    await updateDocument(args.req, args.config.collectionSlug, args.id, {
+      parse_status: 'error',
+      parse_error: message
+    })
+    return Response.json({ status: 'error', error: message }, { status: 500 })
+  }
+}
+
+async function handleInlineMode(req: PayloadRequest, config: EndpointConfig, id: string): Promise<Response> {
+  const clientOrError = getLlamaParseClient(config)
+  if (clientOrError instanceof Response) return clientOrError
+  const client = clientOrError
+
+  const docOrError = await fetchDocument(req, config.collectionSlug, id)
+  if (docOrError instanceof Response) return docOrError
+  const doc = docOrError
+
+  const currentStatus = doc.parse_status ?? 'idle'
+  if (!doc.parse_job_id || isTerminal(currentStatus)) {
+    return Response.json({ status: currentStatus })
+  }
+
+  return pollLlamaParseStatus({
+    req,
+    client,
+    config,
+    id,
+    jobId: doc.parse_job_id,
+    currentStatus
+  })
+}
+
 export const createParseStatusEndpoint = (config: EndpointConfig): Endpoint => ({
   path: '/:id/parse-status',
   method: 'get',
@@ -69,48 +116,7 @@ export const createParseStatusEndpoint = (config: EndpointConfig): Endpoint => (
     // In worker mode the parse runs out-of-process and the worker writes
     // `parsed_text` / `parse_status` directly via Payload REST. The status
     // endpoint becomes a passive read of whatever the worker last stamped.
-    if (config.worker) {
-      const docOrError = await fetchDocument(req, config.collectionSlug, id)
-      if (docOrError instanceof Response) return docOrError
-      const status = docOrError.parse_status ?? 'idle'
-      const body: { status: string; error?: string } = { status }
-      if (status === 'error' && docOrError.parse_error) body.error = docOrError.parse_error
-      return Response.json(body)
-    }
-
-    const clientOrError = getLlamaParseClient(config)
-    if (clientOrError instanceof Response) return clientOrError
-    const client = clientOrError
-
-    const docOrError = await fetchDocument(req, config.collectionSlug, id)
-    if (docOrError instanceof Response) return docOrError
-    const doc = docOrError
-
-    const currentStatus = doc.parse_status ?? 'idle'
-
-    if (!doc.parse_job_id || isTerminal(currentStatus)) {
-      return Response.json({ status: currentStatus })
-    }
-
-    const args: ResolveArgs = {
-      req,
-      client,
-      config,
-      id,
-      jobId: doc.parse_job_id,
-      currentStatus
-    }
-
-    try {
-      const job = await client.getJobStatus(doc.parse_job_id)
-      return await resolveJob(args, job.status, job.error_message)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'LlamaParse status check failed'
-      await updateDocument(req, config.collectionSlug, id, {
-        parse_status: 'error',
-        parse_error: message
-      })
-      return Response.json({ status: 'error', error: message }, { status: 500 })
-    }
+    if (config.worker) return handleWorkerMode(req, config, id)
+    return handleInlineMode(req, config, id)
   }
 })

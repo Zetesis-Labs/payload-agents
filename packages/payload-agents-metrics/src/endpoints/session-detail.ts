@@ -75,12 +75,61 @@ async function extractSources(
   }
 }
 
+function buildToolResultsMap(messages: AgnoMessage[]): Map<string, AgnoMessage> {
+  const map = new Map<string, AgnoMessage>()
+  for (const m of messages) {
+    if (m.role === 'tool' && m.tool_call_id) map.set(m.tool_call_id, m)
+  }
+  return map
+}
+
+function parseToolInput(args: string): Record<string, unknown> {
+  try {
+    return JSON.parse(args) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+async function buildToolCallsFromMessage(
+  message: AgnoMessage,
+  toolResults: Map<string, AgnoMessage>
+): Promise<ToolCallOut[]> {
+  const out: ToolCallOut[] = []
+  for (const tc of message.tool_calls ?? []) {
+    const input = parseToolInput(tc.function.arguments)
+    const toolResult = toolResults.get(tc.id)
+    const resultContent = toolResult?.content || undefined
+    const sources = resultContent ? await extractSources(resultContent) : []
+    out.push({
+      id: tc.id,
+      name: tc.function.name,
+      input,
+      result: resultContent,
+      sources: sources.length > 0 ? sources : undefined
+    })
+  }
+  return out
+}
+
+function dedupeSources(toolCalls: ToolCallOut[]): Array<{ id: string; title: string; slug: string; type: string }> {
+  const all = toolCalls.flatMap(t => t.sources ?? [])
+  return [...new Map(all.map(s => [s.id, s])).values()]
+}
+
+function buildAssistantMessage(content: string, pendingToolCalls: ToolCallOut[]): MappedMessage {
+  const sources = dedupeSources(pendingToolCalls)
+  return {
+    role: 'assistant',
+    content,
+    toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls : undefined,
+    sources: sources.length > 0 ? sources : undefined
+  }
+}
+
 async function mapMessages(allMessages: AgnoMessage[]): Promise<MappedMessage[]> {
   const result: MappedMessage[] = []
-  const toolResults = new Map<string, AgnoMessage>()
-  for (const m of allMessages) {
-    if (m.role === 'tool' && m.tool_call_id) toolResults.set(m.tool_call_id, m)
-  }
+  const toolResults = buildToolResultsMap(allMessages)
 
   let pendingToolCalls: ToolCallOut[] = []
   for (const m of allMessages) {
@@ -90,47 +139,16 @@ async function mapMessages(allMessages: AgnoMessage[]): Promise<MappedMessage[]>
       continue
     }
     if (m.role === 'assistant' && !m.content && m.tool_calls?.length) {
-      for (const tc of m.tool_calls) {
-        let input: Record<string, unknown> = {}
-        try {
-          input = JSON.parse(tc.function.arguments) as Record<string, unknown>
-        } catch {
-          /* */
-        }
-        const toolResult = toolResults.get(tc.id)
-        const resultContent = toolResult?.content || undefined
-        const sources = resultContent ? await extractSources(resultContent) : []
-        pendingToolCalls.push({
-          id: tc.id,
-          name: tc.function.name,
-          input,
-          result: resultContent,
-          sources: sources.length > 0 ? sources : undefined
-        })
-      }
+      pendingToolCalls.push(...(await buildToolCallsFromMessage(m, toolResults)))
       continue
     }
     if (m.role === 'assistant' && m.content) {
-      const allSources = pendingToolCalls.flatMap(t => t.sources ?? [])
-      const uniqueSources = [...new Map(allSources.map(s => [s.id, s])).values()]
-      result.push({
-        role: 'assistant',
-        content: m.content,
-        toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls : undefined,
-        sources: uniqueSources.length > 0 ? uniqueSources : undefined
-      })
+      result.push(buildAssistantMessage(m.content, pendingToolCalls))
       pendingToolCalls = []
     }
   }
   if (pendingToolCalls.length > 0) {
-    const allSources = pendingToolCalls.flatMap(t => t.sources ?? [])
-    const uniqueSources = [...new Map(allSources.map(s => [s.id, s])).values()]
-    result.push({
-      role: 'assistant',
-      content: '',
-      toolCalls: pendingToolCalls,
-      sources: uniqueSources.length > 0 ? uniqueSources : undefined
-    })
+    result.push(buildAssistantMessage('', pendingToolCalls))
   }
   return result
 }

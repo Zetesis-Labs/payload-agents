@@ -271,9 +271,10 @@ export class DocumentSyncer {
         limit: 1
       })
 
-      if (docs.length === 0 || !docs[0].content_hash) return false
+      const existingDoc = docs[0]
+      if (!existingDoc?.content_hash) return false
 
-      const unchanged = docs[0].content_hash === contentHash
+      const unchanged = existingDoc.content_hash === contentHash
       if (unchanged) {
         logger.info('Content unchanged, updating metadata only', {
           documentId: docId,

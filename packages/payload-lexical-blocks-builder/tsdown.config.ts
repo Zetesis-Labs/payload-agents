@@ -4,18 +4,12 @@ export default defineConfig({
   entry: ['src/index.ts', 'src/builder.ts', 'src/renderer.ts'],
   format: ['esm'],
   dts: {
-    resolve: true,
+    resolve: true
   },
   sourcemap: true,
   clean: true,
   treeshake: true,
   outDir: 'dist',
   tsconfig: './tsconfig.json',
-  external: [
-    'payload',
-    '@payloadcms/ui',
-    '@payloadcms/richtext-lexical',
-    'react',
-  ],
+  external: ['payload', '@payloadcms/ui', '@payloadcms/richtext-lexical', 'react']
 })
-
