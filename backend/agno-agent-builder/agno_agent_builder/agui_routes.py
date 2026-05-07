@@ -107,7 +107,7 @@ async def _run_with_metrics(agent: Any, run_input: RunAgentInput) -> AsyncIterat
 
         session_state = validate_agui_state(run_input.state, run_input.thread_id)
 
-        response_stream = agent.arun(  # type: ignore[attr-defined]
+        response_stream = agent.arun(
             input=user_input,
             session_id=run_input.thread_id,
             stream=True,
@@ -140,7 +140,7 @@ async def _run_with_metrics(agent: Any, run_input: RunAgentInput) -> AsyncIterat
         # anything emitted after RUN_FINISHED breaks downstream clients.
         held_terminal: BaseEvent | None = None
         async for event in async_stream_agno_response_as_agui_events(
-            response_stream=teed(),  # type: ignore[arg-type]
+            response_stream=teed(),
             thread_id=run_input.thread_id,
             run_id=run_id,
         ):
