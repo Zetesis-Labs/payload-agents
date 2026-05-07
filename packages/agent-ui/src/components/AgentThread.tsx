@@ -5,10 +5,11 @@ import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useMessage } from
 import { motion } from 'framer-motion'
 import { ArrowRight, ArrowUpIcon, Sparkles, SquareIcon } from 'lucide-react'
 import { type FC, useMemo } from 'react'
-import type { Source } from '../lib/types'
 import { useAgentChat } from '../runtime/AgentChatProvider'
+import { InlineThinking } from './InlineThinking'
 import { LimitAlert } from './LimitAlert'
 import { MarkdownText } from './MarkdownText'
+import { MessageBubble } from './MessageBubble'
 import { Sources } from './Sources'
 import { TokenUsageBar } from './TokenUsageBar'
 import { buildToolCallPart, collectSources } from './ToolCallPart'
@@ -49,6 +50,8 @@ export const AgentThread: FC<AgentThreadProps> = ({ welcomeTitle, welcomeSubtitl
     </ThreadPrimitive.Root>
   )
 }
+
+/* ── Welcome ─────────────────────────────────────────────────────────── */
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -105,16 +108,7 @@ const ThreadWelcome: FC<ThreadWelcomeProps> = ({ title, subtitle, suggestedQuest
   </motion.div>
 )
 
-const InlineThinking: FC<{ agentName: string }> = ({ agentName }) => (
-  <div className="flex items-center gap-3 text-muted-foreground">
-    <div className="flex items-center gap-1">
-      <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
-      <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
-      <span className="typing-dot w-2 h-2 rounded-full bg-primary/60" />
-    </div>
-    <span className="text-sm">{agentName} está pensando...</span>
-  </div>
-)
+/* ── Composer ─────────────────────────────────────────────────────────── */
 
 const Composer: FC = () => (
   <ComposerPrimitive.Root className="flex w-full items-end max-w-4xl mx-auto">
@@ -149,20 +143,17 @@ const Composer: FC = () => (
   </ComposerPrimitive.Root>
 )
 
+/* ── Messages ─────────────────────────────────────────────────────────── */
+
 const UserMessage: FC = () => (
   <MessagePrimitive.Root className="flex justify-end py-2 w-full">
-    <motion.div
-      className="max-w-[80%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-primary-foreground shadow-md shadow-primary/20"
-      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-    >
+    <MessageBubble role="user" className="shadow-md shadow-primary/20 px-4 py-2.5">
       <MessagePrimitive.Parts
         components={{
           Text: ({ text }) => <span className="whitespace-pre-wrap font-medium">{text}</span>
         }}
       />
-    </motion.div>
+    </MessageBubble>
   </MessagePrimitive.Root>
 )
 
@@ -195,12 +186,7 @@ const AssistantMessage: FC = () => {
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
-      <motion.div
-        className="max-w-[85%] rounded-2xl rounded-bl-md border-l-4 border-l-primary/30 bg-card/80 backdrop-blur-sm px-5 py-4 text-card-foreground shadow-sm"
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-      >
+      <MessageBubble role="assistant" className="bg-card/80 backdrop-blur-sm px-5 py-4">
         {textParts.map(({ idx, text }) => (
           <MarkdownText key={`text-${idx}`} text={text} />
         ))}
@@ -232,8 +218,7 @@ const AssistantMessage: FC = () => {
         {aggregatedSources.length > 0 && (
           <Sources sources={aggregatedSources} generateHref={generateHref} LinkComponent={LinkComponent} />
         )}
-      </motion.div>
+      </MessageBubble>
     </MessagePrimitive.Root>
   )
 }
-

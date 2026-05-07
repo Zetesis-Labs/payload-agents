@@ -1,11 +1,11 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import type { FC, ReactNode } from 'react'
 import type { LinkComponent, Source } from '../lib/types'
 import { cn } from '../lib/utils'
 import type { GenerateHref } from '../runtime/AgentChatProvider'
 import { MarkdownText } from './MarkdownText'
+import { MessageBubble } from './MessageBubble'
 import { Sources } from './Sources'
 import { collectSources, ToolCallCard } from './ToolCallPart'
 
@@ -46,6 +46,8 @@ export const ReadOnlyThread: FC<ReadOnlyThreadProps> = ({ messages, generateHref
   </div>
 )
 
+/* ── Single message ──────────────────────────────────────────────────── */
+
 interface ReadOnlyMessageProps {
   message: ReadOnlyThreadMessage
   generateHref?: GenerateHref
@@ -59,17 +61,7 @@ const ReadOnlyMessage: FC<ReadOnlyMessageProps> = ({ message, generateHref, Link
 
   return (
     <div className={cn('flex w-full', message.role === 'user' ? 'justify-end' : 'justify-start')}>
-      <motion.div
-        className={cn(
-          'rounded-2xl px-4 py-3 shadow-sm',
-          message.role === 'user'
-            ? 'max-w-[80%] rounded-br-md bg-primary text-primary-foreground'
-            : 'max-w-[85%] rounded-bl-md border-l-4 border-l-primary/30 bg-card text-card-foreground'
-        )}
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-      >
+      <MessageBubble role={message.role}>
         {message.role === 'assistant' ? renderAssistantText(textParts) : renderUserText(textParts)}
 
         {toolParts.map(part => (
@@ -86,10 +78,12 @@ const ReadOnlyMessage: FC<ReadOnlyMessageProps> = ({ message, generateHref, Link
         ))}
 
         {sources.length > 0 && <Sources sources={sources} generateHref={generateHref} LinkComponent={LinkComponent} />}
-      </motion.div>
+      </MessageBubble>
     </div>
   )
 }
+
+/* ── Helpers ──────────────────────────────────────────────────────────── */
 
 function renderAssistantText(textParts: Extract<ReadOnlyThreadMessagePart, { type: 'text' }>[]): ReactNode {
   return textParts.map(part => <MarkdownText key={textPartKey(part)} text={part.text} />)
@@ -106,4 +100,3 @@ function renderUserText(textParts: Extract<ReadOnlyThreadMessagePart, { type: 't
 function textPartKey(part: Extract<ReadOnlyThreadMessagePart, { type: 'text' }>): string {
   return `text-${part.text.length}-${part.text.slice(0, 48)}`
 }
-

@@ -3,8 +3,10 @@
 // Components
 export { AgentThread, type AgentThreadProps } from './components/AgentThread'
 export { AgentThreadList, type AgentThreadListProps, type SessionSummary } from './components/AgentThreadList'
+export { InlineThinking, type InlineThinkingProps } from './components/InlineThinking'
 export { LimitAlert } from './components/LimitAlert'
 export { MarkdownText, type MarkdownTextProps } from './components/MarkdownText'
+export { MessageBubble, type MessageBubbleProps } from './components/MessageBubble'
 export {
   ReadOnlyThread,
   type ReadOnlyThreadMessage,
