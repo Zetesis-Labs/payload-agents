@@ -1,0 +1,67 @@
+{
+  "name": "@zetesis/agent-ui-element",
+  "version": "0.1.0",
+  "description": "Framework-agnostic Web Component wrapping @zetesis/agent-ui — embed an AG-UI chat in any HTML page.",
+  "keywords": [
+    "web-component",
+    "custom-element",
+    "chat",
+    "ai",
+    "agent",
+    "ag-ui",
+    "assistant-ui",
+    "embed",
+    "widget"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Zetesis",
+    "url": "https://zetesis.xyz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zetesis-Labs/PayloadAgents.git",
+    "directory": "packages/agent-ui-element"
+  },
+  "homepage": "https://github.com/Zetesis-Labs/PayloadAgents/tree/main/packages/agent-ui-element#readme",
+  "bugs": {
+    "url": "https://github.com/Zetesis-Labs/PayloadAgents/issues"
+  },
+  "type": "module",
+  "main": "./dist/zetesis-agent-chat.iife.js",
+  "module": "./dist/zetesis-agent-chat.es.js",
+  "types": "./dist/element.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/element.d.ts",
+      "import": "./dist/zetesis-agent-chat.es.js",
+      "default": "./dist/zetesis-agent-chat.iife.js"
+    },
+    "./element.js": "./dist/zetesis-agent-chat.iife.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "demo": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@r2wc/react-to-web-component": "^2.1.0",
+    "@zetesis/agent-ui": "workspace:*",
+    "react": "^19.2",
+    "react-dom": "^19.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.1",
+    "typescript": "5.7.3",
+    "vite": "^6.0.0"
+  }
+}
