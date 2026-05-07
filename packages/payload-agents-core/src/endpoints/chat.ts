@@ -257,6 +257,16 @@ function extractLastUserText(messages: unknown): string {
     if (m && typeof m === 'object' && (m as { role?: unknown }).role === 'user') {
       const content = (m as { content?: unknown }).content
       if (typeof content === 'string') return content
+      // AG-UI messages may carry content as an array of parts.
+      if (Array.isArray(content)) {
+        return content
+          .filter(
+            (p): p is { text: string } =>
+              typeof p === 'object' && p !== null && 'text' in p && typeof (p as { text: unknown }).text === 'string'
+          )
+          .map(p => p.text)
+          .join('')
+      }
     }
   }
   return ''

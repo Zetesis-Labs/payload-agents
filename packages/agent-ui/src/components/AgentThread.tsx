@@ -11,7 +11,7 @@ import { LimitAlert } from './LimitAlert'
 import { MarkdownText } from './MarkdownText'
 import { Sources } from './Sources'
 import { TokenUsageBar } from './TokenUsageBar'
-import { buildToolCallPart, extractSources } from './ToolCallPart'
+import { buildToolCallPart, collectSources } from './ToolCallPart'
 
 export interface AgentThreadProps {
   welcomeTitle?: string
@@ -191,7 +191,7 @@ const AssistantMessage: FC = () => {
   // Aggregate every tool-call's sources into a single deduped block so
   // the user sees one "Fuentes" list per assistant message, not one
   // per tool call. Matches the pre-migration UX.
-  const aggregatedSources = collectSources(toolParts.map(t => t.part))
+  const aggregatedSources = collectSources(undefined, toolParts.map(t => t.part))
 
   return (
     <MessagePrimitive.Root className="flex justify-start py-4 w-full">
@@ -237,16 +237,3 @@ const AssistantMessage: FC = () => {
   )
 }
 
-function collectSources(toolParts: readonly ToolCallMessagePart[]): Source[] {
-  const out: Source[] = []
-  const seen = new Set<string>()
-  for (const part of toolParts) {
-    for (const s of extractSources(part.result)) {
-      const key = `${s.id}:${s.slug}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      out.push(s)
-    }
-  }
-  return out
-}

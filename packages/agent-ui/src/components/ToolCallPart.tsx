@@ -182,3 +182,40 @@ function numberValue(value: unknown): number | undefined {
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
+
+/**
+ * Unified source collector. Deduplicates sources from:
+ *   1. Message-level `sources` (e.g. from backend history restoration).
+ *   2. Per-tool-call `sources` arrays (pre-parsed by the backend).
+ *   3. Tool-call results parsed via `extractSources` (TOON / JSON).
+ *
+ * Used by both the live `AgentThread` and the read-only `ReadOnlyThread`
+ * so the citations block is identical regardless of context.
+ */
+export interface ToolCallSourceInput {
+  result?: unknown
+  sources?: readonly Source[]
+}
+
+export function collectSources(
+  messageSources: readonly Source[] | undefined,
+  toolParts: readonly ToolCallSourceInput[]
+): Source[] {
+  const out: Source[] = []
+  const seen = new Set<string>()
+
+  const add = (source: Source) => {
+    const key = `${source.id}:${source.slug}`
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push(source)
+  }
+
+  for (const source of messageSources ?? []) add(source)
+  for (const part of toolParts) {
+    for (const source of part.sources ?? []) add(source)
+    for (const source of extractSources(part.result)) add(source)
+  }
+
+  return out
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { Loader2, MessageSquare, Pencil, Trash2 } from 'lucide-react'
-import { type FC, useCallback, useEffect, useState } from 'react'
+import { type FC, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/utils'
 import { useAgentChat } from '../runtime/AgentChatProvider'
 
@@ -63,7 +63,10 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
     void refresh()
   }, [refresh, runCount])
 
+  const renamingRef = useRef(false)
   const handleRename = async (id: string, title: string) => {
+    if (renamingRef.current) return
+    renamingRef.current = true
     try {
       await fetch(`${sessionEndpoint}?conversationId=${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -74,6 +77,8 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
       void refresh()
     } catch (err) {
       console.error('[AgentThreadList] rename failed:', err)
+    } finally {
+      renamingRef.current = false
     }
   }
 
@@ -113,7 +118,7 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
                 onChange={e => setDraft(e.target.value)}
                 onBlur={() => handleRename(s.conversation_id, draft)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') handleRename(s.conversation_id, draft)
+                  if (e.key === 'Enter') e.currentTarget.blur()
                   if (e.key === 'Escape') setEditing(null)
                 }}
                 className="flex-1 rounded border border-input bg-background px-2 py-1 text-xs"

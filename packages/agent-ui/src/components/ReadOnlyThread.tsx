@@ -7,7 +7,7 @@ import { cn } from '../lib/utils'
 import type { GenerateHref } from '../runtime/AgentChatProvider'
 import { MarkdownText } from './MarkdownText'
 import { Sources } from './Sources'
-import { extractSources, ToolCallCard } from './ToolCallPart'
+import { collectSources, ToolCallCard } from './ToolCallPart'
 
 export type ReadOnlyThreadMessagePart =
   | {
@@ -107,25 +107,3 @@ function textPartKey(part: Extract<ReadOnlyThreadMessagePart, { type: 'text' }>)
   return `text-${part.text.length}-${part.text.slice(0, 48)}`
 }
 
-function collectSources(
-  messageSources: readonly Source[] | undefined,
-  toolParts: Extract<ReadOnlyThreadMessagePart, { type: 'tool-call' }>[]
-): Source[] {
-  const out: Source[] = []
-  const seen = new Set<string>()
-
-  const add = (source: Source) => {
-    const key = `${source.id}:${source.slug}`
-    if (seen.has(key)) return
-    seen.add(key)
-    out.push(source)
-  }
-
-  for (const source of messageSources ?? []) add(source)
-  for (const part of toolParts) {
-    for (const source of part.sources ?? []) add(source)
-    for (const source of extractSources(part.result)) add(source)
-  }
-
-  return out
-}

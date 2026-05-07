@@ -108,26 +108,27 @@ const DocumentRow: FC<DocumentRowProps> = ({ group, generateHref, LinkComponent 
 
   return (
     <div className="rounded-lg border border-border/50 bg-muted/20 text-xs">
-      <button
-        type="button"
-        onClick={() => setExpanded(v => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/40 transition-colors rounded-lg"
-      >
-        <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className="flex-1 truncate font-medium text-foreground">{group.title}</span>
-        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-          {group.chunks.length} {group.chunks.length === 1 ? 'chunk' : 'chunks'}
-        </span>
+      <div className="flex w-full items-center gap-2 px-3 py-2 hover:bg-muted/40 transition-colors rounded-lg">
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="flex flex-1 items-center gap-2 text-left min-w-0"
+        >
+          <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="flex-1 truncate font-medium text-foreground">{group.title}</span>
+          <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+            {group.chunks.length} {group.chunks.length === 1 ? 'chunk' : 'chunks'}
+          </span>
+          <ChevronIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        </button>
         <Link
           href={href}
           className="text-muted-foreground hover:text-primary shrink-0"
           aria-label="Abrir documento"
-          onClick={() => {}}
         >
           <ExternalLink className="h-3 w-3" />
         </Link>
-        <ChevronIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      </button>
+      </div>
       <AnimatePresence>
         {expanded && (
           <motion.div

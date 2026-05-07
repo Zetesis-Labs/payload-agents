@@ -13,7 +13,13 @@ export {
 } from './components/ReadOnlyThread'
 export { Sources } from './components/Sources'
 export { TokenUsageBar } from './components/TokenUsageBar'
-export { buildToolCallPart, ToolCallCard, type ToolCallCardProps } from './components/ToolCallPart'
+export {
+  buildToolCallPart,
+  collectSources,
+  ToolCallCard,
+  type ToolCallCardProps,
+  type ToolCallSourceInput
+} from './components/ToolCallPart'
 // Types
 export type { LinkComponent, LinkComponentProps, Source, ToolCall, UsageSnapshot } from './lib/types'
 export { DefaultLink } from './lib/types'

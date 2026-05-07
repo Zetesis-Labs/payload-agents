@@ -96,7 +96,11 @@ interface AgnoRunMetrics {
 }
 
 function isAgnoRunMetrics(v: unknown): v is AgnoRunMetrics {
-  return typeof v === 'object' && v !== null
+  if (typeof v !== 'object' || v === null) return false
+  // Require at least one field characteristic of Agno's RunMetrics to
+  // avoid misinterpreting an unrelated CUSTOM event payload as metrics.
+  const o = v as Record<string, unknown>
+  return typeof o.input_tokens === 'number' || typeof o.output_tokens === 'number'
 }
 
 function tokensFromMetrics(metrics: AgnoRunMetrics): number {
