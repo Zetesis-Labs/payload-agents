@@ -22,10 +22,12 @@ export {
   type ToolCallCardProps,
   type ToolCallSourceInput
 } from './components/ToolCallPart'
+export { FloatingChatWrapper, type FloatingChatWrapperProps } from './components/chat-wrapper/FloatingChatWrapper'
+export { AgentSelector, type AgentSelectorProps } from './components/chat-wrapper/AgentSelector'
+
 // Types
 export type { LinkComponent, LinkComponentProps, Source, ToolCall, UsageSnapshot } from './lib/types'
 export { DefaultLink } from './lib/types'
-// Provider + hook
 export {
   type AgentChatContextValue,
   AgentChatProvider,
