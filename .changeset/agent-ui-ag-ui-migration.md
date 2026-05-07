@@ -1,8 +1,8 @@
 ---
 '@zetesis/agent-ui': minor
-'@zetesis/payload-agents-core': major
-'@zetesis/payload-agents-metrics': major
-'@zetesis/payload-typesense': major
+'@zetesis/payload-agents-core': minor
+'@zetesis/payload-agents-metrics': minor
+'@zetesis/payload-typesense': minor
 ---
 
 feat: replace `@zetesis/chat-agent` with `@zetesis/agent-ui` (AG-UI based)
