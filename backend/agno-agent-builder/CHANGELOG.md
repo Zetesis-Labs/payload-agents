@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.3...agno-agent-builder-v0.1.4) (2026-05-07)
+
+
+### Features
+
+* **agno-agent-builder:** listen on channel_reload + restart on notify ([9a54f94](https://github.com/Zetesis-Labs/PayloadAgents/commit/9a54f94860b06b21d95ccddb1ef2e720bc1f5572))
+* replace chat-agent with AG-UI based @zetesis/agent-ui ([#64](https://github.com/Zetesis-Labs/PayloadAgents/issues/64)) ([adf5acd](https://github.com/Zetesis-Labs/PayloadAgents/commit/adf5acd9cf110bf0339389c215be2075bbf69e5e))
+
 ## [0.1.3](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.2...agno-agent-builder-v0.1.3) (2026-05-05)
 
 
