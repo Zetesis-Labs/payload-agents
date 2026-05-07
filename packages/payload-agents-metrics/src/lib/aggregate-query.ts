@@ -232,6 +232,54 @@ export async function getSeries(
   }))
 }
 
+async function decorateTenantLabels(
+  payload: BasePayload,
+  config: ResolvedMetricsConfig,
+  buckets: BucketRow[]
+): Promise<void> {
+  const ids = [...new Set(buckets.map(b => Number(b.keys.tenant)).filter(n => Number.isFinite(n)))]
+  if (ids.length === 0) return
+  const { docs } = await payload.find({
+    collection: config.tenantsSlug,
+    where: { id: { in: ids } },
+    depth: 0,
+    pagination: false,
+    limit: ids.length
+  })
+  const map = new Map(docs.map(d => [String(d.id), (d as { name?: string }).name || String(d.id)]))
+  for (const b of buckets) b.labels.tenant = map.get(b.keys.tenant) ?? b.keys.tenant
+}
+
+async function decorateUserLabels(
+  payload: BasePayload,
+  config: ResolvedMetricsConfig,
+  buckets: BucketRow[]
+): Promise<void> {
+  const ids = [...new Set(buckets.map(b => Number(b.keys.user)).filter(n => Number.isFinite(n)))]
+  if (ids.length === 0) return
+  const { docs } = await payload.find({
+    collection: config.usersSlug,
+    where: { id: { in: ids } },
+    depth: 0,
+    pagination: false,
+    limit: ids.length
+  })
+  const map = new Map(
+    docs.map(d => {
+      const u = d as { email?: string; name?: string | null }
+      return [String(d.id), u.name || u.email || String(d.id)]
+    })
+  )
+  for (const b of buckets) b.labels.user = map.get(b.keys.user) ?? b.keys.user
+}
+
+function decorateApiKeySourceLabels(buckets: BucketRow[]): void {
+  for (const b of buckets) {
+    const v = b.keys.apiKeySource
+    b.labels.apiKeySource = v === 'agent' ? 'Agent (platform key)' : v === 'user' ? 'User (BYOK)' : v
+  }
+}
+
 export async function decorateBuckets(
   payload: BasePayload,
   config: ResolvedMetricsConfig,
@@ -240,47 +288,9 @@ export async function decorateBuckets(
 ): Promise<BucketRow[]> {
   if (buckets.length === 0) return buckets
 
-  if (groupBy.includes('tenant')) {
-    const ids = [...new Set(buckets.map(b => Number(b.keys.tenant)).filter(n => Number.isFinite(n)))]
-    if (ids.length > 0) {
-      const { docs } = await payload.find({
-        collection: config.tenantsSlug,
-        where: { id: { in: ids } },
-        depth: 0,
-        pagination: false,
-        limit: ids.length
-      })
-      const map = new Map(docs.map(d => [String(d.id), (d as { name?: string }).name || String(d.id)]))
-      for (const b of buckets) b.labels.tenant = map.get(b.keys.tenant) ?? b.keys.tenant
-    }
-  }
-
-  if (groupBy.includes('user')) {
-    const ids = [...new Set(buckets.map(b => Number(b.keys.user)).filter(n => Number.isFinite(n)))]
-    if (ids.length > 0) {
-      const { docs } = await payload.find({
-        collection: config.usersSlug,
-        where: { id: { in: ids } },
-        depth: 0,
-        pagination: false,
-        limit: ids.length
-      })
-      const map = new Map(
-        docs.map(d => {
-          const u = d as { email?: string; name?: string | null }
-          return [String(d.id), u.name || u.email || String(d.id)]
-        })
-      )
-      for (const b of buckets) b.labels.user = map.get(b.keys.user) ?? b.keys.user
-    }
-  }
-
-  if (groupBy.includes('apiKeySource')) {
-    for (const b of buckets) {
-      const v = b.keys.apiKeySource
-      b.labels.apiKeySource = v === 'agent' ? 'Agent (platform key)' : v === 'user' ? 'User (BYOK)' : v
-    }
-  }
+  if (groupBy.includes('tenant')) await decorateTenantLabels(payload, config, buckets)
+  if (groupBy.includes('user')) await decorateUserLabels(payload, config, buckets)
+  if (groupBy.includes('apiKeySource')) decorateApiKeySourceLabels(buckets)
 
   for (const b of buckets) b.label = groupBy.map(g => b.labels[g]).join(' / ')
   return buckets

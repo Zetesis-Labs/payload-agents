@@ -110,6 +110,85 @@ function tokensFromMetrics(metrics: AgnoRunMetrics): number {
   return effectiveTokensFromMetrics({ input_tokens: input, output_tokens: output, cache_read_tokens: cache })
 }
 
+interface StreamState {
+  accumulatedChars: number
+  runId?: string
+  realMetrics?: AgnoRunMetrics
+}
+
+function observeContent(ev: AGUIEvent, state: StreamState): boolean {
+  if (ev.type !== 'TEXT_MESSAGE_CONTENT' || typeof ev.delta !== 'string') return false
+  state.accumulatedChars += ev.delta.length
+  return true
+}
+
+function observeRunStarted(ev: AGUIEvent, state: StreamState): boolean {
+  if (ev.type !== 'RUN_STARTED' || typeof ev.runId !== 'string') return false
+  state.runId = ev.runId
+  return true
+}
+
+function observeRunCompleted(ev: AGUIEvent, state: StreamState): void {
+  if (ev.type !== 'CUSTOM' || ev.name !== 'agno_run_completed') return
+  const v = ev.value as { metrics?: unknown; run_id?: unknown }
+  if (isAgnoRunMetrics(v.metrics)) state.realMetrics = v.metrics
+  if (typeof v.run_id === 'string') state.runId = v.run_id
+}
+
+function observeEvent(ev: AGUIEvent | null, state: StreamState): void {
+  if (!ev || typeof ev.type !== 'string') return
+  if (observeContent(ev, state)) return
+  if (observeRunStarted(ev, state)) return
+  observeRunCompleted(ev, state)
+}
+
+function buildMetricsPayload(state: StreamState): Record<string, unknown> {
+  if (state.realMetrics) return { ...state.realMetrics, source: 'agno_run_completed' }
+  return {
+    estimated_output_chars: state.accumulatedChars,
+    estimated_tokens: Math.ceil(state.accumulatedChars / 4),
+    source: 'estimate'
+  }
+}
+
+function reportRunCompleted(callback: OnStreamRunCompleted, state: StreamState): void {
+  try {
+    callback({ metrics: buildMetricsPayload(state), runId: state.runId })
+  } catch {
+    /* fire-and-forget */
+  }
+}
+
+function emitErrorAndClose(controller: ReadableStreamDefaultController<Uint8Array>, err: unknown): void {
+  try {
+    controller.enqueue(
+      encoder.encode(
+        `data: ${JSON.stringify({ type: 'RUN_ERROR', message: err instanceof Error ? err.message : 'Stream error' })}\n\n`
+      )
+    )
+  } catch {
+    /* controller may already be closed */
+  }
+  try {
+    controller.close()
+  } catch {
+    /* already closed */
+  }
+}
+
+function flushHeldTerminal(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  heldTerminal: Uint8Array,
+  usage: UsageSnapshot,
+  state: StreamState
+): void {
+  // Slot the usage CUSTOM in just before the held RUN_FINISHED so it
+  // lands inside the legal window for AG-UI's verifyEvents.
+  const runTokens = state.realMetrics ? tokensFromMetrics(state.realMetrics) : Math.ceil(state.accumulatedChars / 4)
+  controller.enqueue(customEventBytes('usage', usagePayload(usage, runTokens)))
+  controller.enqueue(heldTerminal)
+}
+
 export function passthroughAguiStream(
   upstreamBody: ReadableStream<Uint8Array>,
   usage: UsageSnapshot,
@@ -119,24 +198,9 @@ export function passthroughAguiStream(
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
-      let accumulatedChars = 0
-      let runId: string | undefined
-      let realMetrics: AgnoRunMetrics | undefined
+      const state: StreamState = { accumulatedChars: 0 }
       let buffer = ''
       let heldTerminal: Uint8Array | null = null
-
-      const observe = (ev: AGUIEvent | null) => {
-        if (!ev || typeof ev.type !== 'string') return
-        if (ev.type === 'TEXT_MESSAGE_CONTENT' && typeof ev.delta === 'string') {
-          accumulatedChars += ev.delta.length
-        } else if (ev.type === 'RUN_STARTED' && typeof ev.runId === 'string') {
-          runId = ev.runId
-        } else if (ev.type === 'CUSTOM' && ev.name === 'agno_run_completed' && isAgnoRunMetrics(ev.value)) {
-          const v = ev.value as { metrics?: unknown; run_id?: unknown }
-          if (isAgnoRunMetrics(v.metrics)) realMetrics = v.metrics
-          if (typeof v.run_id === 'string') runId = v.run_id
-        }
-      }
 
       const handleFrame = (frameWithSeparator: string) => {
         const frameBody = frameWithSeparator.endsWith('\n\n') ? frameWithSeparator.slice(0, -2) : frameWithSeparator
@@ -145,7 +209,7 @@ export function passthroughAguiStream(
           heldTerminal = encoder.encode(frameWithSeparator)
           return
         }
-        observe(ev)
+        observeEvent(ev, state)
         controller.enqueue(encoder.encode(frameWithSeparator))
       }
 
@@ -164,49 +228,15 @@ export function passthroughAguiStream(
         }
 
         // Trailing frame without `\n\n` (rare, defensive).
-        if (buffer.trim()) {
-          handleFrame(`${buffer}\n\n`)
-        }
+        if (buffer.trim()) handleFrame(`${buffer}\n\n`)
 
-        // Slot the usage CUSTOM in just before the held RUN_FINISHED so
-        // it lands inside the legal window for AG-UI's verifyEvents.
-        if (heldTerminal) {
-          const runTokens = realMetrics ? tokensFromMetrics(realMetrics) : Math.ceil(accumulatedChars / 4)
-          controller.enqueue(customEventBytes('usage', usagePayload(usage, runTokens)))
-          controller.enqueue(heldTerminal)
-        }
+        if (heldTerminal) flushHeldTerminal(controller, heldTerminal, usage, state)
 
         controller.close()
 
-        if (onRunCompleted) {
-          const metricsPayload: Record<string, unknown> = realMetrics
-            ? { ...realMetrics, source: 'agno_run_completed' }
-            : {
-                estimated_output_chars: accumulatedChars,
-                estimated_tokens: Math.ceil(accumulatedChars / 4),
-                source: 'estimate'
-              }
-          try {
-            onRunCompleted({ metrics: metricsPayload, runId })
-          } catch {
-            /* fire-and-forget */
-          }
-        }
+        if (onRunCompleted) reportRunCompleted(onRunCompleted, state)
       } catch (err) {
-        try {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: 'RUN_ERROR', message: err instanceof Error ? err.message : 'Stream error' })}\n\n`
-            )
-          )
-        } catch {
-          /* controller may already be closed */
-        }
-        try {
-          controller.close()
-        } catch {
-          /* already closed */
-        }
+        emitErrorAndClose(controller, err)
       }
     },
     async cancel(reason) {

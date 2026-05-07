@@ -9,7 +9,7 @@ import { validateSearchRequest } from './validators'
  * Creates a handler for standard search requests
  */
 export const createSearchHandler = (typesenseClient: Client, pluginOptions: ModularPluginConfig): PayloadHandler => {
-  const searchService = new SearchService(typesenseClient, pluginOptions)
+  const searchService = new SearchService(typesenseClient)
   const targetResolver = new TargetCollectionResolver(pluginOptions)
   const configMapper = new SearchConfigMapper(pluginOptions)
 

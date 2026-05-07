@@ -191,13 +191,12 @@ function SessionsList(props: {
   const [page, setPage] = useState(1)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const filterKey = useMemo(
-    () => `${props.from}|${props.to}|${props.tenantId}|${props.agentSlug}|${props.model}|${props.userId}`,
-    [props.from, props.to, props.tenantId, props.agentSlug, props.model, props.userId]
-  )
-  useEffect(() => {
+  const filterKey = `${props.from}|${props.to}|${props.tenantId}|${props.agentSlug}|${props.model}|${props.userId}`
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey)
     setPage(1)
-  }, [filterKey])
+  }
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()

@@ -1,6 +1,5 @@
 import type { TableConfig } from '@zetesis/payload-indexer'
 import type { Client } from 'typesense'
-import type { ModularPluginConfig } from '../../../core/config/types'
 import { logger } from '../../../core/logging/logger'
 import { searchCache } from '../../../shared/cache/cache'
 import { DEFAULT_ALPHA, DEFAULT_K } from '../constants'
@@ -10,10 +9,7 @@ import type { CombinedSearchResult, UniversalSearchOptions } from '../types'
 import { buildMultiCollectionVectorSearchParams } from '../vector/build-multi-collection-params'
 
 export class SearchService {
-  constructor(
-    private typesenseClient: Client,
-    private pluginOptions: ModularPluginConfig
-  ) {}
+  constructor(private typesenseClient: Client) {}
 
   async performSearch(
     query: string,

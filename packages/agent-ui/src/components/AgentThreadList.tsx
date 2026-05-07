@@ -1,11 +1,11 @@
 'use client'
 
 import { Loader2, MessageSquare, Pencil, Trash2 } from 'lucide-react'
-import { type FC, useCallback, useEffect, useRef, useState } from 'react'
+import { type FC, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { cn } from '../lib/utils'
 import { useAgentChat } from '../runtime/AgentChatProvider'
-import type { AgentChatDataSource, SessionSummary } from './chat-wrapper/types'
+import type { AgentChatDataSource } from './chat-wrapper/types'
 
 export interface AgentThreadListProps {
   dataSource: AgentChatDataSource

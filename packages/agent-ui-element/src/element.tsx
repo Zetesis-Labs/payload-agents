@@ -12,24 +12,13 @@ interface Props {
   welcomeSubtitle?: string
 }
 
-const ChatRoot: FC<Props> = ({
-  endpoint,
-  agentSlug,
-  agentName,
-  authToken,
-  welcomeTitle,
-  welcomeSubtitle
-}) => {
-  const headers = useMemo(
-    () => (authToken ? { Authorization: `Bearer ${authToken}` } : undefined),
-    [authToken]
-  )
+const ChatRoot: FC<Props> = ({ endpoint, agentSlug, agentName, authToken, welcomeTitle, welcomeSubtitle }) => {
+  const headers = useMemo(() => (authToken ? { Authorization: `Bearer ${authToken}` } : undefined), [authToken])
 
   if (!endpoint || !agentSlug) {
     return (
       <div style={{ padding: 16, color: '#666' }}>
-        <strong>&lt;zetesis-agent-chat&gt;</strong> requires <code>endpoint</code> and{' '}
-        <code>agent-slug</code>.
+        <strong>&lt;zetesis-agent-chat&gt;</strong> requires <code>endpoint</code> and <code>agent-slug</code>.
       </div>
     )
   }
@@ -38,12 +27,7 @@ const ChatRoot: FC<Props> = ({
     <>
       <style>{shadowCss}</style>
       <div className="flex h-full w-full flex-col bg-background text-foreground">
-        <AgentChatProvider
-          endpoint={endpoint}
-          agentSlug={agentSlug}
-          agentName={agentName}
-          headers={headers}
-        >
+        <AgentChatProvider endpoint={endpoint} agentSlug={agentSlug} agentName={agentName} headers={headers}>
           <AgentThread welcomeTitle={welcomeTitle} welcomeSubtitle={welcomeSubtitle} />
         </AgentChatProvider>
       </div>
@@ -66,5 +50,3 @@ const WebComponent = r2wc(ChatRoot, {
 if (typeof customElements !== 'undefined' && !customElements.get('zetesis-agent-chat')) {
   customElements.define('zetesis-agent-chat', WebComponent)
 }
-
-export {}

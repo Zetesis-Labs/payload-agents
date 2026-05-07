@@ -74,14 +74,12 @@ export function OverviewTab(props: {
     [defaultGroup]
   )
 
-  const filterKey = useMemo(
-    () =>
-      `${props.from}|${props.to}|${props.tenantId}|${props.agentSlug}|${props.model}|${props.userId}|${apiKeySource}|${groupBy.join(',')}`,
-    [props.from, props.to, props.tenantId, props.agentSlug, props.model, props.userId, apiKeySource, groupBy]
-  )
-  useEffect(() => {
+  const filterKey = `${props.from}|${props.to}|${props.tenantId}|${props.agentSlug}|${props.model}|${props.userId}|${apiKeySource}|${groupBy.join(',')}`
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey)
     setBucketsPage(1)
-  }, [filterKey])
+  }
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()

@@ -10,7 +10,7 @@ import { AgentChatProvider } from '../../runtime/AgentChatProvider'
 import { AgentThread } from '../AgentThread'
 import { AgentThreadList } from '../AgentThreadList'
 import { AgentSelector } from './AgentSelector'
-import { type BackendMessage, toThreadMessageLike } from './message-adapters'
+import { toThreadMessageLike } from './message-adapters'
 import type { ImageComponentProps } from './types'
 import { useChatAgents } from './useChatAgents'
 
@@ -51,6 +51,41 @@ function getPanelAnimationState(maximized: boolean) {
     height: 'auto',
     borderRadius: '0.75rem'
   }
+}
+
+const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidth < 1024
+
+const PANEL_SPRING = { type: 'spring' as const, damping: 30, stiffness: 300, mass: 0.8 }
+
+function getPanelInitial(maximized: boolean, isInitialLoad: boolean) {
+  if (isInitialLoad) return getPanelAnimationState(maximized)
+  return isMobileViewport() ? { y: '100%', opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }
+}
+
+function getPanelAnimate(maximized: boolean, shouldAnimate: boolean) {
+  if (shouldAnimate) return getPanelAnimationState(maximized)
+  return isMobileViewport() ? { y: 0, opacity: 1 } : { opacity: 1, scale: 1, y: 0 }
+}
+
+function getPanelExit(shouldAnimate: boolean) {
+  if (!shouldAnimate) return { opacity: 0 }
+  return isMobileViewport() ? { y: '100%', opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }
+}
+
+function AgentAvatar({
+  avatar,
+  name,
+  ImageComponent
+}: {
+  avatar?: string
+  name: string
+  ImageComponent?: ComponentType<ImageComponentProps>
+}) {
+  if (!avatar) return <Bot className="h-5 w-5 text-primary" />
+  if (ImageComponent) {
+    return <ImageComponent src={avatar} alt={name} width={24} height={24} className="rounded-md" />
+  }
+  return <img src={avatar} alt={name} width={24} height={24} className="rounded-md" />
 }
 
 export interface FloatingChatWrapperProps {
@@ -156,37 +191,10 @@ export function FloatingChatWrapper({
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={
-              isInitialLoad
-                ? getPanelAnimationState(maximized)
-                : typeof window !== 'undefined' && window.innerWidth < 1024
-                  ? { y: '100%', opacity: 0 }
-                  : { opacity: 0, scale: 0.95, y: 20 }
-            }
-            animate={
-              shouldAnimate
-                ? getPanelAnimationState(maximized)
-                : typeof window !== 'undefined' && window.innerWidth < 1024
-                  ? { y: 0, opacity: 1 }
-                  : { opacity: 1, scale: 1, y: 0 }
-            }
-            exit={
-              shouldAnimate
-                ? typeof window !== 'undefined' && window.innerWidth < 1024
-                  ? { y: '100%', opacity: 0 }
-                  : { opacity: 0, scale: 0.95, y: 20 }
-                : { opacity: 0 }
-            }
-            transition={
-              shouldAnimate
-                ? {
-                    type: 'spring',
-                    damping: 30,
-                    stiffness: 300,
-                    mass: 0.8
-                  }
-                : { duration: 0 }
-            }
+            initial={getPanelInitial(maximized, isInitialLoad)}
+            animate={getPanelAnimate(maximized, shouldAnimate)}
+            exit={getPanelExit(shouldAnimate)}
+            transition={shouldAnimate ? PANEL_SPRING : { duration: 0 }}
             className="fixed z-50 flex flex-col overflow-hidden border-border bg-background shadow-2xl lg:border"
             style={{
               ...getPanelAnimationState(maximized),
@@ -196,21 +204,7 @@ export function FloatingChatWrapper({
             <div className="flex shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 py-3 backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 shrink-0">
-                  {agent?.avatar ? (
-                    ImageComponent ? (
-                      <ImageComponent
-                        src={agent.avatar}
-                        alt={agent.name}
-                        width={24}
-                        height={24}
-                        className="rounded-md"
-                      />
-                    ) : (
-                      <img src={agent.avatar} alt={agent.name} width={24} height={24} className="rounded-md" />
-                    )
-                  ) : (
-                    <Bot className="h-5 w-5 text-primary" />
-                  )}
+                  <AgentAvatar avatar={agent?.avatar} name={agent?.name ?? ''} ImageComponent={ImageComponent} />
                 </div>
                 <div className="flex flex-col">
                   <AgentSelector

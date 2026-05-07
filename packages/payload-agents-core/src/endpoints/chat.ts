@@ -122,6 +122,87 @@ export async function parseChatBody(req: Parameters<PayloadHandler>[0]): Promise
   return { ok: true, data: parsed.data }
 }
 
+async function findAgentBySlug(
+  payload: import('payload').Payload,
+  config: ResolvedPluginConfig,
+  agentSlug: string,
+  req: Parameters<PayloadHandler>[0]
+): Promise<AgentDoc | undefined> {
+  const where: Where = { isActive: { equals: true }, slug: { equals: agentSlug } }
+  const { docs } = await payload.find({
+    collection: config.collectionSlug,
+    where,
+    depth: 1,
+    limit: 1,
+    overrideAccess: false,
+    req
+  })
+  return docs[0] as unknown as AgentDoc | undefined
+}
+
+async function resolveSessionId(
+  config: ResolvedPluginConfig,
+  ctx: {
+    user: NonNullable<Parameters<PayloadHandler>[0]['user']>
+    payload: import('payload').Payload
+    req: Parameters<PayloadHandler>[0]
+  },
+  chatId: string | undefined,
+  agentSlug: string
+): Promise<string> {
+  // AG-UI clients (incl. assistant-ui's HttpAgent) auto-generate a UUID
+  // threadId before they ever talk to us. Honour it only when ownership
+  // validates against our own format.
+  const ownsThread = chatId ? await config.validateSessionOwnership(chatId, ctx) : false
+  if (ownsThread && chatId) return chatId
+  return config.buildSessionId({ ...ctx, agentSlug, chatId: undefined })
+}
+
+function buildForwardedProps(fp: Record<string, unknown>, userId: string | number): Record<string, unknown> {
+  const rest: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(fp)) {
+    if (key !== 'agentSlug') rest[key] = value
+  }
+  // Agno's session store types `user_id: Optional[str]`. Passing a number
+  // here makes `agent.arun(user_id=2)` silently skip session persistence.
+  return { ...rest, user_id: String(userId) }
+}
+
+async function fetchRuntimeHeaders(
+  config: ResolvedPluginConfig,
+  ctx: {
+    user: NonNullable<Parameters<PayloadHandler>[0]['user']>
+    payload: import('payload').Payload
+    req: Parameters<PayloadHandler>[0]
+  }
+): Promise<Record<string, string>> {
+  if (!config.getRuntimeHeaders) return {}
+  try {
+    return await config.getRuntimeHeaders(ctx)
+  } catch (err) {
+    ctx.payload.logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      '[agent-plugin] getRuntimeHeaders threw — proceeding without extra headers'
+    )
+    return {}
+  }
+}
+
+function tokenLimitResponse(usage: Awaited<ReturnType<typeof getTokenUsage>>): Response {
+  return Response.json(
+    {
+      error: 'Daily token limit reached',
+      limit_info: {
+        limit: usage.limit,
+        used: usage.used,
+        remaining: usage.remaining,
+        reset_at: usage.reset_at
+      }
+    },
+    { status: 429 }
+  )
+}
+
 export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler {
   return async req => {
     const { user, payload } = req
@@ -140,18 +221,7 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
       return Response.json({ error: 'forwardedProps.agentSlug is required' }, { status: 400 })
     }
 
-    const where: Where = { isActive: { equals: true }, slug: { equals: agentSlug } }
-
-    const { docs: agents } = await payload.find({
-      collection: config.collectionSlug,
-      where,
-      depth: 1,
-      limit: 1,
-      overrideAccess: false,
-      req
-    })
-
-    const agent = agents[0] as unknown as AgentDoc | undefined
+    const agent = await findAgentBySlug(payload, config, agentSlug, req)
     if (!agent || typeof agent.slug !== 'string') {
       return Response.json({ error: 'Agent not found' }, { status: 404 })
     }
@@ -160,67 +230,20 @@ export function createChatHandler(config: ResolvedPluginConfig): PayloadHandler 
     const usage = await getTokenUsage(payload, userId, config.getDailyLimit)
     const userText = extractLastUserText(input.messages)
     const estimated = Math.ceil(userText.length / 3) + 2000
-    if (!usage.canUse(estimated)) {
-      return Response.json(
-        {
-          error: 'Daily token limit reached',
-          limit_info: {
-            limit: usage.limit,
-            used: usage.used,
-            remaining: usage.remaining,
-            reset_at: usage.reset_at
-          }
-        },
-        { status: 429 }
-      )
-    }
+    if (!usage.canUse(estimated)) return tokenLimitResponse(usage)
 
     const agentSlugValue = agent.slug
-    // AG-UI clients (incl. assistant-ui's HttpAgent) auto-generate a UUID
-    // threadId before they ever talk to us. Treat an unrecognised threadId
-    // as "fresh chat, mint a real session id" rather than 403 — only
-    // honour it when ownership validates against our own format.
-    const ownsThread = chatId ? await config.validateSessionOwnership(chatId, { user, payload, req }) : false
-    const sessionId = ownsThread
-      ? (chatId as string)
-      : await config.buildSessionId({
-          user,
-          agentSlug: agentSlugValue,
-          chatId: undefined,
-          payload,
-          req
-        })
+    const ctx = { user, payload, req }
+    const sessionId = await resolveSessionId(config, ctx, chatId, agentSlugValue)
 
-    const forwardedRest: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(fp as Record<string, unknown>)) {
-      if (key !== 'agentSlug') forwardedRest[key] = value
-    }
     const upstreamBody: Record<string, unknown> = {
       ...input,
       threadId: sessionId,
-      forwardedProps: {
-        ...forwardedRest,
-        // Agno's session store types `user_id: Optional[str]`. Passing
-        // a number here makes `agent.arun(user_id=2)` silently skip
-        // session persistence — the run streams normally but no row
-        // is written, so `/sessions` never shows the new conversation.
-        user_id: String(userId)
-      }
+      forwardedProps: buildForwardedProps(fp as Record<string, unknown>, userId)
     }
 
     const upstreamUrl = `${config.runtimeUrl}/agents/${encodeURIComponent(agentSlugValue)}/agui`
-
-    let extraHeaders: Record<string, string> = {}
-    if (config.getRuntimeHeaders) {
-      try {
-        extraHeaders = await config.getRuntimeHeaders({ user, payload, req })
-      } catch (err) {
-        payload.logger.warn(
-          { err: err instanceof Error ? err.message : String(err) },
-          '[agent-plugin] getRuntimeHeaders threw — proceeding without extra headers'
-        )
-      }
-    }
+    const extraHeaders = await fetchRuntimeHeaders(config, ctx)
 
     const callRuntime = () =>
       runtimeFetch(upstreamUrl, config.runtimeSecret, {
