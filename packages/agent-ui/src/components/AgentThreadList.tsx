@@ -2,79 +2,50 @@
 
 import { Loader2, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { type FC, useCallback, useEffect, useRef, useState } from 'react'
+import useSWR from 'swr'
 import { cn } from '../lib/utils'
 import { useAgentChat } from '../runtime/AgentChatProvider'
-
-export interface SessionSummary {
-  conversation_id: string
-  title?: string
-  last_activity: string
-  status: 'active' | 'closed'
-  agentSlug?: string
-}
+import type { AgentChatDataSource, SessionSummary } from './chat-wrapper/types'
 
 export interface AgentThreadListProps {
-  /**
-   * Same-origin endpoint roots, defaulting to the convention used by the
-   * Payload BFF: `/api/chat/sessions` (list) and `/api/chat/session`
-   * (single — query string is appended).
-   */
-  sessionsEndpoint?: string
-  sessionEndpoint?: string
+  dataSource: AgentChatDataSource
+  agentSlug?: string
   onSelectThread?: (conversationId: string) => void
   className?: string
 }
 
 export const AgentThreadList: FC<AgentThreadListProps> = ({
-  sessionsEndpoint = '/api/chat/sessions',
-  sessionEndpoint = '/api/chat/session',
+  dataSource,
+  agentSlug,
   onSelectThread,
   className
 }) => {
   const { threadId, runCount } = useAgentChat()
-  const [sessions, setSessions] = useState<SessionSummary[]>([])
-  const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(sessionsEndpoint)
-      if (!res.ok) {
-        setSessions([])
-        return
-      }
-      const body = (await res.json()) as { sessions?: SessionSummary[] }
-      const active = (body.sessions ?? []).filter(s => s.status === 'active')
-      setSessions(active)
-    } catch (err) {
-      console.error('[AgentThreadList] refresh failed:', err)
-      setSessions([])
-    } finally {
-      setLoading(false)
-    }
-  }, [sessionsEndpoint])
-
-  // Refresh on mount and after every completed run — new conversations
-  // appear in the list as soon as the server has them, without having
-  // to close and reopen the popover.
-  useEffect(() => {
-    void refresh()
-  }, [refresh, runCount])
+  const {
+    data: activeSessions,
+    error,
+    isLoading: loading,
+    mutate
+  } = useSWR(
+    ['agent-sessions', agentSlug, runCount],
+    async () => {
+      const allSessions = await dataSource.getRecentSessions(agentSlug)
+      return allSessions.filter(s => s.status === 'active')
+    },
+    { revalidateOnFocus: false }
+  )
 
   const renamingRef = useRef(false)
   const handleRename = async (id: string, title: string) => {
-    if (renamingRef.current) return
+    if (renamingRef.current || !dataSource.renameSession) return
     renamingRef.current = true
     try {
-      await fetch(`${sessionEndpoint}?conversationId=${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title })
-      })
+      await dataSource.renameSession(id, title)
       setEditing(null)
-      void refresh()
+      void mutate()
     } catch (err) {
       console.error('[AgentThreadList] rename failed:', err)
     } finally {
@@ -83,9 +54,10 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
   }
 
   const handleDelete = async (id: string) => {
+    if (!dataSource.deleteSession) return
     try {
-      await fetch(`${sessionEndpoint}?conversationId=${encodeURIComponent(id)}`, { method: 'DELETE' })
-      void refresh()
+      await dataSource.deleteSession(id)
+      void mutate()
     } catch (err) {
       console.error('[AgentThreadList] delete failed:', err)
     }
@@ -98,63 +70,87 @@ export const AgentThreadList: FC<AgentThreadListProps> = ({
           <Loader2 className="h-4 w-4 animate-spin" />
         </div>
       )}
-      {!loading && sessions.length === 0 && (
-        <p className="px-3 py-6 text-center text-xs text-muted-foreground">No tienes conversaciones todavía.</p>
+
+      {!loading && !error && (!activeSessions || activeSessions.length === 0) && (
+        <div className="px-3 py-6 text-center text-sm text-muted-foreground">No hay conversaciones recientes.</div>
       )}
-      {sessions.map(s => {
-        const isActive = s.conversation_id === threadId
-        return (
-          <div
-            key={s.conversation_id}
-            className={cn(
-              'group flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-              isActive ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:bg-muted'
-            )}
-          >
-            <MessageSquare className="h-4 w-4 shrink-0" />
-            {editing === s.conversation_id ? (
+
+      {activeSessions?.map(session => (
+        <div
+          key={session.conversation_id}
+          className={cn(
+            'group relative flex w-full flex-col gap-1 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+            threadId === session.conversation_id && 'bg-primary/5 text-primary hover:bg-primary/10'
+          )}
+        >
+          {editing === session.conversation_id ? (
+            <div className="flex items-center gap-2">
               <input
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                className="flex-1 rounded border border-input bg-background px-2 py-1 text-sm outline-none ring-offset-background focus-visible:ring-1 focus-visible:ring-ring"
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
-                onBlur={() => handleRename(s.conversation_id, draft)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') e.currentTarget.blur()
+                  if (e.key === 'Enter') void handleRename(session.conversation_id, draft)
                   if (e.key === 'Escape') setEditing(null)
                 }}
-                className="flex-1 rounded border border-input bg-background px-2 py-1 text-xs"
-                ref={el => el?.focus()}
+                onBlur={() => handleRename(session.conversation_id, draft)}
               />
-            ) : (
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => onSelectThread?.(s.conversation_id)}
-                className="flex-1 truncate text-left"
+                className="flex flex-1 items-center gap-2 overflow-hidden"
+                onClick={() => onSelectThread?.(session.conversation_id)}
               >
-                {s.title || 'Conversación sin título'}
+                <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                <span className="truncate font-medium">{session.title || 'Nueva conversación'}</span>
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(s.conversation_id)
-                setDraft(s.title ?? '')
-              }}
-              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-              aria-label="Renombrar"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDelete(s.conversation_id)}
-              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-              aria-label="Borrar"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
-          </div>
-        )
-      })}
+              <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {dataSource.renameSession && (
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation()
+                      setDraft(session.title || '')
+                      setEditing(session.conversation_id)
+                    }}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                    title="Renombrar"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+                {dataSource.deleteSession && (
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (confirm('¿Eliminar esta conversación?')) {
+                        void handleDelete(session.conversation_id)
+                      }
+                    }}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          <span className="text-[10px] text-muted-foreground/70">
+            {new Date(session.last_activity).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

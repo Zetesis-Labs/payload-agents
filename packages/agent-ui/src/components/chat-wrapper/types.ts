@@ -28,3 +28,13 @@ export interface ImageComponentProps {
   height?: number
   className?: string
 }
+
+import type { BackendMessage } from './message-adapters'
+
+export interface AgentChatDataSource {
+  getAgents: () => Promise<AgentInfo[]>
+  getRecentSessions: (agentSlug?: string, limit?: number) => Promise<SessionSummary[]>
+  getSession: (conversationId: string) => Promise<{ messages: BackendMessage[] }>
+  renameSession?: (conversationId: string, title: string) => Promise<void>
+  deleteSession?: (conversationId: string) => Promise<void>
+}

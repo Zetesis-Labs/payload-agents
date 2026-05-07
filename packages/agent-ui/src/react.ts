@@ -2,7 +2,7 @@
 
 // Components
 export { AgentThread, type AgentThreadProps } from './components/AgentThread'
-export { AgentThreadList, type AgentThreadListProps, type SessionSummary } from './components/AgentThreadList'
+export { AgentThreadList, type AgentThreadListProps } from './components/AgentThreadList'
 export { InlineThinking, type InlineThinkingProps } from './components/InlineThinking'
 export { LimitAlert } from './components/LimitAlert'
 export { MarkdownText, type MarkdownTextProps } from './components/MarkdownText'
@@ -24,6 +24,7 @@ export {
 } from './components/ToolCallPart'
 export { FloatingChatWrapper, type FloatingChatWrapperProps } from './components/chat-wrapper/FloatingChatWrapper'
 export { AgentSelector, type AgentSelectorProps } from './components/chat-wrapper/AgentSelector'
+export type { AgentChatDataSource, AgentInfo, SessionSummary, AgentLoadState } from './components/chat-wrapper/types'
 
 // Types
 export type { LinkComponent, LinkComponentProps, Source, ToolCall, UsageSnapshot } from './lib/types'

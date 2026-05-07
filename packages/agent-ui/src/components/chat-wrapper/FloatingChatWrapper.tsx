@@ -55,14 +55,16 @@ function getPanelAnimationState(maximized: boolean) {
 
 export interface FloatingChatWrapperProps {
   hasAccess: boolean
-  apiBaseUrl?: string
+  dataSource: import('./types').AgentChatDataSource
+  chatEndpoint?: string
   LinkComponent?: ComponentType<{ href: string; children: React.ReactNode; className?: string }>
   ImageComponent?: ComponentType<ImageComponentProps>
 }
 
 export function FloatingChatWrapper({
   hasAccess,
-  apiBaseUrl = '/api/chat',
+  dataSource,
+  chatEndpoint = '/api/chat',
   LinkComponent,
   ImageComponent
 }: FloatingChatWrapperProps) {
@@ -75,7 +77,7 @@ export function FloatingChatWrapper({
   const [shouldAnimate, setShouldAnimate] = useState(false)
   const isFirstMount = useRef(true)
 
-  const { agents, selectedAgentSlug, setSelectedAgentSlug, agentLoadState } = useChatAgents(hasAccess, apiBaseUrl)
+  const { agents, selectedAgentSlug, setSelectedAgentSlug, agentLoadState } = useChatAgents(hasAccess, dataSource)
 
   // Solo animar si no es la carga inicial en desktop
   useEffect(() => {
@@ -101,10 +103,7 @@ export function FloatingChatWrapper({
 
   const loadConversation = async (conversationId: string) => {
     try {
-      const res = await fetch(`${apiBaseUrl}/session?conversationId=${encodeURIComponent(conversationId)}`)
-      if (!res.ok) throw new Error('Failed to load session')
-
-      const data = (await res.json()) as { messages: BackendMessage[] }
+      const data = await dataSource.getSession(conversationId)
       const convertedMessages = (data.messages || []).map(toThreadMessageLike)
 
       setLoadedThread({ id: conversationId, messages: convertedMessages })
@@ -133,8 +132,6 @@ export function FloatingChatWrapper({
 
   const agentStatusMessage =
     agentLoadState === 'loading' ? 'Cargando asistentes...' : 'Selecciona un asistente para continuar.'
-
-  const agentSessionsEndpoint = agent ? `${apiBaseUrl}/sessions?agentSlug=${encodeURIComponent(agent.slug)}` : undefined
 
   return (
     <>
@@ -274,7 +271,7 @@ export function FloatingChatWrapper({
               {agent ? (
                 <AgentChatProvider
                   key={`${agent.slug}:${loadedThread?.id ?? `new-${threadKey}`}`}
-                  endpoint={apiBaseUrl}
+                  endpoint={chatEndpoint}
                   agentSlug={agent.slug}
                   agentName={agent.name}
                   initialThreadId={loadedThread?.id}
@@ -311,7 +308,8 @@ export function FloatingChatWrapper({
                             </button>
                           </div>
                           <AgentThreadList
-                            sessionsEndpoint={agentSessionsEndpoint}
+                            dataSource={dataSource}
+                            agentSlug={agent.slug}
                             onSelectThread={handleSelectThread}
                           />
                         </motion.div>
