@@ -1,5 +1,12 @@
 # mcp
 
+## 0.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`43dbd87`](https://github.com/Zetesis-Labs/PayloadAgents/commit/43dbd87481e1c4fe63bc6ae5c931dedffb258518)]:
+  - @zetesis/mcp-typesense@0.4.0
+
 ## 0.2.6
 
 ### Patch Changes
