@@ -1,5 +1,25 @@
 # @zetesis/payload-agents-core
 
+## 0.4.2
+
+### Patch Changes
+
+- [`43dbd87`](https://github.com/Zetesis-Labs/PayloadAgents/commit/43dbd87481e1c4fe63bc6ae5c931dedffb258518) Thanks [@Fiser12](https://github.com/Fiser12)! - **Folder-scoped agents**: the auto-generated `agents` collection gets a
+  new `folders` `relationship[hasMany]` field next to `taxonomies`.
+
+  - `AgentPluginConfig` gains an optional `foldersCollectionSlug` (default
+    `'payload-folders'`, matching Payload's auto-injected folders slug).
+    Override it only if your `buildConfig({ folders: { slug } })` uses a
+    different slug.
+  - The `RAG Configuration` group on the agents admin form now exposes
+    `Folders` so admins can scope an agent to one or more folders. Empty
+    by default — the agent searches all available content unless a folder
+    is selected.
+
+  The agno-agent-builder runtime reads the new field and forwards each
+  folder's breadcrumb slug chain via the `x-folder-slugs` header (handled
+  by `@zetesis/mcp-typesense ≥ 0.4`).
+
 ## 0.4.1
 
 ### Patch Changes
