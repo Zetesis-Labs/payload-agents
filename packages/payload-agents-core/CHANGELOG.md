@@ -1,5 +1,51 @@
 # @zetesis/payload-agents-core
 
+## [0.5.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-core-v0.4.2...payload-agents-core-v0.5.0) (2026-05-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** require searchCollectionOptions on agentPlugin ([#36](https://github.com/Zetesis-Labs/PayloadAgents/issues/36))
+* **agents-core:** require mediaCollectionSlug and taxonomyCollectionSlug
+* **payload-agents-core:** removed `extractTenantId`, `AgentsCollectionOverrides`, `createSessionId`, `parseSessionId`, `validateSessionOwnership`, `defaultExtractTenantId`, and the automatic tenant filter in the agents list endpoint.
+
+### Features
+
+* add payload-agents-core package and agent-runtime service ([971d8e2](https://github.com/Zetesis-Labs/PayloadAgents/commit/971d8e26d5bf1fb9e068f34e3296858c38108ceb))
+* added agno finaly to payload-agents ([670062b](https://github.com/Zetesis-Labs/PayloadAgents/commit/670062b0f4928a36db8f60b83ff584320d3b19ad))
+* **agno-agent-builder:** channel-agnostic loader + WhatsApp + Discord ([#57](https://github.com/Zetesis-Labs/PayloadAgents/issues/57)) ([25766b5](https://github.com/Zetesis-Labs/PayloadAgents/commit/25766b57ed5912d97e3141e8f6d87b2a78c57445))
+* **core:** require searchCollectionOptions on agentPlugin ([#36](https://github.com/Zetesis-Labs/PayloadAgents/issues/36)) ([5c8a958](https://github.com/Zetesis-Labs/PayloadAgents/commit/5c8a958d90237b0a8dcbee03b068e5fd1944e04c))
+* **mcp-typesense,payload-agents-core:** scope MCP search by folder ([#68](https://github.com/Zetesis-Labs/PayloadAgents/issues/68)) ([43dbd87](https://github.com/Zetesis-Labs/PayloadAgents/commit/43dbd87481e1c4fe63bc6ae5c931dedffb258518))
+* **metrics:** add payload-agents-metrics package + onRunCompleted hook ([#23](https://github.com/Zetesis-Labs/PayloadAgents/issues/23)) ([ff02b1a](https://github.com/Zetesis-Labs/PayloadAgents/commit/ff02b1a82a6222ff2bf05992f64140c9c2003052))
+* **payload-agents-core:** decouple tenancy from session id ([4b371b1](https://github.com/Zetesis-Labs/PayloadAgents/commit/4b371b1824c5ed87991eacba99a144d295e3b698))
+* **payload-agents-core:** realistic token estimation + cost calculator ([3a2e190](https://github.com/Zetesis-Labs/PayloadAgents/commit/3a2e1907653a447bf5a447dd1cd16a65cedf2f19))
+* **payload-agents-core:** realistic token estimation + cost calculator ([9e18fdf](https://github.com/Zetesis-Labs/PayloadAgents/commit/9e18fdff2a213fcb738a54c30a4081dd869c9a91))
+* replace chat-agent with AG-UI based @zetesis/agent-ui ([#64](https://github.com/Zetesis-Labs/PayloadAgents/issues/64)) ([adf5acd](https://github.com/Zetesis-Labs/PayloadAgents/commit/adf5acd9cf110bf0339389c215be2075bbf69e5e))
+
+
+### Bug Fixes
+
+* **agents-core:** fix drizzle execute call, add reasoning + tool protocol ([01c9196](https://github.com/Zetesis-Labs/PayloadAgents/commit/01c91960944ce9b3a84b234d5b35dfa4ecd48a13))
+* **agents-core:** require mediaCollectionSlug and taxonomyCollectionSlug ([7b393c1](https://github.com/Zetesis-Labs/PayloadAgents/commit/7b393c1e4a4f78a169f8197521a477068addcf8c))
+* authenticate all runtime requests with X-Internal-Secret ([74a6d3f](https://github.com/Zetesis-Labs/PayloadAgents/commit/74a6d3ffc4ab731bd45f533edcdc23de31a3c227))
+* authenticate all runtime requests with X-Internal-Secret ([b622d37](https://github.com/Zetesis-Labs/PayloadAgents/commit/b622d37f7ecc738a1342d5942e553697b64c8c67))
+* **core:** self-heal agno_sessions.metadata.tenant_id in validateSessionOwnership ([#40](https://github.com/Zetesis-Labs/PayloadAgents/issues/40)) ([df9703e](https://github.com/Zetesis-Labs/PayloadAgents/commit/df9703e8bf42b6abe9e38f76a47ec7dba0892188))
+* linter issues ([61d9125](https://github.com/Zetesis-Labs/PayloadAgents/commit/61d912527ffe4ba8714ac0a07c5d297ce4b0d394))
+* **payload-agents-core:** cap sessions list limit parameter to 100 ([1efcdb9](https://github.com/Zetesis-Labs/PayloadAgents/commit/1efcdb9756b7350f4b2ae5a05961318f3e1d0b4e))
+* **payload-agents-core:** cap sessions list limit to 100 ([eb509b5](https://github.com/Zetesis-Labs/PayloadAgents/commit/eb509b510fe183c84b36451121a40c2ca72aede7))
+* **payload-agents-core:** consistent effective tokens across daily usage and SSE run total ([0e0f448](https://github.com/Zetesis-Labs/PayloadAgents/commit/0e0f448587a5389198c9f35da7c974ac9e026ff8))
+* **payload-agents-core:** enforce access.read on /agents and /chat endpoints ([9d1d4a2](https://github.com/Zetesis-Labs/PayloadAgents/commit/9d1d4a2edbc22183047faa5789ad56a2ad1a0ae5))
+* **payload-agents-core:** pass req to extractTenantId ([46eba87](https://github.com/Zetesis-Labs/PayloadAgents/commit/46eba8763d704aee593945b789e5d2a18406d62d))
+* **payload-agents-core:** pre-deploy hardening (runtimeSecret warning + token estimate) ([9f16277](https://github.com/Zetesis-Labs/PayloadAgents/commit/9f16277650bdea9b80eaed62d1f9549e6fc1af51))
+* **payload-agents-core:** validate session ID ownership on all endpoints ([52bd9bb](https://github.com/Zetesis-Labs/PayloadAgents/commit/52bd9bb63547f58c031dcb074a6ff479eb4c277f))
+* **payload-agents-core:** validate session ID ownership on all endpoints ([e075566](https://github.com/Zetesis-Labs/PayloadAgents/commit/e075566ba0c2a073311e415c649b0f75b7e16f87))
+* **payload-agents-core:** validate tenant on active session lookup ([3924a81](https://github.com/Zetesis-Labs/PayloadAgents/commit/3924a817eeffe530f828932106fc0ddbb509258e))
+* **payload-agents-core:** warn on empty runtimeSecret, improve token estimate ([de24471](https://github.com/Zetesis-Labs/PayloadAgents/commit/de24471d1826075e17a2e4a8011d67a5e1268a84))
+* resolve lint errors (import order, formatting, unused param) ([d0d1ac7](https://github.com/Zetesis-Labs/PayloadAgents/commit/d0d1ac7622a24364702592c4de6897421d82ece7))
+* **runtime:** fan out agent reloads via Postgres LISTEN/NOTIFY ([6beb12b](https://github.com/Zetesis-Labs/PayloadAgents/commit/6beb12b1040147b11182911b60ccf876d8ac202c))
+* **runtime:** fan out agent reloads via Postgres LISTEN/NOTIFY ([5bfeab7](https://github.com/Zetesis-Labs/PayloadAgents/commit/5bfeab7103caca78633aa57d23e6f5c0267949d0))
+* small issues ([f4db5af](https://github.com/Zetesis-Labs/PayloadAgents/commit/f4db5af8873cc36d3742f07cc3c4983c9b0cbc98))
+
 ## 0.4.2
 
 ### Patch Changes
