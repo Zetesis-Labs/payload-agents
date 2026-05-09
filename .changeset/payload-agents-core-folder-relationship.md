@@ -1,5 +1,5 @@
 ---
-"@zetesis/payload-agents-core": minor
+"@zetesis/payload-agents-core": patch
 ---
 
 **Folder-scoped agents**: the auto-generated `agents` collection gets a
