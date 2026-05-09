@@ -37,6 +37,7 @@ function resolveConfig(userConfig: AgentPluginConfig): ResolvedPluginConfig {
     encryptionKey: userConfig.encryptionKey,
     mediaCollectionSlug: userConfig.mediaCollectionSlug,
     taxonomyCollectionSlug: userConfig.taxonomyCollectionSlug,
+    foldersCollectionSlug: userConfig.foldersCollectionSlug ?? 'payload-folders',
     searchCollectionOptions: userConfig.searchCollectionOptions,
     collectionOverrides: userConfig.collectionOverrides,
     onRunCompleted: userConfig.onRunCompleted

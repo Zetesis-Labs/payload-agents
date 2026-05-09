@@ -46,7 +46,7 @@ const mcp = createMcpServer({
       chunkCollection: 'posts_chunk',
       parentCollection: 'posts',
       chunkSearchFields: ['chunk_text', 'title'],
-      chunkFacetFields: ['tenant', 'taxonomy_slugs', 'parent_doc_id', 'headers'],
+      chunkFacetFields: ['tenant', 'taxonomy_slugs', 'folder_slugs', 'parent_doc_id', 'headers'],
       kind: 'document',
     },
     {
@@ -55,7 +55,7 @@ const mcp = createMcpServer({
       chunkCollection: 'books_chunk',
       parentCollection: 'books',
       chunkSearchFields: ['chunk_text', 'title'],
-      chunkFacetFields: ['tenant', 'taxonomy_slugs', 'parent_doc_id', 'headers'],
+      chunkFacetFields: ['tenant', 'taxonomy_slugs', 'folder_slugs', 'parent_doc_id', 'headers'],
       kind: 'book',
     },
   ],
