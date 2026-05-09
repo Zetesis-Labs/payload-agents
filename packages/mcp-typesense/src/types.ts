@@ -169,6 +169,12 @@ export interface McpAuthContext {
   tenantSlug?: string
   /** Taxonomy slugs — if present, searches are auto-scoped by `taxonomy_slugs`. */
   taxonomySlugs?: string[]
+  /**
+   * Folder slugs — if present, searches are auto-scoped by `folder_slugs`.
+   * The slug chain mirrors the folder breadcrumb (root → leaf), so
+   * filtering by any ancestor's slug selects everything below it.
+   */
+  folderSlugs?: string[]
   /** User identifier, for logging/auditing. */
   userId?: string
   /** Arbitrary metadata the auth strategy wants to propagate. */

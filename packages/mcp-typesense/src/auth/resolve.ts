@@ -12,6 +12,17 @@ import type { McpAuthContext, McpAuthStrategy } from '../types'
 
 const DEFAULT_HEADER_NAME = 'x-tenant-slug'
 const TAXONOMY_HEADER_NAME = 'x-taxonomy-slugs'
+const FOLDER_HEADER_NAME = 'x-folder-slugs'
+
+const parseSlugList = (raw: string | string[] | undefined): string[] | undefined => {
+  const value = Array.isArray(raw) ? raw[0] : raw
+  if (!value) return undefined
+  const slugs = value
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+  return slugs.length > 0 ? slugs : undefined
+}
 
 export function resolveAuth(req: IncomingMessage, strategy: McpAuthStrategy | undefined): McpAuthContext | null {
   // Default strategy: header with default header name.
@@ -22,22 +33,17 @@ export function resolveAuth(req: IncomingMessage, strategy: McpAuthStrategy | un
     const raw = req.headers[headerName]
     const tenantSlug = Array.isArray(raw) ? raw[0] : raw
 
-    // Optional: taxonomy slugs for server-enforced content scoping
-    const taxonomyRaw = req.headers[TAXONOMY_HEADER_NAME]
-    const taxonomyStr = Array.isArray(taxonomyRaw) ? taxonomyRaw[0] : taxonomyRaw
-    const taxonomySlugs = taxonomyStr
-      ? taxonomyStr
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean)
-      : undefined
+    // Optional content-scoping headers — set when the proxy resolves the
+    // owning token/agent's `taxonomies` or `folders` relationship.
+    const taxonomySlugs = parseSlugList(req.headers[TAXONOMY_HEADER_NAME])
+    const folderSlugs = parseSlugList(req.headers[FOLDER_HEADER_NAME])
 
-    // Single-tenant deploys (no tenant header) can still send taxonomy
-    // filters. Return a context whenever at least one of the two is present;
+    // Single-tenant deploys (no tenant header) can still send taxonomy or
+    // folder filters. Return a context whenever at least one is present;
     // null means "no auth headers at all" → no auto-scoping.
-    if (!tenantSlug && !taxonomySlugs?.length) return null
+    if (!tenantSlug && !taxonomySlugs?.length && !folderSlugs?.length) return null
 
-    return { tenantSlug: tenantSlug || undefined, taxonomySlugs }
+    return { tenantSlug: tenantSlug || undefined, taxonomySlugs, folderSlugs }
   }
 
   // Exhaustive guard. When new variants are added, TypeScript will force

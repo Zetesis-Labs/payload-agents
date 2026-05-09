@@ -134,6 +134,16 @@ export function createAgentsCollection(config: ResolvedPluginConfig): Collection
                       description:
                         'Taxonomies that filter the RAG content. REQUIRED: if empty, agent will not search any content.'
                     }
+                  },
+                  {
+                    name: 'folders',
+                    type: 'relationship',
+                    relationTo: config.foldersCollectionSlug,
+                    hasMany: true,
+                    admin: {
+                      description:
+                        'Folders that scope the RAG content. Optional: if set, the agent only sees documents inside these folders (and their descendants, since the slug chain mirrors the breadcrumb).'
+                    }
                   }
                 ]
               },

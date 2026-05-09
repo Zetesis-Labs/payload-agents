@@ -79,6 +79,7 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
     tenant_slug = tenant.get("slug") if isinstance(tenant, dict) else None
 
     taxonomy_slugs = _extract_taxonomy_slugs(doc.get("taxonomies"))
+    folder_slugs = _extract_folder_slugs(doc.get("folders"))
 
     search_collections = doc.get("searchCollections")
     if not isinstance(search_collections, list):
@@ -103,6 +104,7 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
         else None,
         tenant_slug=tenant_slug,
         taxonomy_slugs=taxonomy_slugs,
+        folder_slugs=folder_slugs,
         search_collections=search_collections,
         tool_call_limit=tool_call_limit,
         allow_guest_access=bool(doc.get("allowGuestAccess")),
@@ -119,3 +121,37 @@ def _extract_taxonomy_slugs(taxonomies: Any) -> list[str]:
         elif isinstance(item, str):
             slugs.append(item)
     return slugs
+
+
+def _extract_folder_slugs(folders: Any) -> list[str]:
+    """Pull the slug chain from each folder's breadcrumbs.
+
+    A folder filed under ``Proyectos / 2026 / Q1`` indexes its docs with
+    ``folder_slugs = ['proyectos', '2026', 'q1']``. To filter "everything
+    under Q1" we forward the leaf slug (``q1``); Typesense matches all docs
+    whose ``folder_slugs`` array contains it. We collect every slug in the
+    breadcrumb so a user picking ``Proyectos`` selects the whole subtree.
+    """
+    if not isinstance(folders, list):
+        return []
+    slugs: list[str] = []
+    for item in folders:
+        if not isinstance(item, dict):
+            continue
+        breadcrumbs = item.get("breadcrumbs")
+        if isinstance(breadcrumbs, list):
+            for crumb in breadcrumbs:
+                if not isinstance(crumb, dict):
+                    continue
+                url = crumb.get("url")
+                if isinstance(url, str) and url:
+                    slug = url.lstrip("/")
+                    if slug:
+                        slugs.append(slug)
+        else:
+            # Fallback: depth=0 may give us only the slug column
+            fallback_slug = item.get("slug")
+            if isinstance(fallback_slug, str) and fallback_slug:
+                slugs.append(fallback_slug)
+    # Dedupe preserving order
+    return list(dict.fromkeys(slugs))

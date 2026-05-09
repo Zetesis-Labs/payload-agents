@@ -41,7 +41,7 @@ def build_agent(
             cfg, tool_protocol=tool_protocol, output_format=output_format
         ),
         db=db,
-        tools=[build_mcp_tools(mcp_url, cfg.tenant_slug, cfg.taxonomy_slugs)],
+        tools=[build_mcp_tools(mcp_url, cfg.tenant_slug, cfg.taxonomy_slugs, cfg.folder_slugs)],
         add_history_to_context=True,
         num_history_runs=5,
         reasoning=not is_native_reasoner,
@@ -65,13 +65,16 @@ def build_mcp_tools(
     mcp_url: str,
     tenant_slug: str | None = None,
     taxonomy_slugs: list[str] | None = None,
+    folder_slugs: list[str] | None = None,
 ) -> MCPTools:
-    """Build an MCPTools instance with tenant/taxonomy headers."""
+    """Build an MCPTools instance with tenant/taxonomy/folder headers."""
     headers: dict[str, str] = {}
     if tenant_slug:
         headers["x-tenant-slug"] = tenant_slug
     if taxonomy_slugs:
         headers["x-taxonomy-slugs"] = ",".join(taxonomy_slugs)
+    if folder_slugs:
+        headers["x-folder-slugs"] = ",".join(folder_slugs)
     if headers:
         params = StreamableHTTPClientParams(url=mcp_url, headers=headers)
         return MCPTools(server_params=params, transport="streamable-http")
