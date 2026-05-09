@@ -35,7 +35,7 @@ Packages are compiled **isolated** from any app-level `payload-types.ts`. Inside
 
 - Dual exports: `types->dist`, `import->src` (dev) / all->dist (npm via `publishConfig`)
 - tsdown with `dts: { resolve: true }` for self-contained declarations
-- Changesets for coordinated versioning and release
+- **release-please** drives versioning + npm/PyPI publish from conventional commits (no manual `.changeset/*.md`). Same tool covers npm packages and the Python builders under `backend/`.
 - `sideEffects: false` where applicable
 
 > Detail: [docs/architecture/npm-publishability.md](docs/architecture/npm-publishability.md)
@@ -88,7 +88,7 @@ pnpm test
 - **No `eslint-disable` / `biome-ignore`** -- fix the cause, not the symptom
 - **pnpm** as package manager (v10)
 - **Node 22.x+**
-- **Changeset required before PR** -- run `pnpm changeset` and commit the generated file BEFORE creating a pull request.
+- **Conventional commits drive releases** -- write `feat(<component>): ...`, `fix(<component>): ...`, etc. release-please opens a release PR aggregating bumps; merging it tags + publishes. No manual changeset files.
 
 ## Self-correction workflow
 
