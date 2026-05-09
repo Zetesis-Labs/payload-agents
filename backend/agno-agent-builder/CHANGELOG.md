@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.4...agno-agent-builder-v0.1.5) (2026-05-09)
+
+
+### Features
+
+* **mcp-typesense,payload-agents-core:** scope MCP search by folder ([#68](https://github.com/Zetesis-Labs/PayloadAgents/issues/68)) ([43dbd87](https://github.com/Zetesis-Labs/PayloadAgents/commit/43dbd87481e1c4fe63bc6ae5c931dedffb258518))
+
 ## [0.1.4](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.3...agno-agent-builder-v0.1.4) (2026-05-07)
 
 
