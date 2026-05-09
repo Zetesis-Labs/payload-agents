@@ -88,11 +88,32 @@ function resolveTargetCollection(input: GetPostSummariesInput, ctx: ToolContext)
   return { collection: first }
 }
 
-function buildFilters(input: GetPostSummariesInput, tenantSlug: string | null): string[] {
+/**
+ * Format a Typesense facet equality clause for one or many values.
+ * Single value → `field:=value`. Many values → `field:[v1,v2,…]`.
+ */
+const formatFacetClause = (field: string, values: string[]): string =>
+  values.length === 1 ? `${field}:=${values[0]}` : `${field}:[${values.join(',')}]`
+
+function buildFilters(
+  input: GetPostSummariesInput,
+  tenantSlug: string | null,
+  authTaxonomySlugs?: string[],
+  authFolderSlugs?: string[]
+): string[] {
   const filters: string[] = []
   if (tenantSlug) filters.push(`tenant:=${tenantSlug}`)
   if (input.author_slug) filters.push(`taxonomy_slugs:=${input.author_slug}`)
   if (input.topic_slug) filters.push(`taxonomy_slugs:=${input.topic_slug}`)
+  // Auto-scope by taxonomy/folder slugs from the auth context — mirrors the
+  // behavior of `search_collections`. Skipped when the explicit input already
+  // narrows by author/topic to avoid double-AND-ing the same field.
+  if (authTaxonomySlugs?.length && !input.author_slug && !input.topic_slug) {
+    filters.push(formatFacetClause('taxonomy_slugs', authTaxonomySlugs))
+  }
+  if (authFolderSlugs?.length) {
+    filters.push(formatFacetClause('folder_slugs', authFolderSlugs))
+  }
   return filters
 }
 
@@ -128,7 +149,7 @@ export async function getPostSummaries(input: GetPostSummariesInput, ctx: ToolCo
   const perPage = Math.min(input.per_page ?? 50, 100)
   const page = input.page ?? 1
 
-  const filters = buildFilters(input, tenantSlug)
+  const filters = buildFilters(input, tenantSlug, auth?.taxonomySlugs, auth?.folderSlugs)
 
   // Strategy: search chunks with * query, group by parent_doc_id to dedupe
   // into one entry per parent post. The first chunk of each group carries

@@ -13,6 +13,10 @@ Mirrors the existing `x-taxonomy-slugs` plumbing:
 - `searchCollections` injects `folder_slugs:[…]` into `scopedFilters`
   when `auth.folderSlugs` is non-empty and the caller hasn't already
   set the filter explicitly.
+- `getPostSummaries` mirrors the same auto-scoping for both
+  `taxonomy_slugs` (when not already narrowed via `author_slug` /
+  `topic_slug`) and `folder_slugs`. A token-scoped client now sees a
+  consistent corpus across listing and search.
 
 The slug chain is expected to mirror the folder breadcrumb (root →
 leaf), so a token scoped to "Proyectos" matches every doc nested below
