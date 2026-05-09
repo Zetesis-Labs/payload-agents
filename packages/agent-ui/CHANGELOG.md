@@ -1,5 +1,17 @@
 # @zetesis/agent-ui
 
+## [0.1.3](https://github.com/Zetesis-Labs/PayloadAgents/compare/agent-ui-v0.1.2...agent-ui-v0.1.3) (2026-05-09)
+
+
+### Features
+
+* replace chat-agent with AG-UI based @zetesis/agent-ui ([#64](https://github.com/Zetesis-Labs/PayloadAgents/issues/64)) ([adf5acd](https://github.com/Zetesis-Labs/PayloadAgents/commit/adf5acd9cf110bf0339389c215be2075bbf69e5e))
+
+
+### Bug Fixes
+
+* **agent-ui:** floating chat panel polish + extract chat-wrapper hooks ([a96d6a3](https://github.com/Zetesis-Labs/PayloadAgents/commit/a96d6a3c0f991f2c9e7b1487b7fa035d62470803))
+
 ## 0.1.2
 
 ### Patch Changes

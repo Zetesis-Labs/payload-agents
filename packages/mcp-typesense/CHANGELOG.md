@@ -1,5 +1,27 @@
 # @zetesis/mcp-typesense
 
+## [0.5.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/mcp-typesense-v0.4.0...mcp-typesense-v0.5.0) (2026-05-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **indexer,typesense:** removes EmbeddingProviderConfig, EmbeddingService, EmbeddingResolver and their providers; removes IndexerFeatureConfig.embedding, TypesenseRAGPluginConfig.embeddingConfig, and FeatureFlags.embedding; EmbeddingTableConfig.autoEmbed is now required when embedding is set; removes per-table provider overrides, onEmbeddingFailure, reuseEmbeddingsWhenContentUnchanged. See changeset for full migration notes.
+
+### Features
+
+* added agno finaly to payload-agents ([670062b](https://github.com/Zetesis-Labs/PayloadAgents/commit/670062b0f4928a36db8f60b83ff584320d3b19ad))
+* added mcp to repository ([02afa35](https://github.com/Zetesis-Labs/PayloadAgents/commit/02afa352c24c7b61bb737af254b67d8b354d18af))
+* **indexer,typesense:** autoEmbed only + always-on content-hash skip ([#51](https://github.com/Zetesis-Labs/PayloadAgents/issues/51)) ([3ebb6c0](https://github.com/Zetesis-Labs/PayloadAgents/commit/3ebb6c0b297be36973c3c94876a8afdd3ebd9471))
+* **mcp-typesense,payload-agents-core:** scope MCP search by folder ([#68](https://github.com/Zetesis-Labs/PayloadAgents/issues/68)) ([43dbd87](https://github.com/Zetesis-Labs/PayloadAgents/commit/43dbd87481e1c4fe63bc6ae5c931dedffb258518))
+* **mcp-typesense:** enforce taxonomy filtering server-side via header ([7dd730a](https://github.com/Zetesis-Labs/PayloadAgents/commit/7dd730a68fe742793b9acbc4046e639cf04c6dc3))
+* replace chat-agent with AG-UI based @zetesis/agent-ui ([#64](https://github.com/Zetesis-Labs/PayloadAgents/issues/64)) ([adf5acd](https://github.com/Zetesis-Labs/PayloadAgents/commit/adf5acd9cf110bf0339389c215be2075bbf69e5e))
+* uv workspace backend + MCP token taxonomies + release-please ([#44](https://github.com/Zetesis-Labs/PayloadAgents/issues/44)) ([5ffdff5](https://github.com/Zetesis-Labs/PayloadAgents/commit/5ffdff5b574026a6a16be52166c1be350c1ad326))
+
+
+### Bug Fixes
+
+* **mcp-typesense:** surface silent failures in embeddings, taxonomy, and stats ([0d4ec09](https://github.com/Zetesis-Labs/PayloadAgents/commit/0d4ec09492d2c2ab21b7834a507eb1cf6b99bbae))
+
 ## 0.4.0
 
 ### Minor Changes

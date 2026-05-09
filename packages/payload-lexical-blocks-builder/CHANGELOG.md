@@ -1,5 +1,14 @@
 # @zetesis/payload-lexical-blocks-builder
 
+## [0.2.1](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-lexical-blocks-builder-v0.2.0...payload-lexical-blocks-builder-v0.2.1) (2026-05-09)
+
+
+### Features
+
+* devcontainer + test server app with chat-agent integration ([#3](https://github.com/Zetesis-Labs/PayloadAgents/issues/3)) ([ee6bd3e](https://github.com/Zetesis-Labs/PayloadAgents/commit/ee6bd3ef11784d315ed65640a144216ef8fd1f5c))
+* initial payload-agents monorepo with 5 packages ([d89ddf4](https://github.com/Zetesis-Labs/PayloadAgents/commit/d89ddf46b914ddf2d9e0664a6ec8bb1e11a577c0))
+* replace chat-agent with AG-UI based @zetesis/agent-ui ([#64](https://github.com/Zetesis-Labs/PayloadAgents/issues/64)) ([adf5acd](https://github.com/Zetesis-Labs/PayloadAgents/commit/adf5acd9cf110bf0339389c215be2075bbf69e5e))
+
 ## 0.2.0
 
 ### Minor Changes

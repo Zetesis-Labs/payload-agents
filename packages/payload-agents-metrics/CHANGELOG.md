@@ -1,5 +1,30 @@
 # @zetesis/payload-agents-metrics
 
+## [1.1.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-metrics-v1.0.3...payload-agents-metrics-v1.1.0) (2026-05-09)
+
+
+### Features
+
+* **metrics:** add payload-agents-metrics package + onRunCompleted hook ([#23](https://github.com/Zetesis-Labs/PayloadAgents/issues/23)) ([ff02b1a](https://github.com/Zetesis-Labs/PayloadAgents/commit/ff02b1a82a6222ff2bf05992f64140c9c2003052))
+* replace chat-agent with AG-UI based @zetesis/agent-ui ([#64](https://github.com/Zetesis-Labs/PayloadAgents/issues/64)) ([adf5acd](https://github.com/Zetesis-Labs/PayloadAgents/commit/adf5acd9cf110bf0339389c215be2075bbf69e5e))
+
+
+### Bug Fixes
+
+* **metrics:** batchFetchFirstMessages binds text[] correctly via IN list ([#34](https://github.com/Zetesis-Labs/PayloadAgents/issues/34)) ([7636261](https://github.com/Zetesis-Labs/PayloadAgents/commit/763626164d176eae2603ef2780b110ee949d29f6))
+* **metrics:** re-export MetricsPluginResult (lost in 0.1.0 rebase) ([#32](https://github.com/Zetesis-Labs/PayloadAgents/issues/32)) ([419c5c7](https://github.com/Zetesis-Labs/PayloadAgents/commit/419c5c77a4e8c2145cebd9cb41564a43678d9b94))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zetesis/agent-ui bumped to 0.1.3
+    * @zetesis/payload-agents-core bumped to 0.5.0
+  * peerDependencies
+    * @zetesis/agent-ui bumped to 0.1.3
+    * @zetesis/payload-agents-core bumped to 0.5.0
+
 ## 1.0.3
 
 ### Patch Changes
