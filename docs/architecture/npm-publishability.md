@@ -94,7 +94,7 @@ Cada paquete tiene **dos configuraciones de exports**: una para desarrollo y otr
 }
 ```
 
-Cuando `npm publish` (o `changeset publish`) empaqueta el tarball, **reemplaza** el `exports` raiz con el de `publishConfig`. Ahora **todo** apunta a `dist/`:
+Cuando `pnpm publish` (durante el job `publish-npm` del workflow) empaqueta el tarball, **reemplaza** el `exports` raiz con el de `publishConfig`. Ahora **todo** apunta a `dist/`:
 
 - **`types`** → `dist/index.d.mts` (igual que desarrollo)
 - **`import`** → `dist/index.mjs` (ya no source — JavaScript compilado)
@@ -338,7 +338,7 @@ Para features que solo se activan si el consumidor tiene la dependencia instalad
 }
 ```
 
-Esto funciona porque Changesets coordina las versiones (ver seccion "Versionado").
+Esto funciona porque release-please coordina las versiones (ver seccion "Versionado").
 
 ---
 
@@ -364,48 +364,58 @@ Esto funciona porque:
 
 ## Versionado y release
 
-### Changesets
+### release-please
 
-Usamos [Changesets](https://github.com/changesets/changesets) para gestionar versiones y publicacion coordinada.
+Usamos [release-please](https://github.com/googleapis/release-please) para versionado y publicacion coordinada de los 9 paquetes npm + 2 paquetes Python (`backend/agno-agent-builder`, `backend/payload-documents-worker-builder`).
 
 #### Configuracion
 
 ```json
-// .changeset/config.json
+// release-please-config.json
 {
-  "access": "public",
-  "baseBranch": "main",
-  "linked": [
-    [
-      "@zetesis/payload-typesense",
-      "@zetesis/payload-indexer",
-      "@zetesis/payload-stripe-inventory",
-      "@zetesis/payload-taxonomies",
-      "@zetesis/payload-lexical-blocks-builder"
-    ]
-  ],
-  "updateInternalDependencies": "minor"
+  "release-type": "node",
+  "include-component-in-tag": true,
+  "include-v-in-tag": true,
+  "separate-pull-requests": false,
+  "plugins": ["node-workspace"],
+  "packages": {
+    "packages/payload-indexer":   { "package-name": "@zetesis/payload-indexer", "component": "payload-indexer" },
+    "packages/payload-typesense": { "package-name": "@zetesis/payload-typesense", "component": "payload-typesense" },
+    // ... resto de paquetes npm + 2 Python con release-type: "python"
+  }
 }
 ```
 
-- **`linked`**: Estos 5 paquetes comparten version. Si uno sube a `0.6.0`, todos suben a `0.6.0`. Esto simplifica compatibilidad entre paquetes que se usan juntos.
-- **`updateInternalDependencies: "minor"`**: Cuando `payload-indexer` sube de version, `payload-typesense` (que depende de el) actualiza su `dependencies` automaticamente.
-- **`access: "public"`**: Todos los paquetes se publican como publicos en npm.
+- **`node-workspace`**: cuando `payload-indexer` sube de version, todos los paquetes que lo declaran como `workspace:` (ej. `payload-typesense`) reciben un patch automaticamente. Sustituye al viejo `updateInternalDependencies` de Changesets.
+- **`include-component-in-tag`**: cada paquete tiene su propio tag (`payload-indexer-v0.4.0`, `payload-typesense-v0.3.2`, ...). Versiones independientes — no hay lockstep estricto.
+- **`separate-pull-requests: false`**: un solo release PR agrega los bumps de todos los paquetes (mismo UX que el viejo `chore: version packages`).
+- Los paquetes Python (`release-type: "python"`) bumpean `pyproject.toml` y disparan publicacion a PyPI via `publish-python.yml`.
+
+#### Disparadores
+
+Conventional commits dirigen los bumps:
+- `feat(payload-indexer): ...` → minor en `payload-indexer` + patch en `payload-typesense` (cascade via node-workspace)
+- `fix(mcp-typesense): ...` → patch en `mcp-typesense`
+- `feat(payload-indexer)!: ...` (con `!` o `BREAKING CHANGE:` footer) → major
+
+No hay archivos `.changeset/*.md` que mantener — todo nace de los commit messages.
 
 ### Pipeline de release (GitHub Actions)
 
 ```
 push a main
   ↓
-CI: install → tsc --noEmit → turbo build (todos los packages)
+release-please-action revisa conventional commits desde el ultimo release
   ↓
-¿Hay changesets pendientes?
-  ├── Si → Crear PR de release (bump versions + CHANGELOG)
-  └── No → ¿Se mergeó un PR de release?
-              └── Si → changeset publish → npm publish con provenance
+¿Hay bumps pendientes?
+  ├── Si → Abre/actualiza release PR (`chore(main): release ...`) con bumps + CHANGELOG.md
+  └── No → ¿El push fue un merge del release PR?
+              └── Si → tags + GitHub Releases por componente
+                      ├── publish-npm: pnpm publish --filter <pkg> por cada path en `paths_released`
+                      └── publish-python: PyPI trusted publisher (OIDC) via publish-python.yml
 ```
 
-El paso critico es `turbo run build --filter="./packages/*"` **antes** de `changeset publish`. Esto garantiza que `dist/` esta actualizado con las declarations correctas.
+El paso critico sigue siendo `pnpm turbo run build --filter="./packages/*"` antes del publish, para que `dist/` este al dia con las declarations correctas.
 
 ### Provenance
 
@@ -447,13 +457,14 @@ tsdown por paquete:
 ### 3. Publicacion
 
 ```
-changeset publish
+release-please-action emite outputs.paths_released = ["packages/payload-indexer", ...]
   ↓
-Por cada paquete con changeset:
-  1. pnpm reemplaza workspace:* con version real
-  2. publishConfig.exports reemplaza exports raiz
-  3. npm pack genera tarball con files: ["dist"]
-  4. npm publish --provenance sube a registry
+Por cada path:
+  1. pnpm --filter <pkg-name> publish
+  2. pnpm reemplaza workspace:* con version real (resuelta via node-workspace)
+  3. publishConfig.exports reemplaza exports raiz
+  4. npm pack genera tarball con files: ["dist"]
+  5. npm publish --provenance sube a registry
 ```
 
 ### 4. Consumidor instala
@@ -523,10 +534,10 @@ Pero los tipos de `@zetesis/payload-indexer` ya estan compilados. Sus `.d.mts` d
 - [ ] `rootDir: "./src"`
 - [ ] Si depende de otro paquete del monorepo: `references: [{ "path": "../otro-paquete" }]`
 
-### Changesets
+### release-please
 
-- [ ] Añadir a `linked` en `.changeset/config.json` si forma parte del grupo de paquetes versionados juntos
-- [ ] No esta en `ignore` del changeset config
+- [ ] Entrada anyadida en `release-please-config.json` con `package-name`, `component`, `release-type: "node"`, `changelog-path: "CHANGELOG.md"`
+- [ ] Version actual reflejada en `.release-please-manifest.json`
 
 ### Verificacion pre-publish
 
@@ -586,9 +597,9 @@ grep -r "from '\.\." dist/*.d.mts  # No debe haber imports relativos que salgan 
 
 ### "`workspace:*` aparece en el paquete publicado"
 
-**Causa**: Se publico sin pasar por `changeset publish` (que hace la sustitucion automatica).
+**Causa**: Se publico via `npm publish` directo en vez del workflow.
 
-**Solucion**: Siempre publicar via `pnpm release` o `changeset publish`, nunca via `npm publish` directo.
+**Solucion**: Siempre publicar via el workflow `release-please.yml` (que usa `pnpm publish --filter ...`), nunca `npm publish` manual desde una checkout local.
 
 ### "Import de @zetesis/payload-indexer no resuelve en el consumidor"
 

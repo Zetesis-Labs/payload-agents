@@ -5,6 +5,8 @@ on:
     branches:
       - main
 
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
 permissions:
   contents: write
   pull-requests: write
@@ -13,6 +15,8 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     outputs:
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      releases_created: ${{ steps.release.outputs.releases_created }}
       agno_agent_builder_released: ${{ steps.release.outputs['backend/agno-agent-builder--release_created'] }}
       agno_agent_builder_tag: ${{ steps.release.outputs['backend/agno-agent-builder--tag_name'] }}
       payload_documents_worker_builder_released: ${{ steps.release.outputs['backend/payload-documents-worker-builder--release_created'] }}
@@ -24,6 +28,47 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  publish-npm:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build packages
+        run: pnpm turbo run build --filter="./packages/*"
+      - name: Publish changed npm packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          paths='${{ needs.release-please.outputs.paths_released }}'
+          echo "Released paths: $paths"
+          echo "$paths" | jq -r '.[]' | while IFS= read -r path; do
+            case "$path" in
+              packages/*)
+                pkg_name=$(node -p "require('./$path/package.json').name")
+                echo "::group::Publishing $pkg_name ($path)"
+                pnpm --filter "$pkg_name" publish --no-git-checks --access public
+                echo "::endgroup::"
+                ;;
+              *)
+                echo "Skipping non-npm path: $path"
+                ;;
+            esac
+          done
 
   publish-agno-agent-builder:
     needs: release-please

@@ -1,25 +1,78 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "python",
+  "release-type": "node",
   "include-component-in-tag": true,
   "include-v-in-tag": true,
-  "separate-pull-requests": true,
+  "separate-pull-requests": false,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
+  "plugins": ["node-workspace"],
   "packages": {
+    "packages/agent-ui": {
+      "package-name": "@zetesis/agent-ui",
+      "component": "agent-ui",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/mcp-typesense": {
+      "package-name": "@zetesis/mcp-typesense",
+      "component": "mcp-typesense",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/payload-agents-core": {
+      "package-name": "@zetesis/payload-agents-core",
+      "component": "payload-agents-core",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/payload-agents-metrics": {
+      "package-name": "@zetesis/payload-agents-metrics",
+      "component": "payload-agents-metrics",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/payload-documents": {
+      "package-name": "@zetesis/payload-documents",
+      "component": "payload-documents",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/payload-indexer": {
+      "package-name": "@zetesis/payload-indexer",
+      "component": "payload-indexer",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/payload-lexical-blocks-builder": {
+      "package-name": "@zetesis/payload-lexical-blocks-builder",
+      "component": "payload-lexical-blocks-builder",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/payload-taxonomies": {
+      "package-name": "@zetesis/payload-taxonomies",
+      "component": "payload-taxonomies",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
+    "packages/payload-typesense": {
+      "package-name": "@zetesis/payload-typesense",
+      "component": "payload-typesense",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
+    },
     "backend/agno-agent-builder": {
       "package-name": "agno-agent-builder",
       "component": "agno-agent-builder",
       "changelog-path": "CHANGELOG.md",
-      "release-type": "python",
-      "extra-files": []
+      "release-type": "python"
     },
     "backend/payload-documents-worker-builder": {
       "package-name": "payload-documents-worker-builder",
       "component": "payload-documents-worker-builder",
       "changelog-path": "CHANGELOG.md",
-      "release-type": "python",
-      "extra-files": []
+      "release-type": "python"
     }
   }
 }

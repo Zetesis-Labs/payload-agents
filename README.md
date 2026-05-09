@@ -137,7 +137,7 @@ Key design decisions are documented in [`docs/architecture/`](docs/architecture/
 - **ESM only** — all packages use `"type": "module"`
 - **Biome** for linting and formatting
 - **Conventional commits** in English
-- **Changeset required** — run `pnpm changeset` before opening a PR
+- **release-please drives releases** — your conventional commits open the release PR automatically (no manual changeset files)
 
 ## License
 
