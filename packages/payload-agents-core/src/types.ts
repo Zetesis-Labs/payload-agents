@@ -137,6 +137,14 @@ export interface AgentPluginConfig {
    */
   taxonomyCollectionSlug: string
 
+  /**
+   * Slug of the folders collection for RAG filtering. Optional — defaults
+   * to `'payload-folders'`, which is Payload's default for the auto-injected
+   * folders collection. Override only if your `buildConfig({ folders: { slug } })`
+   * uses a different name.
+   */
+  foldersCollectionSlug?: string
+
   /** Options for the agent's `searchCollections` field. Empty arrays are rejected at boot. */
   searchCollectionOptions: ReadonlyArray<{ label: string; value: string }>
 
@@ -252,6 +260,7 @@ export interface ResolvedPluginConfig {
   encryptionKey: string | undefined
   mediaCollectionSlug: string
   taxonomyCollectionSlug: string
+  foldersCollectionSlug: string
   searchCollectionOptions: ReadonlyArray<{ label: string; value: string }>
   collectionOverrides: CollectionOverrides | undefined
   onRunCompleted: OnRunCompleted | undefined

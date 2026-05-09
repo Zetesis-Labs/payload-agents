@@ -16,13 +16,14 @@ WORKFLOW:
 
 SEARCH RULES:
 - Query by CONCEPT. Do NOT put author names or meta-words in the query — scope them via \`filters.taxonomy_slugs\` instead.
+- Use \`filters.folder_slugs\` to scope by folder. Slugs follow the breadcrumb chain (root → leaf), so filtering by an ancestor's slug selects everything below it.
 - Lexical mode AND-joins terms. 1-2 concept words yield the best recall. Shorter query = more results.
 - In semantic/hybrid, vector recall is fixed (top 100 neighbors); \`per_page\` only paginates the page you see.
 - \`total_found\` is only reliable in \`mode: "lexical"\`.
 
 PARAMETER TYPES:
 - \`filters\` MUST be a JSON object, not a stringified JSON.
-- \`taxonomy_slugs\` accepts a string OR a string array.
+- \`taxonomy_slugs\` and \`folder_slugs\` accept a string OR a string array.
 - \`per_page\`, \`page\`, \`snippet_length\` are numbers, not strings.
 
 Read \`guide://search\` for deeper guidance.`
@@ -34,6 +35,7 @@ export const DEFAULT_GUIDE = `# MCP Search Server — Agent Guide
 - Search by **CONCEPT**, not by author name or meta-words. Indexed content is direct text — authors don't name themselves.
 - Use \`taxonomy_slugs\` **FILTERS** to scope by author/topic instead of putting the name in the query:
   \`{ "filters": { "taxonomy_slugs": "some-slug" }, "query": "core concept" }\`
+- Use \`folder_slugs\` **FILTERS** to scope by folder. The slug chain mirrors the folder breadcrumb (root → leaf), so filtering by an ancestor folder's slug selects everything below it.
 - Use the \`headers\` filter to search within a specific book section.
 - Do NOT add meta-words like "opinion", "thinks", "says", "believes" — they are not in the content.
 
@@ -71,7 +73,7 @@ If a search returns suspiciously few results:
 Some MCP clients silently coerce structured parameters into strings. Always pass:
 
 - \`filters\` as a **JSON object**, never as a stringified JSON.
-- \`taxonomy_slugs\` as a string OR string array.
+- \`taxonomy_slugs\` and \`folder_slugs\` as a string OR string array.
 - \`per_page\`, \`page\`, \`snippet_length\` as **numbers**, not strings.
 - \`collections\` as a string array.
 

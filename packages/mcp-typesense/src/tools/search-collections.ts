@@ -37,7 +37,7 @@ export const searchCollectionsSchema = z.object({
     .record(z.union([z.string(), z.array(z.string())]))
     .optional()
     .describe(
-      'Facet filters to apply. Keys are field names (tenant, taxonomy_slugs, headers), values are strings or arrays.'
+      'Facet filters to apply. Keys are field names (tenant, taxonomy_slugs, folder_slugs, headers), values are strings or arrays.'
     ),
   per_page: z
     .number()
@@ -364,7 +364,7 @@ export async function searchCollections(
   ctx: ToolContext,
   auth: McpAuthContext | null
 ): Promise<SearchResult> {
-  // Auto-scope by tenant and taxonomy when auth provides them.
+  // Auto-scope by tenant, taxonomy, and folder when auth provides them.
   let scopedFilters = input.filters
   if (auth?.tenantSlug && !scopedFilters?.tenant) {
     scopedFilters = { ...scopedFilters, tenant: auth.tenantSlug }
@@ -373,6 +373,12 @@ export async function searchCollections(
     scopedFilters = {
       ...scopedFilters,
       taxonomy_slugs: auth.taxonomySlugs.length === 1 ? auth.taxonomySlugs[0] : auth.taxonomySlugs
+    }
+  }
+  if (auth?.folderSlugs?.length && !scopedFilters?.folder_slugs) {
+    scopedFilters = {
+      ...scopedFilters,
+      folder_slugs: auth.folderSlugs.length === 1 ? auth.folderSlugs[0] : auth.folderSlugs
     }
   }
 

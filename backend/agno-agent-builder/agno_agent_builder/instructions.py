@@ -19,7 +19,8 @@ ARGUMENT SHAPE (read this before every call):
   Example: `["posts_chunk", "books_chunk"]`.
 - `filters` (object): facet filters. Keys are field names, values are
   strings or string arrays. The supported keys are `taxonomy_slugs`,
-  `tenant` and `headers`. Example: `{ "taxonomy_slugs": "<slug>" }`.
+  `folder_slugs`, `tenant` and `headers`. Example:
+  `{ "taxonomy_slugs": "<slug>" }` or `{ "folder_slugs": "<slug>" }`.
 - COMMON MISTAKE: do NOT pass `filters: "posts_chunk"`. That is a
   collection name and belongs in `collections: ["posts_chunk"]`.
 
@@ -90,6 +91,8 @@ def compose_instructions(
     rag_parts: list[str] = []
     if cfg.taxonomy_slugs:
         rag_parts.append(f"taxonomy_slugs: {','.join(cfg.taxonomy_slugs)}")
+    if cfg.folder_slugs:
+        rag_parts.append(f"folder_slugs: {','.join(cfg.folder_slugs)}")
     if cfg.search_collections:
         rag_parts.append(f"collections: {','.join(cfg.search_collections)}")
     if rag_parts:
