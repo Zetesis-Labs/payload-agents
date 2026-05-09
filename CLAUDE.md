@@ -88,7 +88,38 @@ pnpm test
 - **No `eslint-disable` / `biome-ignore`** -- fix the cause, not the symptom
 - **pnpm** as package manager (v10)
 - **Node 22.x+**
-- **Conventional commits drive releases** -- write `feat(<component>): ...`, `fix(<component>): ...`, etc. release-please opens a release PR aggregating bumps; merging it tags + publishes. No manual changeset files.
+- **Conventional commits drive releases** -- release-please opens/updates a release PR (`chore(main): release ...`) automatically. No manual `.changeset/*.md` files.
+
+  **Valid scopes** (must match `component` in `release-please-config.json`):
+
+  | Scope | Path | Tag |
+  |---|---|---|
+  | `agent-ui` | `packages/agent-ui` | `agent-ui-v*` |
+  | `mcp-typesense` | `packages/mcp-typesense` | `mcp-typesense-v*` |
+  | `payload-agents-core` | `packages/payload-agents-core` | `payload-agents-core-v*` |
+  | `payload-agents-metrics` | `packages/payload-agents-metrics` | `payload-agents-metrics-v*` |
+  | `payload-documents` | `packages/payload-documents` | `payload-documents-v*` |
+  | `payload-indexer` | `packages/payload-indexer` | `payload-indexer-v*` |
+  | `payload-lexical-blocks-builder` | `packages/payload-lexical-blocks-builder` | `payload-lexical-blocks-builder-v*` |
+  | `payload-taxonomies` | `packages/payload-taxonomies` | `payload-taxonomies-v*` |
+  | `payload-typesense` | `packages/payload-typesense` | `payload-typesense-v*` |
+  | `agno-agent-builder` | `backend/agno-agent-builder` | `agno-agent-builder-v*` |
+  | `payload-documents-worker-builder` | `backend/payload-documents-worker-builder` | `payload-documents-worker-builder-v*` |
+
+  **Bump rules**:
+  - `feat(scope): ...` → minor
+  - `fix(scope): ...` → patch
+  - `feat(scope)!: ...` or footer `BREAKING CHANGE:` → major
+  - `chore:`, `docs:`, `style:`, `refactor:`, `test:`, `ci:` → no bump
+  - `node-workspace` plugin cascades patches: bumping `payload-indexer` auto-patches `payload-typesense`; bumping `agent-ui` or `payload-agents-core` auto-patches `payload-agents-metrics`.
+
+  **Multi-component changes**: write separate commits (one per scope), or a single commit with bullets in the body:
+  ```
+  feat: add chunking strategy across stack
+
+  * feat(payload-indexer): expose chunkStrategy field
+  * feat(payload-typesense): pass chunkStrategy to schema
+  ```
 
 ## Self-correction workflow
 
