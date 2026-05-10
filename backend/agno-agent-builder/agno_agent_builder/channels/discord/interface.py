@@ -45,6 +45,7 @@ from agno.agent import Agent
 from agno.media import Audio, File, Image, Video
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
+from agno_agent_builder.channels.discord.outbound_media import collect_outbound
 from agno_agent_builder.channels.discord.verification import verify_discord_signature
 
 # Discord interaction tokens are valid for 15 minutes. Cap arun() below that
@@ -158,11 +159,14 @@ class DiscordInterface:
         if not isinstance(token, str):
             logger.error("Discord interaction missing token; cannot follow up")
             return
+        files: list[tuple[str, bytes, str]] = []
+        url_suffixes: list[str] = []
         try:
             response = await asyncio.wait_for(
                 self._agent.arun(message, **media_kwargs), timeout=DISCORD_AGENT_RUN_TIMEOUT_S
             )
             content = _stringify_agent_response(response)
+            files, url_suffixes = collect_outbound(response)
         except TimeoutError:
             logger.warning("Discord agent run exceeded 14m, follow-up will likely 404")
             content = "Took too long to respond — please try again."
@@ -170,10 +174,32 @@ class DiscordInterface:
             logger.exception("Discord agent invocation failed")
             content = "Sorry, something went wrong while processing your message."
 
+        if url_suffixes:
+            content = "\n".join([content, *url_suffixes]) if content else "\n".join(url_suffixes)
+
+        await self._patch_followup(token=token, content=content[:2000], files=files)
+
+    async def _patch_followup(
+        self,
+        *,
+        token: str,
+        content: str,
+        files: list[tuple[str, bytes, str]],
+    ) -> None:
         url = f"{DISCORD_API_BASE}/webhooks/{self._application_id}/{token}/messages/@original"
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
-                await client.patch(url, json={"content": content[:2000]})
+                if files:
+                    await client.patch(
+                        url,
+                        data={"payload_json": json.dumps({"content": content})},
+                        files=[
+                            (f"files[{i}]", (name, raw, mime))
+                            for i, (name, raw, mime) in enumerate(files)
+                        ],
+                    )
+                else:
+                    await client.patch(url, json={"content": content})
             except httpx.HTTPError:
                 logger.exception("Failed to deliver Discord follow-up message")
 

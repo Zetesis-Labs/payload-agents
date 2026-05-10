@@ -34,6 +34,7 @@ from agno.agent import Agent
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 
 from agno_agent_builder.channels.teams.attachments import download_attachments
+from agno_agent_builder.channels.teams.outbound_media import build_attachments
 from agno_agent_builder.channels.teams.verification import verify_teams_jwt
 
 # Bot Framework auth tokens are short (1h). MSAL caches them in-memory; we
@@ -178,11 +179,13 @@ class TeamsInterface:
             # Pure attachments-only message where nothing could be downloaded.
             return
 
+        outbound_attachments: list[dict[str, Any]] = []
         try:
             response = await asyncio.wait_for(
                 self._agent.arun(prompt, **media_kwargs), timeout=TEAMS_AGENT_RUN_TIMEOUT_S
             )
             content = _stringify_agent_response(response)
+            outbound_attachments = build_attachments(response)
         except TimeoutError:
             logger.warning("Teams agent run exceeded timeout, sending fallback")
             content = "Took too long to respond — please try again."
@@ -197,6 +200,7 @@ class TeamsInterface:
             text=content,
             recipient=recipient,
             from_=from_,
+            attachments=outbound_attachments,
         )
 
     async def _send_reply(
@@ -208,6 +212,7 @@ class TeamsInterface:
         text: str,
         recipient: dict[str, Any],
         from_: dict[str, Any],
+        attachments: list[dict[str, Any]] | None = None,
     ) -> None:
         token = await acquire_bot_token(self._msal)
         if token is None:
@@ -225,6 +230,8 @@ class TeamsInterface:
         }
         if reply_to_id:
             payload["replyToId"] = reply_to_id
+        if attachments:
+            payload["attachments"] = attachments
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
