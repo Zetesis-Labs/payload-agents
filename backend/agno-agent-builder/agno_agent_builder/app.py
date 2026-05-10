@@ -22,6 +22,7 @@ from agno_agent_builder.channels import (
     ChannelBinding,
     ChannelLoader,
     DiscordChannelLoader,
+    TeamsChannelLoader,
     TelegramChannelLoader,
     WhatsAppChannelLoader,
 )
@@ -63,6 +64,7 @@ def create_app(config: RuntimeConfig) -> FastAPI:
         TelegramChannelLoader(),
         WhatsAppChannelLoader(),
         DiscordChannelLoader(),
+        TeamsChannelLoader(),
     ]
     registry = AgentRegistry(
         source=config.agent_source,
@@ -206,11 +208,13 @@ def create_app(config: RuntimeConfig) -> FastAPI:
     app.add_middleware(InternalAuthMiddleware, secret=secret, public_paths=config.public_paths)
     # Bind interceptor is the OUTERMOST middleware (added last → runs first
     # in the chain) so it can short-circuit `/start <token>` (Telegram),
-    # `connect <token>` (WhatsApp), and `/connect <token>` (Discord) before
-    # the channel-specific routers see them. Each channel's extractor
-    # validates its own request signature inline — see channels.discord.loader
-    # for the Ed25519 path; Telegram/WhatsApp signatures are still validated
-    # by agno's own interface for non-bind passthrough requests.
+    # `connect <token>` (WhatsApp), `/connect <token>` (Discord), and
+    # `bind <token>` (Teams) before the channel-specific routers see them.
+    # Each channel's extractor validates its own request signature inline —
+    # see channels.discord.loader for the Ed25519 path and channels.teams.loader
+    # for Bot Framework JWT verification against the primed JWKS cache.
+    # Telegram/WhatsApp signatures are still validated by agno's own interface
+    # for non-bind passthrough requests.
     app.add_middleware(
         IdentityBindMiddleware,
         payload_url=config.payload_url or "",
