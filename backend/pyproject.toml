@@ -35,7 +35,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**/*.py" = ["S101"]
+# S101 = `assert` (idiomatic in tests)
+# S105/S106/S107 = "possible hardcoded password" — bandit heuristic that fires on any literal containing "token", "secret", "password" in test fixtures
+"**/tests/**/*.py" = ["S101", "S105", "S106", "S107"]
 
 [tool.ruff.format]
 quote-style = "double"

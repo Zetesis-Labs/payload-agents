@@ -12,9 +12,6 @@ from typing import Any
 
 import jwt
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-
 from agno_agent_builder.channels.teams import verification
 from agno_agent_builder.channels.teams.loader import (
     _make_teams_extractor,
@@ -22,6 +19,8 @@ from agno_agent_builder.channels.teams.loader import (
     _parse_bind_command,
     _strip_text_mentions,
 )
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 @pytest.fixture(autouse=True)
@@ -84,7 +83,7 @@ def test_parse_rejects_missing_app_password() -> None:
 
 
 def test_parse_rejects_missing_agent_slug() -> None:
-    with pytest.raises(ValueError, match="agent.slug"):
+    with pytest.raises(ValueError, match=r"agent\.slug"):
         _parse({"id": 1, "appId": "abc", "appPassword": "secret"})
 
 

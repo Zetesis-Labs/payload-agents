@@ -33,6 +33,7 @@ import structlog
 from agno.agent import Agent
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 
+from agno_agent_builder.channels.teams.attachments import download_attachments
 from agno_agent_builder.channels.teams.verification import verify_teams_jwt
 
 # Bot Framework auth tokens are short (1h). MSAL caches them in-memory; we
@@ -136,16 +137,19 @@ class TeamsInterface:
         service_url = activity.get("serviceUrl")
         conversation = activity.get("conversation") or {}
         conversation_id = conversation.get("id")
-        if (
-            not isinstance(text, str)
-            or not isinstance(service_url, str)
-            or not isinstance(conversation_id, str)
-        ):
+        if not isinstance(service_url, str) or not isinstance(conversation_id, str):
+            return Response(status_code=200)
+
+        cleaned_text = _strip_bot_mention(text, activity) if isinstance(text, str) else ""
+        raw_attachments = activity.get("attachments")
+        attachments = raw_attachments if isinstance(raw_attachments, list) else []
+        if not cleaned_text and not attachments:
             return Response(status_code=200)
 
         background_tasks.add_task(
             self._run_agent_and_reply,
-            message=_strip_bot_mention(text, activity),
+            message=cleaned_text,
+            attachments=attachments,
             service_url=service_url,
             conversation_id=conversation_id,
             reply_to_id=activity.get("id") if isinstance(activity.get("id"), str) else None,
@@ -158,15 +162,25 @@ class TeamsInterface:
         self,
         *,
         message: str,
+        attachments: list[dict[str, Any]],
         service_url: str,
         conversation_id: str,
         reply_to_id: str | None,
         recipient: dict[str, Any],
         from_: dict[str, Any],
     ) -> None:
+        bot_token = await acquire_bot_token(self._msal) if attachments else None
+        media_kwargs, skipped = await download_attachments(
+            attachments=attachments, bot_token=bot_token
+        )
+        prompt = _prepend_skip_notice(message, skipped)
+        if not prompt and not media_kwargs:
+            # Pure attachments-only message where nothing could be downloaded.
+            return
+
         try:
             response = await asyncio.wait_for(
-                self._agent.arun(message), timeout=TEAMS_AGENT_RUN_TIMEOUT_S
+                self._agent.arun(prompt, **media_kwargs), timeout=TEAMS_AGENT_RUN_TIMEOUT_S
             )
             content = _stringify_agent_response(response)
         except TimeoutError:
@@ -221,6 +235,17 @@ class TeamsInterface:
                 )
             except httpx.HTTPError:
                 logger.exception("Failed to deliver Teams reply")
+
+
+def _prepend_skip_notice(message: str, skipped: list[str]) -> str:
+    """Mirror agno's WhatsApp pattern: when we can't download some media,
+    prepend a one-line notice so the model and the user both know what was
+    dropped instead of pretending nothing happened.
+    """
+    if not skipped:
+        return message
+    notice = "[Some attachments could not be downloaded: " + "; ".join(skipped) + "]"
+    return f"{notice}\n\n{message}" if message else notice
 
 
 def _strip_bot_mention(text: str, activity: dict[str, Any]) -> str:
