@@ -53,6 +53,33 @@ function assertCollectionExists(config: Config, slug: string, configField: strin
   }
 }
 
+/**
+ * Payload auto-injects the folders collection (default slug `payload-folders`)
+ * only when (1) `buildConfig({ folders: ... })` isn't disabled AND (2) at
+ * least one collection has `folders: true`. Without both, the agents
+ * collection's `folders` relationship field references a phantom collection
+ * and Payload's sanitizer throws a cryptic `InvalidFieldRelationship`.
+ *
+ * Validate eagerly so the host gets an actionable error from us instead.
+ */
+function assertFoldersWillBeInjected(config: Config, slug: string): void {
+  if (config.folders === false) {
+    throw new Error(
+      `[agent-plugin] foldersCollectionSlug="${slug}" but \`buildConfig({ folders: false })\` ` +
+        "disables Payload's auto-injected folders collection. " +
+        'Set `folders: {}` (or any RootFoldersConfiguration) in your payload.config.ts.'
+    )
+  }
+  const hasFolderEnabled = (config.collections ?? []).some(c => c.folders === true)
+  if (!hasFolderEnabled) {
+    throw new Error(
+      `[agent-plugin] foldersCollectionSlug="${slug}" but no host collection has \`folders: true\`. ` +
+        'Payload only auto-injects the folders collection when at least one collection opts in — ' +
+        'enable folders on a content collection (e.g. Posts) in your payload.config.ts.'
+    )
+  }
+}
+
 export function agentPlugin(userConfig: AgentPluginConfig): Plugin {
   return (incomingConfig: Config): Config => {
     const config = resolveConfig(userConfig)
@@ -60,6 +87,7 @@ export function agentPlugin(userConfig: AgentPluginConfig): Plugin {
 
     assertCollectionExists(incomingConfig, config.mediaCollectionSlug, 'mediaCollectionSlug')
     assertCollectionExists(incomingConfig, config.taxonomyCollectionSlug, 'taxonomyCollectionSlug')
+    assertFoldersWillBeInjected(incomingConfig, config.foldersCollectionSlug)
 
     // Create the agents collection + register the internal-list endpoint on
     // it (X-Internal-Secret + overrideAccess; replaces the old runtime-secret

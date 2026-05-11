@@ -76,11 +76,16 @@ export interface Config {
     'llm-usage-events': LlmUsageEvent;
     documents: Document;
     'payload-kv': PayloadKv;
+    'payload-folders': FolderInterface;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
   };
-  collectionsJoins: {};
+  collectionsJoins: {
+    'payload-folders': {
+      documentsAndFolders: 'payload-folders' | 'posts';
+    };
+  };
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -91,6 +96,7 @@ export interface Config {
     'llm-usage-events': LlmUsageEventsSelect<false> | LlmUsageEventsSelect<true>;
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -207,6 +213,7 @@ export interface Post {
   text_transforms?: ('strip-urls' | 'strip-mentions' | 'normalize-whitespace')[] | null;
   categories?: (number | Taxonomy)[] | null;
   _syncStatus?: ('synced' | 'outdated' | 'not-indexed' | 'error') | null;
+  folder?: (number | null) | FolderInterface;
   updatedAt: string;
   createdAt: string;
 }
@@ -234,6 +241,32 @@ export interface Taxonomy {
     | number
     | boolean
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders".
+ */
+export interface FolderInterface {
+  id: number;
+  name: string;
+  folder?: (number | null) | FolderInterface;
+  documentsAndFolders?: {
+    docs?: (
+      | {
+          relationTo?: 'payload-folders';
+          value: number | FolderInterface;
+        }
+      | {
+          relationTo?: 'posts';
+          value: number | Post;
+        }
+    )[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  folderType?: 'posts'[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -283,6 +316,10 @@ export interface Agent {
    */
   isActive?: boolean | null;
   /**
+   * When enabled, anonymous channel callers (e.g. Telegram users not yet bound to a ZP user) can chat with this agent. Leave off to require a bound user.
+   */
+  allowGuestAccess?: boolean | null;
+  /**
    * LLM model to use (e.g., openai/gpt-4o, anthropic/claude-sonnet-4-20250514)
    */
   llmModel: string;
@@ -310,6 +347,10 @@ export interface Agent {
    * Taxonomies that filter the RAG content. REQUIRED: if empty, agent will not search any content.
    */
   taxonomies?: (number | Taxonomy)[] | null;
+  /**
+   * Folders that scope the RAG content. Optional: if set, the agent only sees documents inside these folders (and their descendants, since the slug chain mirrors the breadcrumb).
+   */
+  folders?: (number | FolderInterface)[] | null;
   /**
    * Number of chunks to retrieve for RAG context
    */
@@ -509,6 +550,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'documents';
         value: number | Document;
+      } | null)
+    | ({
+        relationTo: 'payload-folders';
+        value: number | FolderInterface;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -605,6 +650,7 @@ export interface PostsSelect<T extends boolean = true> {
   text_transforms?: T;
   categories?: T;
   _syncStatus?: T;
+  folder?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -642,6 +688,7 @@ export interface AgentsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
   isActive?: T;
+  allowGuestAccess?: T;
   llmModel?: T;
   apiKey?: T;
   apiKeyFingerprint?: T;
@@ -649,6 +696,7 @@ export interface AgentsSelect<T extends boolean = true> {
   toolCallLimit?: T;
   searchCollections?: T;
   taxonomies?: T;
+  folders?: T;
   kResults?: T;
   maxContextBytes?: T;
   ttl?: T;
@@ -725,6 +773,18 @@ export interface DocumentsSelect<T extends boolean = true> {
 export interface PayloadKvSelect<T extends boolean = true> {
   key?: T;
   data?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders_select".
+ */
+export interface PayloadFoldersSelect<T extends boolean = true> {
+  name?: T;
+  folder?: T;
+  documentsAndFolders?: T;
+  folderType?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
