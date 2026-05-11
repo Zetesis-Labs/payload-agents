@@ -131,7 +131,11 @@ def _parse(doc: dict[str, Any]) -> ChannelInstallation:
     tenant = doc.get("tenant")
     tenant_slug = tenant.get("slug") if isinstance(tenant, dict) else None
 
-    raw_tenant_id = doc.get("tenantId")
+    # Field renamed from `tenantId` → `aadTenantId` in the collection
+    # because Payload's multi-tenant plugin already serialises its
+    # `tenant` relationship as `tenant_id` in SQL, and a camelCase
+    # `tenantId` text field collided with that on insert.
+    raw_tenant_id = doc.get("aadTenantId")
     aad_tenant_id = raw_tenant_id if isinstance(raw_tenant_id, str) and raw_tenant_id else None
 
     return ChannelInstallation(

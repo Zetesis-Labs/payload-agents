@@ -87,7 +87,7 @@ def test_parse_rejects_missing_agent_slug() -> None:
         _parse({"id": 1, "appId": "abc", "appPassword": "secret"})
 
 
-def test_parse_extracts_optional_tenant_id_when_string() -> None:
+def test_parse_extracts_optional_aad_tenant_id_when_string() -> None:
     install = _parse(
         {
             "id": 7,
@@ -95,7 +95,10 @@ def test_parse_extracts_optional_tenant_id_when_string() -> None:
             "appPassword": "secret",
             "agent": {"slug": "agent-x"},
             "tenant": {"slug": "acme"},
-            "tenantId": "00000000-0000-0000-0000-000000000000",
+            # `aadTenantId` (not `tenantId`) to avoid colliding with the
+            # multi-tenant plugin's `tenant` field, which Payload serialises
+            # as `tenant_id` in SQL.
+            "aadTenantId": "00000000-0000-0000-0000-000000000000",
         }
     )
     assert install.extras["app_id"] == "appid"
@@ -104,14 +107,14 @@ def test_parse_extracts_optional_tenant_id_when_string() -> None:
     assert install.tenant_slug == "acme"
 
 
-def test_parse_drops_non_string_tenant_id() -> None:
+def test_parse_drops_non_string_aad_tenant_id() -> None:
     install = _parse(
         {
             "id": 8,
             "appId": "appid",
             "appPassword": "secret",
             "agent": {"slug": "agent-x"},
-            "tenantId": 12345,
+            "aadTenantId": 12345,
         }
     )
     assert install.extras["tenant_id"] is None
