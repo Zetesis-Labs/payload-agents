@@ -3,6 +3,7 @@ import { type CollectionConfig, slugField } from 'payload'
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
+  folders: true,
   access: {
     read: () => true
   },

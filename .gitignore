@@ -10,6 +10,10 @@ dist
 *.env.local
 node-compile-cache
 
+# Generated Teams app packages
+**/teams-manifest/manifest.json
+**/teams-manifest/*.zip
+
 # Python
 .venv
 __pycache__

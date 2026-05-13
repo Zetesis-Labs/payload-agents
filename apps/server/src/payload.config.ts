@@ -25,6 +25,7 @@ async function getDailyLimit(_payload: Payload, _userId: string | number): Promi
 }
 
 export default buildConfig({
+  folders: {},
   admin: {
     user: Users.slug,
     importMap: {

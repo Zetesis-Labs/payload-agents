@@ -1,4 +1,5 @@
 from agno_agent_builder.channels.discord import DiscordChannelLoader
+from agno_agent_builder.channels.teams import TeamsChannelLoader
 from agno_agent_builder.channels.telegram import TelegramChannelLoader
 from agno_agent_builder.channels.types import (
     BindExtraction,
@@ -14,6 +15,7 @@ __all__ = [
     "ChannelInstallation",
     "ChannelLoader",
     "DiscordChannelLoader",
+    "TeamsChannelLoader",
     "TelegramChannelLoader",
     "WhatsAppChannelLoader",
 ]

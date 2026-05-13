@@ -10,17 +10,33 @@
  * agents and tenants collections to make depth=1 populate work.
  */
 
+import { timingSafeEqual } from 'node:crypto'
 import type { PayloadHandler, PayloadRequest, Where } from 'payload'
 import type { ResolvedPluginConfig } from '../types'
 
 const INTERNAL_SECRET_HEADER = 'x-internal-secret'
+
+/**
+ * Constant-time comparison. Falls back to a dummy compare on mismatched
+ * length so an attacker can't infer the secret length from the
+ * early-exit timing of a length check. (Security audit: H1.)
+ */
+const safeCompareSecrets = (a: string, b: string): boolean => {
+  const aBuf = Buffer.from(a, 'utf8')
+  const bBuf = Buffer.from(b, 'utf8')
+  if (aBuf.length !== bBuf.length) {
+    timingSafeEqual(aBuf, Buffer.alloc(aBuf.length, 0))
+    return false
+  }
+  return timingSafeEqual(aBuf, bBuf)
+}
 
 const requireInternalSecret = (req: PayloadRequest, internalSecret: string): Response | null => {
   if (!internalSecret) {
     return Response.json({ error: 'Internal endpoint not configured' }, { status: 503 })
   }
   const headerSecret = req.headers?.get?.(INTERNAL_SECRET_HEADER)
-  if (!headerSecret || headerSecret !== internalSecret) {
+  if (!headerSecret || !safeCompareSecrets(headerSecret, internalSecret)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return null

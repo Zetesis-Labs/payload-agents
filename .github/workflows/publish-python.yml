@@ -1,16 +1,6 @@
 name: Publish Python Package
 
 on:
-  workflow_call:
-    inputs:
-      package:
-        description: "Workspace package to publish"
-        required: true
-        type: string
-      ref:
-        description: "Git ref (tag or sha) to checkout and build from"
-        required: true
-        type: string
   workflow_dispatch:
     inputs:
       package:
@@ -20,6 +10,7 @@ on:
         type: choice
         options:
           - agno-agent-builder
+          - agno-microsoft-teams
           - payload-documents-worker-builder
       ref:
         description: "Git ref (tag or sha) to publish (defaults to current branch)"
@@ -50,7 +41,9 @@ jobs:
           enable-cache: true
 
       - name: Build distribution
-        run: uv build --package "${{ inputs.package }}"
+        run: |
+          rm -rf dist
+          uv build --package "${{ inputs.package }}"
 
       - name: Publish to PyPI (trusted publisher / OIDC)
         run: uv publish

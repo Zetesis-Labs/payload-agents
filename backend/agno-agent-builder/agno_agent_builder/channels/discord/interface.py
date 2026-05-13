@@ -19,12 +19,18 @@ Operator step (one-time per bot):
     PUT /applications/{appId}/commands
     body: [
       {"name":"chat","description":"Talk to the agent","options":[
-        {"name":"message","description":"Your message","type":3,"required":true}
+        {"name":"message","description":"Your message","type":3,"required":true},
+        {"name":"file","description":"Optional file (image/PDF/etc.) for the agent","type":11,"required":false}
       ]},
       {"name":"connect","description":"Link your Zetesis account","options":[
         {"name":"token","description":"Token from /settings/integrations","type":3,"required":true}
       ]}
     ]
+
+  Type 11 = ATTACHMENT. Discord delivers it via
+  ``interaction.data.resolved.attachments[<id>]`` with a public CDN
+  ``url`` (no auth) so we pass it as ``Image(url=...)`` / ``File(url=...)``
+  to agno without downloading first.
 """
 
 from __future__ import annotations
@@ -36,8 +42,10 @@ from typing import Any
 import httpx
 import structlog
 from agno.agent import Agent
+from agno.media import Audio, File, Image, Video
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
+from agno_agent_builder.channels.discord.outbound_media import collect_outbound
 from agno_agent_builder.channels.discord.verification import verify_discord_signature
 
 # Discord interaction tokens are valid for 15 minutes. Cap arun() below that
@@ -128,24 +136,37 @@ class DiscordInterface:
         self, interaction: dict[str, Any], background_tasks: BackgroundTasks
     ) -> dict[str, Any]:
         message_text = _option_value(interaction, "message")
-        if not message_text:
+        media_kwargs = _resolve_attachments(interaction)
+        if not message_text and not media_kwargs:
             return {"type": 4, "data": {"content": "No message provided.", "flags": 64}}
 
         background_tasks.add_task(
-            self._run_agent_and_followup, interaction=interaction, message=message_text
+            self._run_agent_and_followup,
+            interaction=interaction,
+            message=message_text or "",
+            media_kwargs=media_kwargs,
         )
         return {"type": 5}
 
-    async def _run_agent_and_followup(self, *, interaction: dict[str, Any], message: str) -> None:
+    async def _run_agent_and_followup(
+        self,
+        *,
+        interaction: dict[str, Any],
+        message: str,
+        media_kwargs: dict[str, Any],
+    ) -> None:
         token = interaction.get("token")
         if not isinstance(token, str):
             logger.error("Discord interaction missing token; cannot follow up")
             return
+        files: list[tuple[str, bytes, str]] = []
+        url_suffixes: list[str] = []
         try:
             response = await asyncio.wait_for(
-                self._agent.arun(message), timeout=DISCORD_AGENT_RUN_TIMEOUT_S
+                self._agent.arun(message, **media_kwargs), timeout=DISCORD_AGENT_RUN_TIMEOUT_S
             )
             content = _stringify_agent_response(response)
+            files, url_suffixes = collect_outbound(response)
         except TimeoutError:
             logger.warning("Discord agent run exceeded 14m, follow-up will likely 404")
             content = "Took too long to respond — please try again."
@@ -153,10 +174,32 @@ class DiscordInterface:
             logger.exception("Discord agent invocation failed")
             content = "Sorry, something went wrong while processing your message."
 
+        if url_suffixes:
+            content = "\n".join([content, *url_suffixes]) if content else "\n".join(url_suffixes)
+
+        await self._patch_followup(token=token, content=content[:2000], files=files)
+
+    async def _patch_followup(
+        self,
+        *,
+        token: str,
+        content: str,
+        files: list[tuple[str, bytes, str]],
+    ) -> None:
         url = f"{DISCORD_API_BASE}/webhooks/{self._application_id}/{token}/messages/@original"
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
-                await client.patch(url, json={"content": content[:2000]})
+                if files:
+                    await client.patch(
+                        url,
+                        data={"payload_json": json.dumps({"content": content})},
+                        files=[
+                            (f"files[{i}]", (name, raw, mime))
+                            for i, (name, raw, mime) in enumerate(files)
+                        ],
+                    )
+                else:
+                    await client.patch(url, json={"content": content})
             except httpx.HTTPError:
                 logger.exception("Failed to deliver Discord follow-up message")
 
@@ -169,6 +212,69 @@ def _option_value(interaction: dict[str, Any], name: str) -> str | None:
             if isinstance(value, str):
                 return value
     return None
+
+
+def _resolve_attachments(interaction: dict[str, Any]) -> dict[str, Any]:
+    """Discord delivers attachment-typed slash command options as IDs;
+    the actual ``url`` + ``content_type`` live under ``data.resolved.attachments``.
+
+    We don't download — Discord's CDN URLs are public and signed, so passing
+    ``url=`` lets agno fetch lazily when the model is invoked.
+    """
+    data = interaction.get("data") or {}
+    options = data.get("options") or []
+    resolved = (data.get("resolved") or {}).get("attachments") or {}
+    if not isinstance(options, list) or not isinstance(resolved, dict):
+        return {}
+
+    attachment_ids: list[str] = []
+    for opt in options:
+        if isinstance(opt, dict) and opt.get("type") == 11:
+            attachment_id = opt.get("value")
+            if isinstance(attachment_id, str):
+                attachment_ids.append(attachment_id)
+    if not attachment_ids:
+        return {}
+
+    images: list[Image] = []
+    audio: list[Audio] = []
+    videos: list[Video] = []
+    files: list[File] = []
+    for attachment_id in attachment_ids:
+        attachment = resolved.get(attachment_id)
+        if not isinstance(attachment, dict):
+            continue
+        url = attachment.get("url")
+        if not isinstance(url, str) or not url:
+            continue
+        content_type = attachment.get("content_type")
+        filename = (
+            attachment.get("filename") if isinstance(attachment.get("filename"), str) else None
+        )
+        if isinstance(content_type, str) and content_type.startswith("image/"):
+            images.append(Image(url=url, mime_type=content_type))
+        elif isinstance(content_type, str) and content_type.startswith("audio/"):
+            audio.append(Audio(url=url, mime_type=content_type))
+        elif isinstance(content_type, str) and content_type.startswith("video/"):
+            videos.append(Video(url=url, mime_type=content_type))
+        else:
+            valid_mime = (
+                content_type
+                if isinstance(content_type, str) and content_type in File.valid_mime_types()
+                else None
+            )
+            files.append(File(url=url, mime_type=valid_mime, filename=filename, name=filename))
+
+    out: dict[str, Any] = {}
+    if images:
+        out["images"] = images
+    if audio:
+        out["audio"] = audio
+    if videos:
+        out["videos"] = videos
+    if files:
+        out["files"] = files
+    return out
 
 
 def _stringify_agent_response(response: Any) -> str:

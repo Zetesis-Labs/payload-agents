@@ -31,6 +31,28 @@ from payload_documents_worker_builder.config import RuntimeConfig
 PARSE_DOCUMENT_TASK_NAME = "documents.parse"
 DEFAULT_FILENAME = "upload.bin"
 
+# Defensive limits before we ship a file to LlamaParse. A single 1GB upload
+# in Payload (or many MB-sized files in a tight loop) can rack up significant
+# LlamaParse cost. Mirrors the limit in apps/server/src/collections/Documents
+# (kept conservative for now; raise via config if needed). Security audit: M6.
+MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100 MiB
+ALLOWED_MIME_PREFIXES = (
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument",
+    "text/",
+    "image/",
+)
+
+
+class FileTooLargeError(Exception):
+    """Raised when a Payload upload exceeds MAX_FILE_SIZE_BYTES."""
+
+
+class UnsupportedMimeTypeError(Exception):
+    """Raised when the upload's MIME type isn't on the allowlist."""
+
+
 logger = structlog.get_logger("payload_documents_worker_builder.parse_document")
 
 
@@ -77,7 +99,12 @@ async def _run_parse_document(document_id: str, config: RuntimeConfig) -> None:
             markdown = await _poll_until_done(llama, job.id, config, log)
             await _writeback_success(payload, config, document_id, markdown, log)
             log.info("Parse document task succeeded")
-        except (LlamaParseError, PayloadError) as exc:
+        except (
+            LlamaParseError,
+            PayloadError,
+            FileTooLargeError,
+            UnsupportedMimeTypeError,
+        ) as exc:
             log.exception("Parse document task failed")
             await _stamp_error(payload, config, document_id, str(exc))
             raise
@@ -98,8 +125,32 @@ async def _fetch_inputs(
     log: structlog.stdlib.BoundLogger,
 ) -> tuple[ParseContext, bytes]:
     ctx = await payload.fetch_parse_context(config.documents_collection_slug, document_id)
+
+    # Validate MIME type before pulling bytes — a quota-abuse attempt with a
+    # huge non-document file can be rejected without ever downloading.
+    mime_type = ctx.get("mimeType") or ctx.get("mime_type")
+    if mime_type and not any(mime_type.startswith(p) for p in ALLOWED_MIME_PREFIXES):
+        log.warning("Rejecting upload with unsupported MIME", mime_type=mime_type)
+        raise UnsupportedMimeTypeError(
+            f"MIME type {mime_type!r} not in allowlist; refusing to send to LlamaParse"
+        )
+
     log.info("Downloading upload from Payload", filename=_resolve_filename(ctx))
     file_bytes = await payload.fetch_parse_file(config.documents_collection_slug, document_id)
+
+    # Size-cap after download so we have actual bytes (Payload may not always
+    # populate filesize in the metadata depending on storage adapter).
+    if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+        log.warning(
+            "Rejecting upload over size limit",
+            size=len(file_bytes),
+            limit=MAX_FILE_SIZE_BYTES,
+        )
+        raise FileTooLargeError(
+            f"File size {len(file_bytes)} bytes exceeds limit {MAX_FILE_SIZE_BYTES}; "
+            "refusing to send to LlamaParse"
+        )
+
     return ctx, file_bytes
 
 
