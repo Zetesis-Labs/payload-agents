@@ -248,7 +248,9 @@ def _resolve_attachments(interaction: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(url, str) or not url:
             continue
         content_type = attachment.get("content_type")
-        filename = attachment.get("filename") if isinstance(attachment.get("filename"), str) else None
+        filename = (
+            attachment.get("filename") if isinstance(attachment.get("filename"), str) else None
+        )
         if isinstance(content_type, str) and content_type.startswith("image/"):
             images.append(Image(url=url, mime_type=content_type))
         elif isinstance(content_type, str) and content_type.startswith("audio/"):

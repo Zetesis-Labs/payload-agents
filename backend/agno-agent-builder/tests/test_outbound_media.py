@@ -14,7 +14,7 @@ from typing import Any
 
 from agno.media import Audio, File, Image, Video
 from agno_agent_builder.channels.discord.outbound_media import collect_outbound
-from agno_agent_builder.channels.teams.outbound_media import (
+from agno_microsoft_teams.outbound_media import (
     MAX_INLINE_ATTACHMENT_BYTES,
     build_attachments,
 )
@@ -38,9 +38,7 @@ class _FakeResponse:
 
 
 def test_teams_build_attachments_inlines_image_bytes_as_data_uri() -> None:
-    response = _FakeResponse(
-        images=[Image(content=b"PNGDATA", mime_type="image/png", id="a")]
-    )
+    response = _FakeResponse(images=[Image(content=b"PNGDATA", mime_type="image/png", id="a")])
     attachments = build_attachments(response)
     assert len(attachments) == 1
     expected_b64 = base64.b64encode(b"PNGDATA").decode()

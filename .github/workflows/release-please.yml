@@ -19,6 +19,8 @@ jobs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       agno_agent_builder_released: ${{ steps.release.outputs['backend/agno-agent-builder--release_created'] }}
       agno_agent_builder_tag: ${{ steps.release.outputs['backend/agno-agent-builder--tag_name'] }}
+      agno_microsoft_teams_released: ${{ steps.release.outputs['backend/agno-microsoft-teams--release_created'] }}
+      agno_microsoft_teams_tag: ${{ steps.release.outputs['backend/agno-microsoft-teams--tag_name'] }}
       payload_documents_worker_builder_released: ${{ steps.release.outputs['backend/payload-documents-worker-builder--release_created'] }}
       payload_documents_worker_builder_tag: ${{ steps.release.outputs['backend/payload-documents-worker-builder--tag_name'] }}
     steps:
@@ -80,6 +82,17 @@ jobs:
     with:
       package: agno-agent-builder
       ref: ${{ needs.release-please.outputs.agno_agent_builder_tag }}
+
+  publish-agno-microsoft-teams:
+    needs: release-please
+    if: needs.release-please.outputs.agno_microsoft_teams_released == 'true'
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/publish-python.yml
+    with:
+      package: agno-microsoft-teams
+      ref: ${{ needs.release-please.outputs.agno_microsoft_teams_tag }}
 
   publish-payload-documents-worker-builder:
     needs: release-please

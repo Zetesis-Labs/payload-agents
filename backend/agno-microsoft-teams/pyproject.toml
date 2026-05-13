@@ -1,14 +1,14 @@
 [project]
-name = "agno-agent-builder"
-version = "0.1.5"
-description = "Parametrizable Agno-based agent runtime — FastAPI factory with pluggable agent sources, multi-tenant headers, and LISTEN/NOTIFY hot reload."
+name = "agno-microsoft-teams"
+version = "0.0.0"
+description = "Microsoft Teams / Bot Framework interface for Agno agents."
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Zetesis Labs" }]
-keywords = ["agno", "agent", "fastapi", "llm", "rag", "mcp"]
+keywords = ["agno", "teams", "microsoft-teams", "bot-framework", "fastapi"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Framework :: FastAPI",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
@@ -18,16 +18,13 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "ag-ui-protocol>=0.1.13",
-    "agno[anthropic,mcp,openai,os,postgres,telegram]>=2.6.0",
-    "agno-microsoft-teams",
+    "agno>=2.6.0",
     "cryptography>=42.0",
     "fastapi>=0.115",
     "httpx>=0.28",
-    "psycopg[binary]>=3.2",
-    "pydantic>=2.9",
+    "msal>=1.30",
+    "pyjwt[crypto]>=2.8",
     "structlog>=24.1",
-    "uvicorn[standard]>=0.34",
 ]
 
 [project.urls]
@@ -40,10 +37,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["agno_agent_builder"]
+packages = ["agno_microsoft_teams"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"agno_agent_builder/py.typed" = "agno_agent_builder/py.typed"
+"agno_microsoft_teams/py.typed" = "agno_microsoft_teams/py.typed"
 
 [dependency-groups]
 dev = [

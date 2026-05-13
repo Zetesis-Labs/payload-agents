@@ -20,17 +20,15 @@ from typing import Any
 
 import httpx
 import structlog
-
-from agno_agent_builder.channels.fetch import fetch_installation_docs
-from agno_agent_builder.channels.teams.interface import (
+from agno_microsoft_teams import (
     TeamsInterface,
     acquire_bot_token,
     build_msal_client,
-)
-from agno_agent_builder.channels.teams.verification import (
     prime_jwks_cache,
     verify_teams_jwt_sync,
 )
+
+from agno_agent_builder.channels.fetch import fetch_installation_docs
 from agno_agent_builder.channels.types import (
     BindExtraction,
     ChannelBinding,
@@ -71,7 +69,9 @@ class TeamsChannelLoader:
             try:
                 await prime_jwks_cache()
             except Exception:
-                logger.exception("Failed to prime Teams JWKS cache; bind path will reject all messages until next refresh")
+                logger.exception(
+                    "Failed to prime Teams JWKS cache; bind path will reject all messages until next refresh"
+                )
 
         bindings: list[ChannelBinding] = []
         for install in installations:
@@ -199,7 +199,9 @@ def _make_teams_extractor(*, app_id: str) -> Any:
         return BindExtraction(
             token=token,
             external_id=aad_object_id,
-            external_username=from_user.get("name") if isinstance(from_user.get("name"), str) else None,
+            external_username=from_user.get("name")
+            if isinstance(from_user.get("name"), str)
+            else None,
             reply_target=reply_target,
         )
 
@@ -231,9 +233,7 @@ def _parse_bind_command(text: str) -> str | None:
 
 
 def _make_teams_replier(*, app_id: str, app_password: str, tenant_id: str | None) -> Any:
-    msal_client = build_msal_client(
-        app_id=app_id, app_password=app_password, tenant_id=tenant_id
-    )
+    msal_client = build_msal_client(app_id=app_id, app_password=app_password, tenant_id=tenant_id)
 
     async def reply(target: str | int, text: str) -> None:
         if not isinstance(target, str) or REPLY_TARGET_SEPARATOR not in target:

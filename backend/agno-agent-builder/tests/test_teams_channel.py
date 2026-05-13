@@ -12,13 +12,13 @@ from typing import Any
 
 import jwt
 import pytest
-from agno_agent_builder.channels.teams import verification
 from agno_agent_builder.channels.teams.loader import (
     _make_teams_extractor,
     _parse,
     _parse_bind_command,
     _strip_text_mentions,
 )
+from agno_microsoft_teams import verification
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 

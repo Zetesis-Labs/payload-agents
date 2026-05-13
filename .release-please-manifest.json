@@ -9,5 +9,6 @@
   "packages/payload-taxonomies": "0.2.1",
   "packages/payload-typesense": "0.4.0",
   "backend/agno-agent-builder": "0.1.5",
+  "backend/agno-microsoft-teams": "0.0.0",
   "backend/payload-documents-worker-builder": "0.1.1"
 }

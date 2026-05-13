@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 import pytest
-from agno_agent_builder.channels.teams.attachments import (
+from agno_microsoft_teams.attachments import (
     TEAMS_FILE_DOWNLOAD_INFO,
     download_attachments,
 )
@@ -44,7 +44,7 @@ class _FakeClient:
 def patch_async_client(monkeypatch: pytest.MonkeyPatch) -> Any:
     def _patch(registry: dict[str, tuple[bytes, int]]) -> None:
         monkeypatch.setattr(
-            "agno_agent_builder.channels.teams.attachments.httpx.AsyncClient",
+            "agno_microsoft_teams.attachments.httpx.AsyncClient",
             lambda timeout=None: _FakeClient(registry),
         )
 

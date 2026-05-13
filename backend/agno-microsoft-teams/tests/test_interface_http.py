@@ -16,21 +16,19 @@ from __future__ import annotations
 
 import time
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import jwt
 import pytest
+from agno_microsoft_teams import interface as interface_module
+from agno_microsoft_teams import verification
+from agno_microsoft_teams.interface import TeamsInterface
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from agno_agent_builder.channels.teams import interface as interface_module
-from agno_agent_builder.channels.teams import verification
-from agno_agent_builder.channels.teams.interface import TeamsInterface
-
 
 APP_ID = "bot-app-id-123"
 SERVICE_URL = "https://smba.trafficmanager.net/emea/"
@@ -67,9 +65,7 @@ def _generate_signing_key() -> tuple[bytes, str, dict[str, Any]]:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    public_jwk = jwt.algorithms.RSAAlgorithm.to_jwk(
-        private_key.public_key(), as_dict=True
-    )
+    public_jwk = jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key(), as_dict=True)
     public_jwk["kid"] = "test-kid"
     public_jwk["alg"] = "RS256"
     return private_pem, "test-kid", public_jwk
@@ -98,9 +94,7 @@ def _issue_token(
     }
     if service_url:
         payload["serviceurl"] = service_url
-    return jwt.encode(
-        payload, private_pem, algorithm="RS256", headers={"kid": kid}
-    )
+    return jwt.encode(payload, private_pem, algorithm="RS256", headers={"kid": kid})
 
 
 def _make_app(agent: Any) -> FastAPI:
@@ -131,12 +125,12 @@ def _message_activity(text: str = "hola bot") -> dict[str, Any]:
 class _StubAsyncClient:
     """Stand-in for httpx.AsyncClient that records calls for assertions."""
 
-    captured: list[dict[str, Any]] = []
+    captured: ClassVar[list[dict[str, Any]]] = []
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: D401
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
-    async def __aenter__(self) -> "_StubAsyncClient":
+    async def __aenter__(self) -> _StubAsyncClient:
         return self
 
     async def __aexit__(self, *args: Any) -> None:
@@ -207,9 +201,7 @@ def test_rejects_when_jwt_service_url_does_not_match_body() -> None:
 def test_conversation_update_returns_200_without_invoking_agent() -> None:
     pem, kid, jwk = _generate_signing_key()
     _prime_cache_with(jwk)
-    token = _issue_token(
-        private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL
-    )
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
     agent = MagicMock()
     agent.arun = AsyncMock()
     activity = {
@@ -230,9 +222,7 @@ def test_conversation_update_returns_200_without_invoking_agent() -> None:
 def test_empty_message_without_attachments_is_acked_without_agent_run() -> None:
     pem, kid, jwk = _generate_signing_key()
     _prime_cache_with(jwk)
-    token = _issue_token(
-        private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL
-    )
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
     agent = MagicMock()
     agent.arun = AsyncMock()
     activity = _message_activity(text="")
@@ -251,9 +241,7 @@ def test_message_runs_agent_and_posts_reply_to_bot_connector(
 ) -> None:
     pem, kid, jwk = _generate_signing_key()
     _prime_cache_with(jwk)
-    token = _issue_token(
-        private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL
-    )
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
 
     agent_response = MagicMock()
     agent_response.content = "hi back"
@@ -273,7 +261,7 @@ def test_message_runs_agent_and_posts_reply_to_bot_connector(
 
     assert resp.status_code == 202
     agent.arun.assert_awaited_once()
-    args, kwargs = agent.arun.call_args
+    args, _kwargs = agent.arun.call_args
     assert args[0] == "hola bot"
 
     assert len(stub_outbound.captured) == 1
@@ -293,9 +281,7 @@ def test_message_with_bot_mention_strips_mention_before_calling_agent(
 ) -> None:
     pem, kid, jwk = _generate_signing_key()
     _prime_cache_with(jwk)
-    token = _issue_token(
-        private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL
-    )
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
     agent_response = MagicMock()
     agent_response.content = "ok"
     agent_response.images = None
@@ -326,9 +312,7 @@ def test_agent_timeout_sends_fallback_reply(
 ) -> None:
     pem, kid, jwk = _generate_signing_key()
     _prime_cache_with(jwk)
-    token = _issue_token(
-        private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL
-    )
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
 
     # Force a real asyncio.wait_for timeout by making arun outlast the budget.
     monkeypatch.setattr(interface_module, "TEAMS_AGENT_RUN_TIMEOUT_S", 0.01)
@@ -357,9 +341,7 @@ def test_agent_exception_sends_generic_error_reply(
 ) -> None:
     pem, kid, jwk = _generate_signing_key()
     _prime_cache_with(jwk)
-    token = _issue_token(
-        private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL
-    )
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
     agent = MagicMock()
     agent.arun = AsyncMock(side_effect=RuntimeError("boom"))
 
@@ -376,7 +358,7 @@ def test_agent_exception_sends_generic_error_reply(
 
 
 def test_invalid_json_body_returns_400() -> None:
-    pem, kid, jwk = _generate_signing_key()
+    _pem, _kid, jwk = _generate_signing_key()
     _prime_cache_with(jwk)
     agent = MagicMock()
     with TestClient(_make_app(agent)) as client:
