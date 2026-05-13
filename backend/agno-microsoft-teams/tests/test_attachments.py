@@ -9,10 +9,27 @@ from typing import Any
 
 import httpx
 import pytest
+from agno_microsoft_teams import attachments as attachments_module
 from agno_microsoft_teams.attachments import (
     TEAMS_FILE_DOWNLOAD_INFO,
     download_attachments,
 )
+
+
+class _FakeStream:
+    def __init__(self, body: bytes, status: int, headers: dict[str, str] | None = None) -> None:
+        self._response = httpx.Response(
+            status_code=status,
+            content=body,
+            headers=headers or {},
+            request=httpx.Request("GET", "https://example.test/file"),
+        )
+
+    async def __aenter__(self) -> httpx.Response:
+        return self._response
+
+    async def __aexit__(self, *_a: Any) -> None:
+        return None
 
 
 class _FakeClient:
@@ -23,7 +40,9 @@ class _FakeClient:
     is exercised the same way it would be in flight.
     """
 
-    def __init__(self, registry: dict[str, tuple[bytes, int]]) -> None:
+    def __init__(
+        self, registry: dict[str, tuple[bytes, int] | tuple[bytes, int, dict[str, str]]]
+    ) -> None:
         self._registry = registry
 
     async def __aenter__(self) -> _FakeClient:
@@ -32,17 +51,23 @@ class _FakeClient:
     async def __aexit__(self, *_a: Any) -> None:
         return None
 
-    async def get(self, url: str, headers: dict[str, str] | None = None) -> httpx.Response:
+    def stream(self, method: str, url: str, headers: dict[str, str] | None = None) -> _FakeStream:
+        if method != "GET":
+            raise httpx.HTTPError(f"unexpected method: {method}")
         if url not in self._registry:
             raise httpx.HTTPError(f"unexpected URL: {url}")
-        body, status = self._registry[url]
-        request = httpx.Request("GET", url)
-        return httpx.Response(status_code=status, content=body, request=request)
+        entry = self._registry[url]
+        if len(entry) == 3:
+            body, status, response_headers = entry
+        else:
+            body, status = entry
+            response_headers = {}
+        return _FakeStream(body, status, response_headers)
 
 
 @pytest.fixture
 def patch_async_client(monkeypatch: pytest.MonkeyPatch) -> Any:
-    def _patch(registry: dict[str, tuple[bytes, int]]) -> None:
+    def _patch(registry: dict[str, tuple[bytes, int] | tuple[bytes, int, dict[str, str]]]) -> None:
         monkeypatch.setattr(
             "agno_microsoft_teams.attachments.httpx.AsyncClient",
             lambda timeout=None: _FakeClient(registry),
@@ -163,6 +188,60 @@ async def test_download_attachments_records_failure_when_download_breaks(
     assert media == {}
     assert len(skipped) == 1
     assert "broken.png" in skipped[0]
+
+
+@pytest.mark.asyncio
+async def test_download_attachments_skips_when_content_length_exceeds_limit(
+    patch_async_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(attachments_module, "MAX_ATTACHMENT_BYTES", 8)
+    patch_async_client(
+        {
+            "https://smba.example/huge": (
+                b"",
+                200,
+                {"content-length": "9"},
+            )
+        }
+    )
+
+    media, skipped = await download_attachments(
+        attachments=[
+            {
+                "contentType": "image/png",
+                "contentUrl": "https://smba.example/huge",
+                "name": "huge.png",
+            }
+        ],
+        bot_token="bot-token",
+    )
+
+    assert media == {}
+    assert skipped == ["huge.png (download failed)"]
+
+
+@pytest.mark.asyncio
+async def test_download_attachments_skips_when_stream_exceeds_limit(
+    patch_async_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(attachments_module, "MAX_ATTACHMENT_BYTES", 8)
+    patch_async_client({"https://smba.example/huge": (b"x" * 9, 200)})
+
+    media, skipped = await download_attachments(
+        attachments=[
+            {
+                "contentType": "application/pdf",
+                "contentUrl": "https://smba.example/huge",
+                "name": "huge.pdf",
+            }
+        ],
+        bot_token="bot-token",
+    )
+
+    assert media == {}
+    assert skipped == ["huge.pdf (download failed)"]
 
 
 @pytest.mark.asyncio

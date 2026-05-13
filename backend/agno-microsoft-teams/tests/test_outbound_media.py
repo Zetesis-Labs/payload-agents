@@ -46,6 +46,13 @@ def test_build_attachments_skips_oversized_inline() -> None:
     assert attachments == []
 
 
+def test_build_attachments_skips_when_base64_data_uri_exceeds_budget() -> None:
+    raw = b"x" * ((MAX_INLINE_ATTACHMENT_BYTES * 3) // 4)
+    response = _FakeResponse(images=[Image(content=raw, mime_type="image/png", id="c")])
+    attachments = build_attachments(response)
+    assert attachments == []
+
+
 def test_build_attachments_handles_files_pdf() -> None:
     response = _FakeResponse(
         files=[File(content=b"PDFDATA", mime_type="application/pdf", filename="report.pdf")]

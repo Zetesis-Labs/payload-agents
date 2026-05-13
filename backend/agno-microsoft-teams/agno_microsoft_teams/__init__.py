@@ -1,4 +1,5 @@
 from agno_microsoft_teams.attachments import (
+    MAX_ATTACHMENT_BYTES,
     TEAMS_FILE_DOWNLOAD_INFO,
     download_attachments,
 )
@@ -21,6 +22,7 @@ from agno_microsoft_teams.verification import (
 )
 
 __all__ = [
+    "MAX_ATTACHMENT_BYTES",
     "MAX_INLINE_ATTACHMENT_BYTES",
     "TEAMS_AGENT_RUN_TIMEOUT_S",
     "TEAMS_FILE_DOWNLOAD_INFO",

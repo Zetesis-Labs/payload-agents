@@ -163,6 +163,8 @@ class Teams(BaseInterface):
         attachments = raw_attachments if isinstance(raw_attachments, list) else []
         if not cleaned_text and not attachments:
             return Response(status_code=200)
+        if _is_bind_command(cleaned_text):
+            return Response(status_code=200)
 
         background_tasks.add_task(
             self._run_agent_and_reply,
@@ -289,6 +291,11 @@ def _strip_bot_mention(text: str, activity: dict[str, Any]) -> str:
         if isinstance(mention_text, str) and mention_text:
             cleaned = cleaned.replace(mention_text, "", 1)
     return cleaned.strip()
+
+
+def _is_bind_command(text: str) -> bool:
+    parts = text.strip().split(maxsplit=1)
+    return len(parts) == 2 and parts[0].lower() == "bind" and bool(parts[1].strip())
 
 
 def _stringify_agent_response(response: Any) -> str:

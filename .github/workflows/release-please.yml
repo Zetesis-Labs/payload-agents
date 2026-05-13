@@ -73,34 +73,91 @@ jobs:
           done
 
   publish-agno-agent-builder:
-    needs: release-please
-    if: needs.release-please.outputs.agno_agent_builder_released == 'true'
+    needs: [release-please, publish-agno-microsoft-teams]
+    if: |
+      always() &&
+      needs.release-please.outputs.agno_agent_builder_released == 'true' &&
+      (
+        needs.release-please.outputs.agno_microsoft_teams_released != 'true' ||
+        needs.publish-agno-microsoft-teams.result == 'success'
+      )
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/agno-agent-builder
     permissions:
       id-token: write
       contents: read
-    uses: ./.github/workflows/publish-python.yml
-    with:
-      package: agno-agent-builder
-      ref: ${{ needs.release-please.outputs.agno_agent_builder_tag }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.agno_agent_builder_tag }}
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - name: Build distribution
+        run: |
+          rm -rf dist
+          uv build --package agno-agent-builder
+      - name: Publish to PyPI
+        run: uv publish
 
   publish-agno-microsoft-teams:
     needs: release-please
     if: needs.release-please.outputs.agno_microsoft_teams_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/agno-microsoft-teams
     permissions:
       id-token: write
       contents: read
-    uses: ./.github/workflows/publish-python.yml
-    with:
-      package: agno-microsoft-teams
-      ref: ${{ needs.release-please.outputs.agno_microsoft_teams_tag }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.agno_microsoft_teams_tag }}
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - name: Build distribution
+        run: |
+          rm -rf dist
+          uv build --package agno-microsoft-teams
+      - name: Publish to PyPI
+        run: uv publish
 
   publish-payload-documents-worker-builder:
     needs: release-please
     if: needs.release-please.outputs.payload_documents_worker_builder_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/payload-documents-worker-builder
     permissions:
       id-token: write
       contents: read
-    uses: ./.github/workflows/publish-python.yml
-    with:
-      package: payload-documents-worker-builder
-      ref: ${{ needs.release-please.outputs.payload_documents_worker_builder_tag }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.payload_documents_worker_builder_tag }}
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - name: Build distribution
+        run: |
+          rm -rf dist
+          uv build --package payload-documents-worker-builder
+      - name: Publish to PyPI
+        run: uv publish

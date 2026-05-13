@@ -25,8 +25,8 @@ from agno.media import Audio, File, Image, Video
 
 logger = structlog.get_logger("agno_microsoft_teams.outbound_media")
 
-# 220 KB — leaves room under the documented 256 KB activity limit for the
-# JSON envelope, mentions, text body, etc.
+# 220 KB for the final data URI — leaves room under the documented 256 KB
+# activity limit for the JSON envelope, mentions, text body, etc.
 MAX_INLINE_ATTACHMENT_BYTES = 220 * 1024
 
 
@@ -78,18 +78,20 @@ def _to_attachment(media: Any, *, default_mime: str) -> dict[str, Any] | None:
 
     raw = getattr(media, "content", None)
     if isinstance(raw, bytes) and raw:
-        if len(raw) > MAX_INLINE_ATTACHMENT_BYTES:
+        encoded = base64.b64encode(raw).decode("ascii")
+        content_url = f"data:{mime};base64,{encoded}"
+        if len(content_url.encode("utf-8")) > MAX_INLINE_ATTACHMENT_BYTES:
             logger.warning(
                 "Skipping outbound Teams attachment over inline-size budget",
                 name=name,
-                size=len(raw),
+                raw_size=len(raw),
+                encoded_size=len(content_url),
                 budget=MAX_INLINE_ATTACHMENT_BYTES,
             )
             return None
-        encoded = base64.b64encode(raw).decode("ascii")
         return {
             "contentType": mime,
-            "contentUrl": f"data:{mime};base64,{encoded}",
+            "contentUrl": content_url,
             "name": name,
         }
 

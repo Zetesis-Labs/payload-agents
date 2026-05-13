@@ -39,6 +39,11 @@ logger = structlog.get_logger("agno_microsoft_teams.attachments")
 
 TEAMS_FILE_DOWNLOAD_INFO = "application/vnd.microsoft.teams.file.download.info"
 ATTACHMENT_DOWNLOAD_TIMEOUT_S = 30.0
+MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
+
+class AttachmentTooLargeError(Exception):
+    """Raised when a Teams attachment exceeds the in-memory intake budget."""
 
 
 async def download_attachments(
@@ -119,8 +124,8 @@ async def _ingest_one(
     if not isinstance(content_url, str) or not content_url:
         return None
 
-    headers = {"Authorization": f"Bearer {bot_token}"} if bot_token else {}
-    raw = (await client.get(content_url, headers=headers)).raise_for_status().content
+    headers = {"Authorization": f"Bearer {bot_token}"} if bot_token else None
+    raw = await _download_bytes(client=client, url=content_url, headers=headers)
 
     if content_type.startswith("image/"):
         return "image", Image(content=raw, mime_type=content_type)
@@ -140,7 +145,7 @@ async def _ingest_teams_file(
     download_url = content.get("downloadUrl")
     if not isinstance(download_url, str) or not download_url:
         return None
-    raw = (await client.get(download_url)).raise_for_status().content
+    raw = await _download_bytes(client=client, url=download_url, headers=None)
 
     file_type = content.get("fileType") if isinstance(content.get("fileType"), str) else None
     mime_type = _file_type_to_mime(file_type)
@@ -156,6 +161,34 @@ def _build_file(raw: bytes, *, mime_type: str | None, name: str | None) -> File:
     """
     valid = mime_type if mime_type in File.valid_mime_types() else None
     return File(content=raw, mime_type=valid, filename=name, name=name)
+
+
+async def _download_bytes(
+    *, client: httpx.AsyncClient, url: str, headers: dict[str, str] | None
+) -> bytes:
+    total = 0
+    chunks: list[bytes] = []
+    async with client.stream("GET", url, headers=headers or {}) as response:
+        response.raise_for_status()
+        content_length = response.headers.get("content-length")
+        if content_length is not None:
+            try:
+                declared_size = int(content_length)
+            except ValueError:
+                declared_size = 0
+            if declared_size > MAX_ATTACHMENT_BYTES:
+                raise AttachmentTooLargeError(
+                    f"Attachment is {declared_size} bytes; limit is {MAX_ATTACHMENT_BYTES}"
+                )
+
+        async for chunk in response.aiter_bytes():
+            total += len(chunk)
+            if total > MAX_ATTACHMENT_BYTES:
+                raise AttachmentTooLargeError(
+                    f"Attachment exceeded {MAX_ATTACHMENT_BYTES} bytes while downloading"
+                )
+            chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _file_type_to_mime(file_type: str | None) -> str | None:

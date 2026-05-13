@@ -307,6 +307,27 @@ def test_message_with_bot_mention_strips_mention_before_calling_agent(
     assert args[0] == "hola"
 
 
+def test_bind_command_is_acked_without_agent_run_when_middleware_misses_it() -> None:
+    pem, kid, jwk = _generate_signing_key()
+    _prime_cache_with(jwk)
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
+    agent = MagicMock()
+    agent.arun = AsyncMock()
+
+    activity = _message_activity(text="<at>Bot</at> bind secret-token")
+    activity["entities"] = [{"type": "mention", "text": "<at>Bot</at>"}]
+
+    with TestClient(_make_app(agent)) as client:
+        resp = client.post(
+            f"/teams/{APP_ID}/messages",
+            json=activity,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    agent.arun.assert_not_called()
+
+
 def test_agent_timeout_sends_fallback_reply(
     monkeypatch: pytest.MonkeyPatch, stub_outbound: type[_StubAsyncClient]
 ) -> None:

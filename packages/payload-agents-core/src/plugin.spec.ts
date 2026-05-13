@@ -44,9 +44,7 @@ function makeIncomingConfig(overrides: Partial<Config> = {}): Config {
 describe('agentPlugin — folders config validation', () => {
   it('throws when host disables folders globally (`folders: false`)', () => {
     const plugin = agentPlugin(baseUserConfig)
-    expect(() => plugin(makeIncomingConfig({ folders: false }))).toThrow(
-      /foldersCollectionSlug.*folders: false/
-    )
+    expect(() => plugin(makeIncomingConfig({ folders: false }))).toThrow(/foldersCollectionSlug.*folders: false/)
   })
 
   it('throws when no collection has `folders: true` (auto-injection never fires)', () => {
@@ -62,9 +60,7 @@ describe('agentPlugin — folders config validation', () => {
       ...baseUserConfig,
       foldersCollectionSlug: 'my-custom-folders'
     })
-    expect(() => plugin(makeIncomingConfig({ folders: false }))).toThrow(
-      /foldersCollectionSlug="my-custom-folders"/
-    )
+    expect(() => plugin(makeIncomingConfig({ folders: false }))).toThrow(/foldersCollectionSlug="my-custom-folders"/)
   })
 
   it('error guides the host to a concrete fix (folders: {} and/or collection opt-in)', () => {
