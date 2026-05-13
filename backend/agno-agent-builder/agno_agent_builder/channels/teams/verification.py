@@ -109,16 +109,35 @@ def _decode_with_keys(
     keys_by_kid: dict[str, Any],
     expected_app_id: str,
 ) -> dict[str, Any] | None:
+    # TEMPORARY [DBG] logging added during 12-May-2026 E2E validation.
+    # Leave in for the next dev to follow JWT failures end-to-end; revert
+    # to silent returns once Teams traffic is stable in prod.
     try:
         unverified_header = jwt.get_unverified_header(token)
-    except jwt.DecodeError:
+    except jwt.DecodeError as exc:
+        logger.warning("[DBG] header decode failed", error=str(exc))
         return None
     kid = unverified_header.get("kid")
     if not isinstance(kid, str) or not kid:
+        logger.warning("[DBG] header has no kid", header=unverified_header)
         return None
 
     signing_key = keys_by_kid.get(kid)
     if signing_key is None:
+        try:
+            unverified = jwt.decode(token, options={"verify_signature": False})
+        except Exception:
+            unverified = {}
+        logger.warning(
+            "[DBG] kid not in cache",
+            incoming_kid=kid,
+            cache_size=len(keys_by_kid),
+            sample_cache_kids=list(keys_by_kid.keys())[:5],
+            unverified_aud=unverified.get("aud"),
+            unverified_iss=unverified.get("iss"),
+            unverified_appid=unverified.get("appid"),
+            unverified_tid=unverified.get("tid"),
+        )
         return None
 
     try:
@@ -131,7 +150,21 @@ def _decode_with_keys(
             leeway=CLOCK_SKEW_SECONDS,
         )
     except jwt.PyJWTError as exc:
-        logger.warning("Teams JWT validation failed", error=str(exc))
+        try:
+            unverified = jwt.decode(token, options={"verify_signature": False})
+        except Exception:
+            unverified = {}
+        logger.warning(
+            "[DBG] Teams JWT validation failed",
+            error=str(exc),
+            expected_app_id=expected_app_id,
+            allowed_issuers=list(ALLOWED_ISSUERS),
+            unverified_aud=unverified.get("aud"),
+            unverified_iss=unverified.get("iss"),
+            unverified_appid=unverified.get("appid"),
+            unverified_tid=unverified.get("tid"),
+            unverified_exp=unverified.get("exp"),
+        )
         return None
 
 
@@ -198,8 +231,17 @@ async def verify_teams_jwt(
     body_service_url: str | None,
 ) -> VerifiedClaims | None:
     """Async validator with on-demand JWKS refresh on cache miss."""
+    # TEMPORARY [DBG] logging — see _decode_with_keys.
+    logger.warning(
+        "[DBG] verify_teams_jwt called",
+        has_auth_header=authorization_header is not None,
+        auth_header_len=len(authorization_header) if authorization_header else 0,
+        auth_header_prefix=(authorization_header or "")[:30],
+        body_service_url=body_service_url,
+    )
     token = _extract_token(authorization_header)
     if token is None:
+        logger.warning("[DBG] verify_teams_jwt: no token extracted")
         return None
 
     keys_by_kid = await prime_jwks_cache()
