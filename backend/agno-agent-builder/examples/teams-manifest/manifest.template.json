@@ -1,0 +1,48 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "__TEAMS_APP_ID__",
+  "developer": {
+    "name": "Zetesis",
+    "websiteUrl": "https://zetesis.xyz",
+    "privacyUrl": "https://zetesis.xyz/privacy",
+    "termsOfUseUrl": "https://zetesis.xyz/terms"
+  },
+  "name": {
+    "short": "Zetesis Agent",
+    "full": "Zetesis Agent - chat with your tenants AI in Teams"
+  },
+  "description": {
+    "short": "Chat with your Zetesis agent in Microsoft Teams.",
+    "full": "Brings your Zetesis agent into Microsoft Teams - 1:1 chat, channel mentions, file attachments. Type bind followed by your token to link your Teams account to your Zetesis tenant."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#5C2D91",
+  "bots": [
+    {
+      "botId": "__AZURE_BOT_APP_ID__",
+      "scopes": ["personal", "team", "groupChat"],
+      "isNotificationOnly": false,
+      "supportsFiles": true,
+      "supportsCalling": false,
+      "supportsVideo": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            {
+              "title": "bind",
+              "description": "Link this Teams account to your Zetesis tenant. Usage: bind <token>"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": []
+}

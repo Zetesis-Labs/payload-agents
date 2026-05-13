@@ -20,11 +20,13 @@ DEFAULT_PUBLIC_PATHS: tuple[str, ...] = (
     "/openapi.json",
     # Trailing slash = prefix match. Each channel's interface validates its
     # own request signature (X-Telegram-Bot-Api-Secret-Token, X-Hub-Signature
-    # for Meta/WhatsApp, Ed25519 for Discord), so the global X-Internal-Secret
-    # is not required on incoming channel webhooks.
+    # for Meta/WhatsApp, Ed25519 for Discord, Bot Framework JWT for Teams),
+    # so the global X-Internal-Secret is not required on incoming channel
+    # webhooks.
     "/telegram/",
     "/whatsapp/",
     "/discord/",
+    "/teams/",
 )
 DEFAULT_RELOAD_CHANNEL = "agent_reload"
 # Channel-installation changes (telegram-bot-installations / whatsapp-installations /

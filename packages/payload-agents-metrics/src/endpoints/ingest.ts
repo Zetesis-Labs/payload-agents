@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { PayloadHandler } from 'payload'
 import { z } from 'zod'
 import { calculateLlmCost, type LlmProvider } from '../lib/cost-calculator'
@@ -30,11 +31,25 @@ const EventSchema = z.object({
 type IngestEvent = z.infer<typeof EventSchema>
 const PayloadSchema = z.union([EventSchema, z.array(EventSchema).min(1).max(100)])
 
+/**
+ * Constant-time secret comparison. Prevents byte-by-byte timing attacks
+ * on the ingest secret. (Security audit: H1.)
+ */
+const safeCompareSecrets = (a: string, b: string): boolean => {
+  const aBuf = Buffer.from(a, 'utf8')
+  const bBuf = Buffer.from(b, 'utf8')
+  if (aBuf.length !== bBuf.length) {
+    timingSafeEqual(aBuf, Buffer.alloc(aBuf.length, 0))
+    return false
+  }
+  return timingSafeEqual(aBuf, bBuf)
+}
+
 export function createIngestHandler(config: ResolvedMetricsConfig): PayloadHandler {
   return async req => {
     const secret = config.ingestSecret
     const provided = req.headers?.get?.('x-internal-secret')
-    if (!provided || provided !== secret) {
+    if (!provided || !safeCompareSecrets(provided, secret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
