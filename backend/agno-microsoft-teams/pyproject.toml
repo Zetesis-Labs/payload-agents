@@ -1,6 +1,6 @@
 [project]
 name = "agno-microsoft-teams"
-version = "0.0.0"
+version = "0.1.0"
 description = "Microsoft Teams / Bot Framework interface for Agno agents."
 requires-python = ">=3.12"
 readme = "README.md"

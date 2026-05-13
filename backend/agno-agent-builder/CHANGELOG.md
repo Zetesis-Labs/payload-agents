@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.6](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.5...agno-agent-builder-v0.1.6) (2026-05-13)
+
+
+### Features
+
+* **agno-agent-builder:** add Teams channel support ([c937a81](https://github.com/Zetesis-Labs/PayloadAgents/commit/c937a81615b56b70350bae9b0a84d8cfffd8bc6f))
+* **agno-agent-builder:** Microsoft Teams channel + attachment intake (Teams + Discord) ([f0dd9af](https://github.com/Zetesis-Labs/PayloadAgents/commit/f0dd9afd2de75e8ae87180da70faedf80351dd53))
+* **agno-microsoft-teams:** extract Teams interface package ([ba7962b](https://github.com/Zetesis-Labs/PayloadAgents/commit/ba7962bc1d542171af39dbed3516887bf922626f))
+
+
+### Bug Fixes
+
+* **teams:** harden runtime and package publishing ([f99459b](https://github.com/Zetesis-Labs/PayloadAgents/commit/f99459be32408009806191e0dd236e6fddbc2d40))
+
 ## [0.1.5](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.4...agno-agent-builder-v0.1.5) (2026-05-09)
 
 
