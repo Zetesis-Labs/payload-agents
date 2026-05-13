@@ -1,5 +1,18 @@
 # @zetesis/payload-agents-core
 
+## [0.5.1](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-core-v0.5.0...payload-agents-core-v0.5.1) (2026-05-13)
+
+
+### Features
+
+* **agno-agent-builder:** add Teams channel support ([c937a81](https://github.com/Zetesis-Labs/PayloadAgents/commit/c937a81615b56b70350bae9b0a84d8cfffd8bc6f))
+* **agno-agent-builder:** Microsoft Teams channel + attachment intake (Teams + Discord) ([f0dd9af](https://github.com/Zetesis-Labs/PayloadAgents/commit/f0dd9afd2de75e8ae87180da70faedf80351dd53))
+
+
+### Bug Fixes
+
+* **teams:** harden runtime and package publishing ([f99459b](https://github.com/Zetesis-Labs/PayloadAgents/commit/f99459be32408009806191e0dd236e6fddbc2d40))
+
 ## [0.5.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-core-v0.4.2...payload-agents-core-v0.5.0) (2026-05-09)
 
 

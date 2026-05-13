@@ -1,5 +1,22 @@
 # @zetesis/payload-agents-metrics
 
+## [1.2.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-metrics-v1.1.0...payload-agents-metrics-v1.2.0) (2026-05-13)
+
+
+### Features
+
+* **agno-agent-builder:** add Teams channel support ([c937a81](https://github.com/Zetesis-Labs/PayloadAgents/commit/c937a81615b56b70350bae9b0a84d8cfffd8bc6f))
+* **agno-agent-builder:** Microsoft Teams channel + attachment intake (Teams + Discord) ([f0dd9af](https://github.com/Zetesis-Labs/PayloadAgents/commit/f0dd9afd2de75e8ae87180da70faedf80351dd53))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zetesis/payload-agents-core bumped to 0.5.1
+  * peerDependencies
+    * @zetesis/payload-agents-core bumped to 0.5.1
+
 ## [1.1.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-metrics-v1.0.3...payload-agents-metrics-v1.1.0) (2026-05-09)
 
 
