@@ -21,5 +21,8 @@ app = create_app(
         internal_secret=settings.internal_secret,
         payload_url=settings.payload_url,
         log_level=settings.log_level,
+        langfuse_host=settings.langfuse_host,
+        langfuse_public_key=settings.langfuse_public_key,
+        langfuse_secret_key=settings.langfuse_secret_key,
     )
 )

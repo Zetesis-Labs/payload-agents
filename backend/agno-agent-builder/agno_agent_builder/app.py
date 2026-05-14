@@ -45,6 +45,7 @@ from agno_agent_builder.middleware import (
 from agno_agent_builder.registry import AgentRegistry
 from agno_agent_builder.reload_listener import run_reload_listener
 from agno_agent_builder.schemas import ErrorResponse, ReloadResponse
+from agno_agent_builder.telemetry import configure_langfuse_tracing
 
 _AgentList = list[Agent | RemoteAgent | AgentProtocol | AgentFactory]
 
@@ -57,6 +58,7 @@ def create_app(config: RuntimeConfig) -> FastAPI:
     """Build a fully configured FastAPI app for the Agno runtime."""
     configure_logging(config.log_level)
     logger = get_logger(config.app_name)
+    tracer_provider = configure_langfuse_tracing(config, logger)
 
     secret = config.internal_secret.get_secret_value()
     bind_state = IdentityBindState()
@@ -187,11 +189,14 @@ def create_app(config: RuntimeConfig) -> FastAPI:
 
         logger.info("Shutting down — disposing shared DB engine")
         await engine_holder.dispose()
+        if tracer_provider is not None:
+            tracer_provider.shutdown()
 
     agent_os_kwargs: dict[str, Any] = {
         "telemetry": False,
         "authorization": False,
         "auto_provision_dbs": True,
+        "tracing": bool(config.langfuse_host),
         **config.agent_os_kwargs,
     }
     agent_os = AgentOS(
