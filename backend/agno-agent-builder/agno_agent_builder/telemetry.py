@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import base64
 import threading
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -42,6 +43,15 @@ LANGFUSE_TAGS_ATTRIBUTE = "langfuse.trace.tags"
 class LangfuseCredentials:
     public_key: str
     secret_key: str
+
+
+@dataclass(frozen=True)
+class LangfuseTracingHandle:
+    """Returned by ``configure_langfuse_tracing`` so the runtime lifespan
+    can hook the tenant_reload NOTIFY listener into the resolver cache."""
+
+    provider: TracerProvider
+    resolver: "PayloadTenantKeyResolver"
 
 
 class BaggageAttributeSpanProcessor(SpanProcessor):
@@ -74,8 +84,14 @@ class PayloadTenantKeyResolver:
     The runtime calls Payload's internal
     ``GET /tenants/{id}/langfuse-project-keys`` endpoint with
     ``X-Internal-Secret``. Missing keys (404) fall back to the shared
-    project credentials. Lookups are cached process-local; restart the
-    runtime after rotating a tenant's keys to invalidate.
+    project credentials.
+
+    Caching:
+    - Positive hits are cached for ``ttl_s`` seconds (default 300). New
+      keys pasted in Payload after that propagate without restart.
+    - Negative responses (404 / network errors) are **not** cached, so
+      a tenant that did not have keys when first seen picks them up on
+      its next trace once the superadmin saves them in Payload.
     """
 
     def __init__(
@@ -85,28 +101,44 @@ class PayloadTenantKeyResolver:
         internal_secret: str,
         fallback: LangfuseCredentials | None,
         timeout_s: float = 5.0,
+        ttl_s: float = 300.0,
         logger: Any,
     ) -> None:
         self._payload_url = payload_url.rstrip("/") if payload_url else None
         self._internal_secret = internal_secret
         self._fallback = fallback
         self._timeout_s = timeout_s
+        self._ttl_s = ttl_s
         self._logger = logger
-        self._cache: dict[str, LangfuseCredentials | None] = {}
+        self._cache: dict[str, tuple[LangfuseCredentials, float]] = {}
         self._lock = threading.Lock()
 
     def resolve(self, tenant_id: str | None) -> LangfuseCredentials | None:
         if not tenant_id or not self._payload_url or not self._internal_secret:
             return self._fallback
 
+        now = time.monotonic()
         with self._lock:
-            if tenant_id in self._cache:
-                return self._cache[tenant_id] or self._fallback
+            entry = self._cache.get(tenant_id)
+            if entry is not None and entry[1] > now:
+                return entry[0]
 
         credentials = self._fetch(tenant_id)
+        if credentials is not None:
+            with self._lock:
+                self._cache[tenant_id] = (credentials, now + self._ttl_s)
+            return credentials
+        return self._fallback
+
+    def invalidate(self, tenant_id: str | None) -> None:
+        """Drop the cached entry for ``tenant_id`` (or the whole cache when
+        the payload is empty). Called by the runtime's tenant_reload
+        listener so the next trace re-fetches fresh keys."""
         with self._lock:
-            self._cache[tenant_id] = credentials
-        return credentials or self._fallback
+            if tenant_id:
+                self._cache.pop(tenant_id, None)
+            else:
+                self._cache.clear()
 
     def _fetch(self, tenant_id: str) -> LangfuseCredentials | None:
         url = f"{self._payload_url}/api/tenants/{tenant_id}/langfuse-project-keys"
@@ -188,10 +220,11 @@ class TenantRoutingLangfuseExporter(SpanExporter):
             return exporter
 
 
-def configure_langfuse_tracing(config: RuntimeConfig, logger: Any) -> TracerProvider | None:
+def configure_langfuse_tracing(config: RuntimeConfig, logger: Any) -> LangfuseTracingHandle | None:
     """Configure process-wide OpenTelemetry export to Langfuse, routing
     spans to the per-tenant project when available and falling back to
-    the shared project otherwise."""
+    the shared project otherwise. Returns a handle exposing the
+    resolver so the lifespan can wire NOTIFY-based cache invalidation."""
 
     if not config.langfuse_host:
         return None
@@ -202,6 +235,13 @@ def configure_langfuse_tracing(config: RuntimeConfig, logger: Any) -> TracerProv
             "LANGFUSE_HOST is set but LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY are missing; "
             "only tenants with provisioned project keys will be exported"
         )
+
+    resolver = PayloadTenantKeyResolver(
+        payload_url=config.payload_url,
+        internal_secret=config.internal_secret.get_secret_value(),
+        fallback=fallback,
+        logger=logger,
+    )
 
     provider = TracerProvider(
         resource=Resource.create(
@@ -216,12 +256,7 @@ def configure_langfuse_tracing(config: RuntimeConfig, logger: Any) -> TracerProv
         BatchSpanProcessor(
             TenantRoutingLangfuseExporter(
                 endpoint=_otel_traces_endpoint(config.langfuse_host),
-                resolver=PayloadTenantKeyResolver(
-                    payload_url=config.payload_url,
-                    internal_secret=config.internal_secret.get_secret_value(),
-                    fallback=fallback,
-                    logger=logger,
-                ),
+                resolver=resolver,
             )
         )
     )
@@ -234,7 +269,7 @@ def configure_langfuse_tracing(config: RuntimeConfig, logger: Any) -> TracerProv
         tenant_project_routing=bool(config.payload_url),
         fallback_project=bool(fallback),
     )
-    return provider
+    return LangfuseTracingHandle(provider=provider, resolver=resolver)
 
 
 def tenant_baggage_context(tenant_id: str) -> Any:

@@ -58,7 +58,7 @@ def create_app(config: RuntimeConfig) -> FastAPI:
     """Build a fully configured FastAPI app for the Agno runtime."""
     configure_logging(config.log_level)
     logger = get_logger(config.app_name)
-    tracer_provider = configure_langfuse_tracing(config, logger)
+    tracing_handle = configure_langfuse_tracing(config, logger)
 
     secret = config.internal_secret.get_secret_value()
     bind_state = IdentityBindState()
@@ -166,6 +166,16 @@ def create_app(config: RuntimeConfig) -> FastAPI:
             logger.info("Channel reload notified — sending SIGTERM to self for clean restart")
             os.kill(os.getpid(), signal.SIGTERM)
 
+        async def invalidate_tenant_langfuse_keys(payload: str | None) -> None:
+            # Payload's afterChange hook on the Tenants collection sends
+            # NOTIFY tenant_reload, '<tenant-id>'. We invalidate the matching
+            # cache entry so the next trace re-fetches fresh Langfuse keys
+            # (or falls back to the shared project when keys were cleared).
+            if tracing_handle is None:
+                return
+            tracing_handle.resolver.invalidate(payload)
+            logger.info("Tenant reload notified — invalidated Langfuse key cache", tenant_id=payload)
+
         listener_task = asyncio.create_task(
             run_reload_listener(
                 reload_registry,
@@ -180,17 +190,24 @@ def create_app(config: RuntimeConfig) -> FastAPI:
                 channel=config.channel_reload_channel,
             )
         )
+        tenant_listener_task = asyncio.create_task(
+            run_reload_listener(
+                invalidate_tenant_langfuse_keys,
+                database_url=config.database_url,
+                channel=config.tenant_reload_channel,
+            )
+        )
         resync_task = asyncio.create_task(periodic_resync())
         yield
-        for task in (listener_task, channel_listener_task, resync_task):
+        for task in (listener_task, channel_listener_task, tenant_listener_task, resync_task):
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
         logger.info("Shutting down — disposing shared DB engine")
         await engine_holder.dispose()
-        if tracer_provider is not None:
-            tracer_provider.shutdown()
+        if tracing_handle is not None:
+            tracing_handle.provider.shutdown()
 
     agent_os_kwargs: dict[str, Any] = {
         "telemetry": False,
