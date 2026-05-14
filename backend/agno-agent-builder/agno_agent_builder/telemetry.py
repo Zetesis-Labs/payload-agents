@@ -1,20 +1,26 @@
 """Langfuse/OpenTelemetry wiring for the Agno runtime.
 
-Single-project mode: all spans are exported to one Langfuse project
-configured via ``LANGFUSE_PUBLIC_KEY`` / ``LANGFUSE_SECRET_KEY``.
-Per-tenant isolation lives in the trace metadata + tags so a superadmin
-can filter the global project by ``tenant_id`` in the Langfuse UI.
+Routes each tenant's OTel spans to the Langfuse project whose API key pair
+is stored on its Payload tenant row, falling back to the globally
+configured project (``LANGFUSE_PUBLIC_KEY`` / ``LANGFUSE_SECRET_KEY``)
+for tenants without a provisioned project.
 
-Per-tenant projects (one Langfuse project per Payload tenant) requires
-Langfuse Enterprise license for the SCIM / org-scoped API surface; that
-path is intentionally not wired here.
+Projects are created manually in the Langfuse UI by the superadmin —
+self-hosted Langfuse community edition does not expose the SCIM /
+org-scoped API surface needed for automated provisioning, so the
+superadmin pastes the project ID + key pair into the tenant row in
+Payload admin and the runtime picks them up from there.
 """
 
 from __future__ import annotations
 
 import base64
+import threading
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
+import httpx
 from openinference.instrumentation.agno import AgnoInstrumentor
 from opentelemetry import baggage
 from opentelemetry import context as otel_context
@@ -22,7 +28,8 @@ from opentelemetry import trace as trace_api
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
+from pydantic import SecretStr
 
 from agno_agent_builder.config import RuntimeConfig
 
@@ -31,9 +38,15 @@ LANGFUSE_TENANT_METADATA_ATTRIBUTE = "langfuse.trace.metadata.tenant_id"
 LANGFUSE_TAGS_ATTRIBUTE = "langfuse.trace.tags"
 
 
+@dataclass(frozen=True)
+class LangfuseCredentials:
+    public_key: str
+    secret_key: str
+
+
 class BaggageAttributeSpanProcessor(SpanProcessor):
     """Copy the tenant_id baggage value to every started span so Langfuse
-    can filter and tag traces per tenant in the single shared project."""
+    can filter and tag traces per tenant within each project."""
 
     def on_start(self, span: Span, parent_context: otel_context.Context | None = None) -> None:
         ctx = parent_context or otel_context.get_current()
@@ -55,20 +68,140 @@ class BaggageAttributeSpanProcessor(SpanProcessor):
         return True
 
 
+class PayloadTenantKeyResolver:
+    """Resolve per-tenant Langfuse project credentials from Payload.
+
+    The runtime calls Payload's internal
+    ``GET /tenants/{id}/langfuse-project-keys`` endpoint with
+    ``X-Internal-Secret``. Missing keys (404) fall back to the shared
+    project credentials. Lookups are cached process-local; restart the
+    runtime after rotating a tenant's keys to invalidate.
+    """
+
+    def __init__(
+        self,
+        *,
+        payload_url: str | None,
+        internal_secret: str,
+        fallback: LangfuseCredentials | None,
+        timeout_s: float = 5.0,
+        logger: Any,
+    ) -> None:
+        self._payload_url = payload_url.rstrip("/") if payload_url else None
+        self._internal_secret = internal_secret
+        self._fallback = fallback
+        self._timeout_s = timeout_s
+        self._logger = logger
+        self._cache: dict[str, LangfuseCredentials | None] = {}
+        self._lock = threading.Lock()
+
+    def resolve(self, tenant_id: str | None) -> LangfuseCredentials | None:
+        if not tenant_id or not self._payload_url or not self._internal_secret:
+            return self._fallback
+
+        with self._lock:
+            if tenant_id in self._cache:
+                return self._cache[tenant_id] or self._fallback
+
+        credentials = self._fetch(tenant_id)
+        with self._lock:
+            self._cache[tenant_id] = credentials
+        return credentials or self._fallback
+
+    def _fetch(self, tenant_id: str) -> LangfuseCredentials | None:
+        url = f"{self._payload_url}/api/tenants/{tenant_id}/langfuse-project-keys"
+        try:
+            response = httpx.get(
+                url,
+                headers={"X-Internal-Secret": self._internal_secret},
+                timeout=self._timeout_s,
+            )
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            data = response.json()
+            public_key = data.get("publicKey")
+            secret_key = data.get("secretKey")
+            if isinstance(public_key, str) and isinstance(secret_key, str):
+                return LangfuseCredentials(public_key=public_key, secret_key=secret_key)
+        except Exception:
+            self._logger.warning(
+                "Langfuse tenant credential lookup failed; using fallback project",
+                tenant_id=tenant_id,
+                exc_info=True,
+            )
+        return None
+
+
+class TenantRoutingLangfuseExporter(SpanExporter):
+    """Route OTLP span batches to the Langfuse project matching tenant_id."""
+
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        resolver: PayloadTenantKeyResolver,
+    ) -> None:
+        self._endpoint = endpoint
+        self._resolver = resolver
+        self._exporters: dict[LangfuseCredentials, OTLPSpanExporter] = {}
+        self._lock = threading.Lock()
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        grouped: dict[LangfuseCredentials, list[ReadableSpan]] = {}
+        for span in spans:
+            credentials = self._resolver.resolve(_tenant_id_from_span(span))
+            if credentials is None:
+                continue
+            grouped.setdefault(credentials, []).append(span)
+
+        for credentials, credential_spans in grouped.items():
+            result = self._exporter_for(credentials).export(credential_spans)
+            if result is not SpanExportResult.SUCCESS:
+                return result
+        return SpanExportResult.SUCCESS
+
+    def shutdown(self) -> None:
+        for exporter in self._exporters.values():
+            exporter.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return all(exporter.force_flush(timeout_millis) for exporter in self._exporters.values())
+
+    def _exporter_for(self, credentials: LangfuseCredentials) -> OTLPSpanExporter:
+        with self._lock:
+            exporter = self._exporters.get(credentials)
+            if exporter is not None:
+                return exporter
+
+            auth = base64.b64encode(
+                f"{credentials.public_key}:{credentials.secret_key}".encode()
+            ).decode()
+            exporter = OTLPSpanExporter(
+                endpoint=self._endpoint,
+                headers={
+                    "Authorization": f"Basic {auth}",
+                    "x-langfuse-ingestion-version": "4",
+                },
+            )
+            self._exporters[credentials] = exporter
+            return exporter
+
+
 def configure_langfuse_tracing(config: RuntimeConfig, logger: Any) -> TracerProvider | None:
-    """Configure process-wide OpenTelemetry export to the shared Langfuse
-    project. Returns None when Langfuse is not configured."""
+    """Configure process-wide OpenTelemetry export to Langfuse, routing
+    spans to the per-tenant project when available and falling back to
+    the shared project otherwise."""
 
     if not config.langfuse_host:
         return None
 
-    public_key = config.langfuse_public_key.get_secret_value() if config.langfuse_public_key else ""
-    secret_key = config.langfuse_secret_key.get_secret_value() if config.langfuse_secret_key else ""
-    if not public_key or not secret_key:
+    fallback = _credentials_from_secrets(config.langfuse_public_key, config.langfuse_secret_key)
+    if fallback is None:
         logger.warning(
-            "LANGFUSE_HOST is set but LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY are missing — tracing disabled"
+            "LANGFUSE_HOST is set but LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY are missing; "
+            "only tenants with provisioned project keys will be exported"
         )
-        return None
 
     provider = TracerProvider(
         resource=Resource.create(
@@ -79,21 +212,28 @@ def configure_langfuse_tracing(config: RuntimeConfig, logger: Any) -> TracerProv
         )
     )
     provider.add_span_processor(BaggageAttributeSpanProcessor())
-
-    auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
-    exporter = OTLPSpanExporter(
-        endpoint=_otel_traces_endpoint(config.langfuse_host),
-        headers={
-            "Authorization": f"Basic {auth}",
-            "x-langfuse-ingestion-version": "4",
-        },
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            TenantRoutingLangfuseExporter(
+                endpoint=_otel_traces_endpoint(config.langfuse_host),
+                resolver=PayloadTenantKeyResolver(
+                    payload_url=config.payload_url,
+                    internal_secret=config.internal_secret.get_secret_value(),
+                    fallback=fallback,
+                    logger=logger,
+                ),
+            )
+        )
     )
-    provider.add_span_processor(BatchSpanProcessor(exporter))
-
     trace_api.set_tracer_provider(provider)
     AgnoInstrumentor().instrument()
 
-    logger.info("Langfuse tracing enabled", host=config.langfuse_host)
+    logger.info(
+        "Langfuse tracing enabled",
+        host=config.langfuse_host,
+        tenant_project_routing=bool(config.payload_url),
+        fallback_project=bool(fallback),
+    )
     return provider
 
 
@@ -109,6 +249,17 @@ def detach_tenant_baggage(token: Any) -> None:
     otel_context.detach(token)
 
 
+def _credentials_from_secrets(
+    public_key: SecretStr | None,
+    secret_key: SecretStr | None,
+) -> LangfuseCredentials | None:
+    public = public_key.get_secret_value() if public_key else ""
+    secret = secret_key.get_secret_value() if secret_key else ""
+    if not public or not secret:
+        return None
+    return LangfuseCredentials(public_key=public, secret_key=secret)
+
+
 def _otel_traces_endpoint(host: str) -> str:
     base = host.rstrip("/")
     if base.endswith("/api/public/otel/v1/traces"):
@@ -116,3 +267,12 @@ def _otel_traces_endpoint(host: str) -> str:
     if base.endswith("/api/public/otel"):
         return f"{base}/v1/traces"
     return f"{base}/api/public/otel/v1/traces"
+
+
+def _tenant_id_from_span(span: ReadableSpan) -> str | None:
+    value = span.attributes.get(TENANT_ID_ATTRIBUTE) or span.attributes.get(
+        LANGFUSE_TENANT_METADATA_ATTRIBUTE
+    )
+    if value is None:
+        return None
+    return str(value)
