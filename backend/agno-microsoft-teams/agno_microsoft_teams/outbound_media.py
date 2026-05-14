@@ -1,7 +1,7 @@
 """Outbound media for Teams: turn agno ``RunOutput`` media (``response.images``,
-``response.videos``, ``response.audio``, ``response.files``) into Bot Framework
-``attachments[]`` so the agent can deliver pictures, PDFs, audio, etc. through
-the channel.
+``response.videos``, ``response.audio``, ``response.files``) and explicit Teams
+cards into Bot Framework ``attachments[]`` so the agent can deliver pictures,
+PDFs, audio, Adaptive Cards, etc. through the channel.
 
 We use ``data:`` URIs (RFC 2397) for in-memory bytes — Teams renders them
 fine and it skips the upload-then-attach round trip entirely. URL-only media
@@ -17,13 +17,15 @@ which we punt to a future iteration when a use case demands it.
 from __future__ import annotations
 
 import base64
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import structlog
 from agno.media import Audio, File, Image, Video
 
 logger = structlog.get_logger("agno_microsoft_teams.outbound_media")
+
+ADAPTIVE_CARD_CONTENT_TYPE = "application/vnd.microsoft.card.adaptive"
 
 # 220 KB for the final data URI — leaves room under the documented 256 KB
 # activity limit for the JSON envelope, mentions, text body, etc.
@@ -38,11 +40,67 @@ def build_attachments(response: Any) -> list[dict[str, Any]]:
     against partial responses); same for items above the inline size budget.
     """
     out: list[dict[str, Any]] = []
+    for source in _iter_response_attachment_sources(response):
+        out.extend(_iter_response_card_attachments(source))
     for media, default_mime in _iter_response_media(response):
         attachment = _to_attachment(media, default_mime=default_mime)
         if attachment is not None:
             out.append(attachment)
     return out
+
+
+def adaptive_card_attachment(card: Mapping[str, Any]) -> dict[str, Any]:
+    return {"contentType": ADAPTIVE_CARD_CONTENT_TYPE, "content": dict(card)}
+
+
+def _iter_response_card_attachments(response: Any) -> Iterable[dict[str, Any]]:
+    for card in _iter_structured_items(response, "adaptive_cards", "teams_cards"):
+        if _is_adaptive_card(card):
+            yield adaptive_card_attachment(card)
+        else:
+            logger.warning("Skipping malformed Teams Adaptive Card")
+
+    for attachment in _iter_structured_items(response, "teams_attachments"):
+        if _is_bot_framework_attachment(attachment):
+            yield dict(attachment)
+        else:
+            logger.warning("Skipping malformed Teams attachment")
+
+
+def _iter_response_attachment_sources(response: Any) -> Iterable[Any]:
+    yield response
+    content = getattr(response, "content", None)
+    if content is not None and content is not response and not isinstance(content, (str, bytes)):
+        yield content
+
+
+def _iter_structured_items(response: Any, *attrs: str) -> Iterable[Mapping[str, Any]]:
+    for attr in attrs:
+        value = (
+            response.get(attr) if isinstance(response, Mapping) else getattr(response, attr, None)
+        )
+        if value is None:
+            continue
+        if isinstance(value, Mapping):
+            yield value
+            continue
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+            for item in value:
+                if isinstance(item, Mapping):
+                    yield item
+
+
+def _is_adaptive_card(card: Mapping[str, Any]) -> bool:
+    return (
+        card.get("type") == "AdaptiveCard"
+        and isinstance(card.get("version"), str)
+        and isinstance(card.get("body"), list)
+    )
+
+
+def _is_bot_framework_attachment(attachment: Mapping[str, Any]) -> bool:
+    content_type = attachment.get("contentType")
+    return isinstance(content_type, str) and bool(content_type)
 
 
 def _iter_response_media(response: Any) -> Iterable[tuple[Any, str]]:

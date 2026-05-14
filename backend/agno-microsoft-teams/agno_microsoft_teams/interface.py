@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Mapping
+from contextlib import suppress
 from typing import Any, cast
 
 import httpx
@@ -48,6 +50,8 @@ from agno_microsoft_teams.verification import verify_teams_jwt
 # until we POST back. Cap the agent run at 14m so a slow run produces an
 # error follow-up rather than a hung conversation.
 TEAMS_AGENT_RUN_TIMEOUT_S = 14 * 60
+TEAMS_TYPING_INITIAL_DELAY_S = 1.5
+TEAMS_TYPING_INTERVAL_S = 5.0
 
 logger = structlog.get_logger("agno_microsoft_teams.interface")
 
@@ -199,6 +203,14 @@ class Teams(BaseInterface):
             return
 
         outbound_attachments: list[dict[str, Any]] = []
+        typing_task = asyncio.create_task(
+            self._send_typing_until_done(
+                service_url=service_url,
+                conversation_id=conversation_id,
+                recipient=recipient,
+                from_=from_,
+            )
+        )
         try:
             response = await asyncio.wait_for(
                 self._entity.arun(prompt, **media_kwargs), timeout=TEAMS_AGENT_RUN_TIMEOUT_S
@@ -211,6 +223,10 @@ class Teams(BaseInterface):
         except Exception:
             logger.exception("Teams agent invocation failed")
             content = "Sorry, something went wrong while processing your message."
+        finally:
+            typing_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await typing_task
 
         await self._send_reply(
             service_url=service_url,
@@ -221,6 +237,57 @@ class Teams(BaseInterface):
             from_=from_,
             attachments=outbound_attachments,
         )
+
+    async def _send_typing_until_done(
+        self,
+        *,
+        service_url: str,
+        conversation_id: str,
+        recipient: dict[str, Any],
+        from_: dict[str, Any],
+    ) -> None:
+        await asyncio.sleep(TEAMS_TYPING_INITIAL_DELAY_S)
+        while True:
+            try:
+                await self._send_typing(
+                    service_url=service_url,
+                    conversation_id=conversation_id,
+                    recipient=recipient,
+                    from_=from_,
+                )
+            except Exception:
+                logger.warning("Teams typing indicator failed", exc_info=True)
+            await asyncio.sleep(TEAMS_TYPING_INTERVAL_S)
+
+    async def _send_typing(
+        self,
+        *,
+        service_url: str,
+        conversation_id: str,
+        recipient: dict[str, Any],
+        from_: dict[str, Any],
+    ) -> None:
+        token = await acquire_bot_token(self._msal)
+        if token is None:
+            return
+
+        url = f"{service_url.rstrip('/')}/v3/conversations/{conversation_id}/activities"
+        payload: dict[str, Any] = {
+            "type": "typing",
+            "from": from_,
+            "recipient": recipient,
+            "conversation": {"id": conversation_id},
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                await client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {token}"},
+                    json=payload,
+                )
+            except httpx.HTTPError:
+                logger.warning("Failed to deliver Teams typing indicator")
 
     async def _send_reply(
         self,
@@ -302,6 +369,13 @@ def _stringify_agent_response(response: Any) -> str:
     content = getattr(response, "content", None)
     if isinstance(content, str) and content:
         return content
+    if isinstance(content, Mapping):
+        for key in ("text", "message", "content"):
+            value = content.get(key)
+            if isinstance(value, str):
+                return value
+        if any(key in content for key in ("adaptive_cards", "teams_cards", "teams_attachments")):
+            return ""
     return str(response)
 
 

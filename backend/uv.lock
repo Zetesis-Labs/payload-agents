@@ -99,7 +99,7 @@ requires-dist = [
 
 [[package]]
 name = "agno-agent-builder"
-version = "0.1.5"
+version = "0.1.6"
 source = { editable = "agno-agent-builder" }
 dependencies = [
     { name = "ag-ui-protocol" },
@@ -144,7 +144,7 @@ dev = [
 
 [[package]]
 name = "agno-microsoft-teams"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "agno-microsoft-teams" }
 dependencies = [
     { name = "agno" },
@@ -1656,7 +1656,7 @@ requires-dist = [
 
 [[package]]
 name = "payload-documents-worker-builder"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "payload-documents-worker-builder" }
 dependencies = [
     { name = "fastapi" },
