@@ -35,11 +35,6 @@ DEFAULT_RELOAD_CHANNEL = "agent_reload"
 # FastAPI doesn't support runtime route detach for the dynamic per-bot routers
 # the channel loaders mount at boot.
 DEFAULT_CHANNEL_RELOAD_CHANNEL = "channel_reload"
-# Tenant updates (e.g. pasting/rotating Langfuse project keys in Payload admin)
-# trigger a NOTIFY on this channel with the tenant id as payload. The runtime
-# listens and invalidates its in-memory PayloadTenantKeyResolver entry so the
-# next trace for that tenant re-fetches the keys.
-DEFAULT_TENANT_RELOAD_CHANNEL = "tenant_reload"
 DEFAULT_RESYNC_INTERVAL_S = 300.0
 DEFAULT_BOOT_MAX_RETRIES = 10
 DEFAULT_BOOT_BACKOFF_BASE = 2.0
@@ -63,7 +58,6 @@ class RuntimeConfig(BaseModel):
     log_level: str = "INFO"
     reload_channel: str = DEFAULT_RELOAD_CHANNEL
     channel_reload_channel: str = DEFAULT_CHANNEL_RELOAD_CHANNEL
-    tenant_reload_channel: str = DEFAULT_TENANT_RELOAD_CHANNEL
     resync_interval_s: float = DEFAULT_RESYNC_INTERVAL_S
     boot_max_retries: int = DEFAULT_BOOT_MAX_RETRIES
     boot_backoff_base: float = DEFAULT_BOOT_BACKOFF_BASE
