@@ -66,3 +66,6 @@ class RuntimeConfig(BaseModel):
     tool_protocol: str | None = None
     output_format: str | None = None
     agent_os_kwargs: dict[str, Any] = Field(default_factory=dict)
+    langfuse_host: str | None = None
+    langfuse_public_key: SecretStr | None = None
+    langfuse_secret_key: SecretStr | None = None

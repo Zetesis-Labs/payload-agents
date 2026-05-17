@@ -13,8 +13,11 @@ import hmac
 import re
 import uuid
 from contextvars import ContextVar
+from typing import Any
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from agno_agent_builder.telemetry import detach_tenant_baggage, tenant_baggage_context
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
@@ -107,13 +110,19 @@ class SessionMetadataMiddleware:
             return
 
         tenant_id = _header(scope, b"x-tenant-id")
+        baggage_token: Any | None = None
         if tenant_id:
             state = scope.setdefault("state", {})
             existing = state.get("metadata") or {}
             existing["tenant_id"] = tenant_id
             state["metadata"] = existing
+            baggage_token = tenant_baggage_context(tenant_id)
 
-        await self.app(scope, receive, send)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            if baggage_token is not None:
+                detach_tenant_baggage(baggage_token)
 
 
 def _header(scope: Scope, name: bytes) -> str:

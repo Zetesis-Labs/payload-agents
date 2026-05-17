@@ -276,6 +276,121 @@ def test_message_runs_agent_and_posts_reply_to_bot_connector(
     assert reply["json"]["replyToId"] == ACTIVITY_ID
 
 
+def test_slow_message_sends_typing_before_final_reply(
+    monkeypatch: pytest.MonkeyPatch, stub_outbound: type[_StubAsyncClient]
+) -> None:
+    pem, kid, jwk = _generate_signing_key()
+    _prime_cache_with(jwk)
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
+    monkeypatch.setattr(interface_module, "TEAMS_TYPING_INITIAL_DELAY_S", 0.01)
+    monkeypatch.setattr(interface_module, "TEAMS_TYPING_INTERVAL_S", 60.0)
+
+    agent_response = MagicMock()
+    agent_response.content = "done"
+    agent_response.images = None
+    agent_response.videos = None
+    agent_response.audio = None
+    agent_response.files = None
+
+    async def _slow(*_args: Any, **_kwargs: Any) -> Any:
+        await interface_module.asyncio.sleep(0.03)
+        return agent_response
+
+    agent = MagicMock()
+    agent.arun = _slow
+
+    with TestClient(_make_app(agent)) as client:
+        resp = client.post(
+            f"/teams/{APP_ID}/messages",
+            json=_message_activity(text="slow"),
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 202
+    activity_types = [item["json"]["type"] for item in stub_outbound.captured]
+    assert activity_types == ["typing", "message"]
+    assert stub_outbound.captured[-1]["json"]["text"] == "done"
+
+
+def test_message_can_send_adaptive_card_attachment(
+    stub_outbound: type[_StubAsyncClient],
+) -> None:
+    pem, kid, jwk = _generate_signing_key()
+    _prime_cache_with(jwk)
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
+    card = {
+        "type": "AdaptiveCard",
+        "version": "1.5",
+        "body": [{"type": "TextBlock", "text": "Card result"}],
+    }
+
+    agent_response = MagicMock()
+    agent_response.content = "see card"
+    agent_response.images = None
+    agent_response.videos = None
+    agent_response.audio = None
+    agent_response.files = None
+    agent_response.adaptive_cards = [card]
+    agent = MagicMock()
+    agent.arun = AsyncMock(return_value=agent_response)
+
+    with TestClient(_make_app(agent)) as client:
+        resp = client.post(
+            f"/teams/{APP_ID}/messages",
+            json=_message_activity(text="card"),
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 202
+    reply = stub_outbound.captured[0]
+    assert reply["json"]["text"] == "see card"
+    assert reply["json"]["attachments"] == [
+        {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": card,
+        }
+    ]
+
+
+def test_message_can_send_adaptive_card_from_structured_content(
+    stub_outbound: type[_StubAsyncClient],
+) -> None:
+    pem, kid, jwk = _generate_signing_key()
+    _prime_cache_with(jwk)
+    token = _issue_token(private_pem=pem, kid=kid, audience=APP_ID, service_url=SERVICE_URL)
+    card = {
+        "type": "AdaptiveCard",
+        "version": "1.5",
+        "body": [{"type": "TextBlock", "text": "Structured card"}],
+    }
+
+    agent_response = MagicMock()
+    agent_response.content = {"text": "structured", "adaptive_cards": [card]}
+    agent_response.images = None
+    agent_response.videos = None
+    agent_response.audio = None
+    agent_response.files = None
+    agent = MagicMock()
+    agent.arun = AsyncMock(return_value=agent_response)
+
+    with TestClient(_make_app(agent)) as client:
+        resp = client.post(
+            f"/teams/{APP_ID}/messages",
+            json=_message_activity(text="card"),
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 202
+    reply = stub_outbound.captured[0]
+    assert reply["json"]["text"] == "structured"
+    assert reply["json"]["attachments"] == [
+        {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": card,
+        }
+    ]
+
+
 def test_message_with_bot_mention_strips_mention_before_calling_agent(
     stub_outbound: type[_StubAsyncClient],
 ) -> None:

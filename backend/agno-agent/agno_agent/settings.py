@@ -28,6 +28,10 @@ class Settings(BaseSettings):
 
     app_name: str = "agno-agent"
 
+    langfuse_host: str | None = None
+    langfuse_public_key: SecretStr | None = None
+    langfuse_secret_key: SecretStr | None = None
+
     def model_post_init(self, __context: Any) -> None:
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable is required")
