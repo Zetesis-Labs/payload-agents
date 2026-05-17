@@ -25,3 +25,12 @@ class AgentConfig(BaseModel):
     search_collections: list[str] = []
     tool_call_limit: int | None = None
     allow_guest_access: bool = False
+    # Retrieval params sourced from the agent's `defaultRetrievalProfile`.
+    # Forwarded as headers to the MCP server so it can run two-stage retrieval
+    # (Typesense → reranker). All optional; missing fields fall back to MCP
+    # defaults.
+    reranker_kind: str | None = None
+    reranker_model: str | None = None
+    hybrid_alpha: float | None = None
+    input_k: int | None = None
+    top_k: int | None = None

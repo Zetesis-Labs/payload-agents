@@ -41,7 +41,7 @@ def build_agent(
             cfg, tool_protocol=tool_protocol, output_format=output_format
         ),
         db=db,
-        tools=[build_mcp_tools(mcp_url, cfg.tenant_slug, cfg.taxonomy_slugs, cfg.folder_slugs)],
+        tools=[build_mcp_tools(mcp_url, cfg)],
         add_history_to_context=True,
         num_history_runs=5,
         reasoning=not is_native_reasoner,
@@ -61,20 +61,25 @@ def build_model(provider: str, model_id: str, api_key: str) -> Model:
     raise UnsupportedProviderError(provider=provider)
 
 
-def build_mcp_tools(
-    mcp_url: str,
-    tenant_slug: str | None = None,
-    taxonomy_slugs: list[str] | None = None,
-    folder_slugs: list[str] | None = None,
-) -> MCPTools:
-    """Build an MCPTools instance with tenant/taxonomy/folder headers."""
+def build_mcp_tools(mcp_url: str, cfg: AgentConfig) -> MCPTools:
+    """Build an MCPTools instance, forwarding the agent's SearchProfile config as headers."""
     headers: dict[str, str] = {}
-    if tenant_slug:
-        headers["x-tenant-slug"] = tenant_slug
-    if taxonomy_slugs:
-        headers["x-taxonomy-slugs"] = ",".join(taxonomy_slugs)
-    if folder_slugs:
-        headers["x-folder-slugs"] = ",".join(folder_slugs)
+    if cfg.tenant_slug:
+        headers["x-tenant-slug"] = cfg.tenant_slug
+    if cfg.taxonomy_slugs:
+        headers["x-taxonomy-slugs"] = ",".join(cfg.taxonomy_slugs)
+    if cfg.folder_slugs:
+        headers["x-folder-slugs"] = ",".join(cfg.folder_slugs)
+    if cfg.reranker_kind and cfg.reranker_kind != "none":
+        headers["x-reranker-kind"] = cfg.reranker_kind
+    if cfg.reranker_model:
+        headers["x-reranker-model"] = cfg.reranker_model
+    if cfg.hybrid_alpha is not None:
+        headers["x-hybrid-alpha"] = str(cfg.hybrid_alpha)
+    if cfg.input_k is not None:
+        headers["x-input-k"] = str(cfg.input_k)
+    if cfg.top_k is not None:
+        headers["x-top-k"] = str(cfg.top_k)
     if headers:
         params = StreamableHTTPClientParams(url=mcp_url, headers=headers)
         return MCPTools(server_params=params, transport="streamable-http")

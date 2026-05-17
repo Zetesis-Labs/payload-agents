@@ -78,18 +78,31 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
     tenant = doc.get("tenant")
     tenant_slug = tenant.get("slug") if isinstance(tenant, dict) else None
 
-    profile = doc.get("defaultRetrievalProfile")
-    if isinstance(profile, dict):
+    profile = doc.get("defaultRetrievalProfile") if isinstance(doc.get("defaultRetrievalProfile"), dict) else None
+    if profile:
         taxonomy_slugs = _extract_taxonomy_slugs(profile.get("taxonomyFilters"))
         folder_slugs = _extract_folder_slugs(profile.get("folderFilters"))
+        reranker = profile.get("reranker") if isinstance(profile.get("reranker"), dict) else None
+        reranker_kind = reranker.get("kind") if reranker and isinstance(reranker.get("kind"), str) else None
+        reranker_model = reranker.get("model") if reranker and isinstance(reranker.get("model"), str) else None
+        hybrid_alpha = _coerce_float(profile.get("hybridAlpha"))
+        input_k = _coerce_int(profile.get("inputK"))
+        top_k = _coerce_int(profile.get("topK"))
+        raw_collections = profile.get("searchCollections")
+        search_collections = (
+            [s for s in raw_collections if isinstance(s, str)]
+            if isinstance(raw_collections, list)
+            else []
+        )
     else:
         taxonomy_slugs = []
         folder_slugs = []
-
-    search_collections = doc.get("searchCollections")
-    if not isinstance(search_collections, list):
+        reranker_kind = None
+        reranker_model = None
+        hybrid_alpha = None
+        input_k = None
+        top_k = None
         search_collections = []
-    search_collections = [s for s in search_collections if isinstance(s, str)]
 
     raw_limit = doc.get("toolCallLimit")
     tool_call_limit: int | None = None
@@ -113,7 +126,30 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
         search_collections=search_collections,
         tool_call_limit=tool_call_limit,
         allow_guest_access=bool(doc.get("allowGuestAccess")),
+        reranker_kind=reranker_kind,
+        reranker_model=reranker_model,
+        hybrid_alpha=hybrid_alpha,
+        input_k=input_k,
+        top_k=top_k,
     )
+
+
+def _coerce_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _extract_taxonomy_slugs(taxonomies: Any) -> list[str]:
