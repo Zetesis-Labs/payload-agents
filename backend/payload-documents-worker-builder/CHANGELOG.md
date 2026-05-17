@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-documents-worker-builder-v0.1.2...payload-documents-worker-builder-v0.1.3) (2026-05-17)
+
+
+### Bug Fixes
+
+* **payload-documents-worker-builder:** ruff format (blank line after exception classes) ([a87b1ae](https://github.com/Zetesis-Labs/PayloadAgents/commit/a87b1aed64450538c62ed7260c806b8cfa8ac919))
+* **security:** timing-safe internal-secret compare + LlamaParse upload limits ([77ac5c6](https://github.com/Zetesis-Labs/PayloadAgents/commit/77ac5c6954abb196b25f3cb3ef0fe120fa32ca28))
+
 ## [0.1.2](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-documents-worker-builder-v0.1.1...payload-documents-worker-builder-v0.1.2) (2026-05-13)
 
 

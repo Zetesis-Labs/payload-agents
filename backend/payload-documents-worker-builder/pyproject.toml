@@ -1,6 +1,6 @@
 [project]
 name = "payload-documents-worker-builder"
-version = "0.1.2"
+version = "0.1.3"
 description = "Parametrizable taskiq-based worker for Payload CMS — FastAPI kick app + Postgres LISTEN/NOTIFY broker + LlamaParse parse-document task."
 requires-python = ">=3.12"
 readme = "README.md"

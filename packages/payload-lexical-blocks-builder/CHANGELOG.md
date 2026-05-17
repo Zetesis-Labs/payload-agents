@@ -1,5 +1,12 @@
 # @zetesis/payload-lexical-blocks-builder
 
+## [0.2.2](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-lexical-blocks-builder-v0.2.1...payload-lexical-blocks-builder-v0.2.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **security:** timing-safe internal-secret compare + LlamaParse upload limits ([77ac5c6](https://github.com/Zetesis-Labs/PayloadAgents/commit/77ac5c6954abb196b25f3cb3ef0fe120fa32ca28))
+
 ## [0.2.1](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-lexical-blocks-builder-v0.2.0...payload-lexical-blocks-builder-v0.2.1) (2026-05-09)
 
 

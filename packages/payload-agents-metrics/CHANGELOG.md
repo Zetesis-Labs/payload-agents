@@ -1,5 +1,23 @@
 # @zetesis/payload-agents-metrics
 
+## [1.2.1](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-metrics-v1.2.0...payload-agents-metrics-v1.2.1) (2026-05-17)
+
+
+### Bug Fixes
+
+* **security:** timing-safe internal-secret compare + LlamaParse upload limits ([77ac5c6](https://github.com/Zetesis-Labs/PayloadAgents/commit/77ac5c6954abb196b25f3cb3ef0fe120fa32ca28))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zetesis/agent-ui bumped to 0.1.4
+    * @zetesis/payload-agents-core bumped to 0.5.2
+  * peerDependencies
+    * @zetesis/agent-ui bumped to 0.1.4
+    * @zetesis/payload-agents-core bumped to 0.5.2
+
 ## [1.2.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-agents-metrics-v1.1.0...payload-agents-metrics-v1.2.0) (2026-05-13)
 
 
