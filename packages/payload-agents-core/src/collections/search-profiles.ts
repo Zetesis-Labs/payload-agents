@@ -19,18 +19,48 @@
 
 import type { CollectionConfig, Field } from 'payload'
 
+/**
+ * A single filter field shown inside the profile's "Filters" tab. Consumers
+ * compose any number of these to describe the dimensions that scope a
+ * search — typical examples are taxonomies, folders, search collections,
+ * authors, products, etc. The package owns no opinion on what matters; it
+ * just wires up the field declaratively.
+ */
+export type SearchProfileFilterConfig =
+  | {
+      /** hasMany relationship to another Payload collection. */
+      type: 'relation'
+      /** Field name as stored on the document (e.g. 'taxonomyFilters'). */
+      name: string
+      /** Slug of the related collection. */
+      relationTo: string
+      /** Admin label. Defaults to humanized `name`. */
+      label?: string
+      /** Admin description shown beneath the field. */
+      description?: string
+    }
+  | {
+      /** hasMany select with predefined options (e.g. chunk collection names). */
+      type: 'select'
+      name: string
+      options: Array<{ label: string; value: string }>
+      /** Default selection. Defaults to all option values. */
+      defaultValue?: string[]
+      label?: string
+      description?: string
+    }
+
 export interface CreateSearchProfilesCollectionConfig {
   /** Override the Payload collection slug. Default: `'search-profiles'`. */
   collectionSlug?: string
 
-  /** Slug of the taxonomy collection for hard filters. */
-  taxonomyCollectionSlug: string
-
   /**
-   * Slug of the folders collection for hard filters. Defaults to
-   * `'payload-folders'` (Payload's auto-injected folders slug).
+   * Filter fields rendered in the "Filters" tab. Each entry adds a field
+   * the consumer can use to scope searches the profile drives. If omitted,
+   * the tab is skipped and the profile is a pure retrieval-params + reranker
+   * bundle.
    */
-  foldersCollectionSlug?: string
+  filters?: SearchProfileFilterConfig[]
 
   /**
    * Transform the SearchProfiles collection config before it is registered.
@@ -59,7 +89,18 @@ const rerankerKindOptions: Array<{ label: string; value: SearchProfileRerankerKi
 
 export function createSearchProfilesCollection(config: CreateSearchProfilesCollectionConfig): CollectionConfig {
   const collectionSlug = config.collectionSlug ?? 'search-profiles'
-  const foldersCollectionSlug = config.foldersCollectionSlug ?? 'payload-folders'
+  const filterFields = (config.filters ?? []).map(buildFilterField)
+
+  const filtersTab =
+    filterFields.length > 0
+      ? [
+          {
+            label: 'Filters',
+            description: 'Hard filters applied AND-composed with any filters the caller passes per query.',
+            fields: filterFields
+          }
+        ]
+      : []
 
   const fields: Field[] = [
     {
@@ -90,31 +131,7 @@ export function createSearchProfilesCollection(config: CreateSearchProfilesColle
             }
           ]
         },
-        {
-          label: 'Filters',
-          description: 'Hard filters applied AND-composed with any filters the caller passes per query.',
-          fields: [
-            {
-              name: 'taxonomyFilters',
-              type: 'relationship',
-              relationTo: config.taxonomyCollectionSlug,
-              hasMany: true,
-              admin: {
-                description: 'Only chunks whose document carries one of these taxonomies are searched.'
-              }
-            },
-            {
-              name: 'folderFilters',
-              type: 'relationship',
-              relationTo: foldersCollectionSlug,
-              hasMany: true,
-              admin: {
-                description:
-                  'Only chunks under one of these folders (or their descendants) are searched. Compounds with taxonomyFilters.'
-              }
-            }
-          ]
-        },
+        ...filtersTab,
         {
           label: 'Retrieval params',
           fields: [
@@ -211,4 +228,26 @@ export function createSearchProfilesCollection(config: CreateSearchProfilesColle
   }
 
   return config.collectionOverrides ? config.collectionOverrides(base) : base
+}
+
+function buildFilterField(filter: SearchProfileFilterConfig): Field {
+  if (filter.type === 'relation') {
+    return {
+      name: filter.name,
+      type: 'relationship',
+      relationTo: filter.relationTo,
+      hasMany: true,
+      label: filter.label,
+      admin: filter.description ? { description: filter.description } : undefined
+    }
+  }
+  return {
+    name: filter.name,
+    type: 'select',
+    hasMany: true,
+    options: filter.options,
+    defaultValue: filter.defaultValue ?? filter.options.map(o => o.value),
+    label: filter.label,
+    admin: filter.description ? { description: filter.description } : undefined
+  }
 }

@@ -8,6 +8,8 @@
  * consumers. See README.md "Evolution" section.
  */
 
+import type { CreateRerankerInput, Reranker } from './rerankers'
+
 // ============================================================================
 // TYPESENSE
 // ============================================================================
@@ -175,6 +177,19 @@ export interface McpAuthContext {
    * filtering by any ancestor's slug selects everything below it.
    */
   folderSlugs?: string[]
+  /**
+   * Retrieval params from the caller's attached Search Profile. When any
+   * field is present the search tool routes through two-stage retrieval:
+   * Typesense fetches `inputK` candidates with `hybridAlpha`, then the
+   * reranker reorders to `topK`. Missing fields fall back to tool defaults.
+   */
+  retrieval?: {
+    rerankerKind?: string
+    rerankerModel?: string
+    inputK?: number
+    topK?: number
+    hybridAlpha?: number
+  }
   /** User identifier, for logging/auditing. */
   userId?: string
   /** Arbitrary metadata the auth strategy wants to propagate. */
@@ -254,6 +269,15 @@ export interface McpServerConfig {
   /** Required to enable `get_book_toc`. If absent, that tool is skipped. */
   content?: ContentConfig
   auth?: McpAuthStrategy
+  /**
+   * Optional reranker factory. When provided, search results are reordered
+   * by the closure the factory returns for the per-request (kind, model)
+   * pair. Without this config, search ignores `retrieval.rerankerKind`.
+   * Typically built via `createRerankerFactory({ deepInfra: { apiKey } })`.
+   */
+  reranker?: {
+    factory: (input: CreateRerankerInput) => Reranker
+  }
   resources?: ResourcesConfig
   features?: FeaturesConfig
   toolNames?: ToolNameOverrides

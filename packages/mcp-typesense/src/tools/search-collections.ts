@@ -17,11 +17,13 @@ const DEFAULT_PER_PAGE = 20
 const DEFAULT_SNIPPET_LENGTH = 300
 const MAX_EXPAND_CONTEXT = 5
 /**
- * Number of nearest neighbors fetched by the vector search in semantic/hybrid modes.
- * Decoupled from per_page so that pagination does not constrain recall — small per_page
- * values would otherwise cap the entire result set (e.g. per_page=3 → k=6 → max 6 hits).
+ * Default number of nearest neighbors fetched by the vector search in
+ * semantic/hybrid modes. Decoupled from per_page so that pagination does
+ * not constrain recall. Overridden per-request when the caller's
+ * SearchProfile sets `inputK`.
  */
-const VECTOR_K = 100
+const DEFAULT_VECTOR_K = 100
+const DEFAULT_HYBRID_ALPHA = 0.7
 
 export const searchCollectionsSchema = z.object({
   query: z.string().describe('Search query text'),
@@ -159,8 +161,10 @@ function buildSearchParams(args: {
   filters: Record<string, string | string[]> | undefined
   perPage: number
   page: number
+  vectorK: number
+  hybridAlpha: number
 }): MultiSearchRequestSchema<ChunkDoc, string> {
-  const { collectionDef, mode, query, filters, perPage, page } = args
+  const { collectionDef, mode, query, filters, perPage, page, vectorK, hybridAlpha } = args
   const params: MultiSearchRequestSchema<ChunkDoc, string> = {
     collection: collectionDef.chunkCollection,
     per_page: perPage,
@@ -178,7 +182,7 @@ function buildSearchParams(args: {
   if (mode === 'semantic') {
     params.q = query
     params.query_by = 'embedding'
-    params.vector_query = `embedding:([], k:${VECTOR_K})`
+    params.vector_query = `embedding:([], k:${vectorK})`
     params.prefix = false
     return params
   }
@@ -186,7 +190,7 @@ function buildSearchParams(args: {
   if (mode === 'hybrid') {
     params.q = query
     params.query_by = `${textFields},embedding`
-    params.vector_query = `embedding:([], k:${VECTOR_K}, alpha:0.7)`
+    params.vector_query = `embedding:([], k:${vectorK}, alpha:${hybridAlpha})`
     params.prefix = false
     return params
   }
@@ -390,14 +394,26 @@ export async function searchCollections(
   const snippetLength = input.snippet_length ?? DEFAULT_SNIPPET_LENGTH
   const mode: SearchMode = input.mode ?? 'hybrid'
 
+  // SearchProfile-driven knobs. inputK caps the per-collection recall sent
+  // to the reranker (or to the caller when no reranker is configured).
+  // hybridAlpha weights vector vs lexical in hybrid mode. topK caps the
+  // final response — defaults to perPage so the legacy single-stage
+  // behavior is preserved when no profile is attached.
+  const inputK = clampPositiveInt(auth?.retrieval?.inputK, DEFAULT_VECTOR_K, 1, 1000)
+  const hybridAlpha = clampNumber(auth?.retrieval?.hybridAlpha, DEFAULT_HYBRID_ALPHA, 0, 1)
+  const topK = clampPositiveInt(auth?.retrieval?.topK, perPage, 1, MAX_PER_PAGE)
+  const fetchPerCollection = Math.min(inputK, MAX_PER_PAGE)
+
   const searches = targets.map(collectionDef =>
     buildSearchParams({
       collectionDef,
       mode,
       query: input.query,
       filters: scopedFilters,
-      perPage,
-      page
+      perPage: fetchPerCollection,
+      page,
+      vectorK: inputK,
+      hybridAlpha
     })
   )
 
@@ -421,7 +437,9 @@ export async function searchCollections(
     hitsPerCollection.push(hits.map(h => mapHit(h, collectionDef.chunkCollection, snippetLength)))
   })
 
-  const finalHits = roundRobinMerge(hitsPerCollection).slice(0, perPage)
+  const merged = roundRobinMerge(hitsPerCollection)
+  const reranked = await maybeRerank(ctx, auth, input.query, merged)
+  const finalHits = reranked.slice(0, topK)
   await enrichTaxonomies(ctx, finalHits)
 
   if (input.expand_context && input.expand_context > 0) {
@@ -433,8 +451,65 @@ export async function searchCollections(
     hits: finalHits,
     total_found: totalFound,
     page,
-    per_page: perPage,
+    per_page: topK,
     search_time_ms: totalTime,
     snippet_length: snippetLength
+  }
+}
+
+function clampPositiveInt(value: number | undefined, fallback: number, min: number, max: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback
+  const n = Math.floor(value)
+  return Math.max(min, Math.min(max, n))
+}
+
+function clampNumber(value: number | undefined, fallback: number, min: number, max: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, value))
+}
+
+/**
+ * Two-stage retrieval: when the caller's SearchProfile selects a reranker
+ * provider AND the MCP runtime was configured with a reranker factory, run
+ * the merged candidates through the reranker and return them sorted by
+ * `rerankerScore` desc. Falls back to the original order on any failure
+ * so a broken reranker degrades to single-stage retrieval instead of an
+ * empty response.
+ */
+async function maybeRerank(
+  ctx: ToolContext,
+  auth: McpAuthContext | null,
+  query: string,
+  hits: SearchHit[]
+): Promise<SearchHit[]> {
+  const retrieval = auth?.retrieval
+  if (!retrieval?.rerankerKind || retrieval.rerankerKind === 'none') return hits
+  if (!retrieval.rerankerModel) return hits
+  if (!ctx.resolveReranker) return hits
+  if (hits.length === 0) return hits
+
+  const reranker = ctx.resolveReranker({
+    kind: retrieval.rerankerKind,
+    model: retrieval.rerankerModel
+  })
+
+  try {
+    const ranked = await reranker(
+      query,
+      hits.map(hit => ({
+        id: hit.chunk_id,
+        text: hit.chunk_text,
+        previousScore: hit.score,
+        original: hit
+      }))
+    )
+    return ranked.map(entry => {
+      const hit = entry.original as SearchHit
+      hit.score = entry.rerankerScore
+      return hit
+    })
+  } catch (err) {
+    console.error('[mcp-typesense] reranker failed, falling back to single-stage hits:', err)
+    return hits
   }
 }

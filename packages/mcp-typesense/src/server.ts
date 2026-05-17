@@ -49,7 +49,8 @@ function buildToolContext(config: McpServerConfig): ToolContext {
   const collections = buildCollectionRegistry(config.collections)
   const taxonomy = createTaxonomyResolver(config.taxonomy)
   const content: ContentFetcher | null = config.content ? createContentFetcher(config.content) : null
-  return { typesense, collections, taxonomy, content }
+  const resolveReranker = config.reranker?.factory ?? null
+  return { typesense, collections, taxonomy, content, resolveReranker }
 }
 
 export function createMcpServer(config: McpServerConfig): McpServerHandle {

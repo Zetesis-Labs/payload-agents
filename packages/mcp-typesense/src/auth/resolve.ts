@@ -13,6 +13,11 @@ import type { McpAuthContext, McpAuthStrategy } from '../types'
 const DEFAULT_HEADER_NAME = 'x-tenant-slug'
 const TAXONOMY_HEADER_NAME = 'x-taxonomy-slugs'
 const FOLDER_HEADER_NAME = 'x-folder-slugs'
+const RERANKER_KIND_HEADER = 'x-reranker-kind'
+const RERANKER_MODEL_HEADER = 'x-reranker-model'
+const INPUT_K_HEADER = 'x-input-k'
+const TOP_K_HEADER = 'x-top-k'
+const HYBRID_ALPHA_HEADER = 'x-hybrid-alpha'
 
 const parseSlugList = (raw: string | string[] | undefined): string[] | undefined => {
   const value = Array.isArray(raw) ? raw[0] : raw
@@ -24,30 +29,64 @@ const parseSlugList = (raw: string | string[] | undefined): string[] | undefined
   return slugs.length > 0 ? slugs : undefined
 }
 
+const readScalar = (raw: string | string[] | undefined): string | undefined => {
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return value && value.length > 0 ? value : undefined
+}
+
+const parseFiniteNumber = (raw: string | string[] | undefined): number | undefined => {
+  const value = readScalar(raw)
+  if (value === undefined) return undefined
+  const n = Number(value)
+  return Number.isFinite(n) ? n : undefined
+}
+
 export function resolveAuth(req: IncomingMessage, strategy: McpAuthStrategy | undefined): McpAuthContext | null {
   // Default strategy: header with default header name.
   const effective: McpAuthStrategy = strategy ?? { type: 'header' }
 
   if (effective.type === 'header') {
     const headerName = (effective.headerName ?? DEFAULT_HEADER_NAME).toLowerCase()
-    const raw = req.headers[headerName]
-    const tenantSlug = Array.isArray(raw) ? raw[0] : raw
+    const tenantSlug = readScalar(req.headers[headerName])
 
     // Optional content-scoping headers — set when the proxy resolves the
-    // owning token/agent's `taxonomies` or `folders` relationship.
+    // owning token/agent's attached SearchProfile.
     const taxonomySlugs = parseSlugList(req.headers[TAXONOMY_HEADER_NAME])
     const folderSlugs = parseSlugList(req.headers[FOLDER_HEADER_NAME])
 
-    // Single-tenant deploys (no tenant header) can still send taxonomy or
-    // folder filters. Return a context whenever at least one is present;
-    // null means "no auth headers at all" → no auto-scoping.
-    if (!tenantSlug && !taxonomySlugs?.length && !folderSlugs?.length) return null
+    // Retrieval params from the attached SearchProfile. Empty/absent
+    // headers leave the corresponding field undefined so the search tool
+    // can fall back to its own defaults.
+    const retrieval = readRetrievalHeaders(req.headers)
 
-    return { tenantSlug: tenantSlug || undefined, taxonomySlugs, folderSlugs }
+    if (!tenantSlug && !taxonomySlugs?.length && !folderSlugs?.length && !retrieval) {
+      return null
+    }
+
+    return { tenantSlug, taxonomySlugs, folderSlugs, retrieval }
   }
 
   // Exhaustive guard. When new variants are added, TypeScript will force
   // handling them here instead of silently returning null.
   const _exhaustive: never = effective
   return _exhaustive
+}
+
+function readRetrievalHeaders(headers: IncomingMessage['headers']): McpAuthContext['retrieval'] | undefined {
+  const rerankerKind = readScalar(headers[RERANKER_KIND_HEADER])
+  const rerankerModel = readScalar(headers[RERANKER_MODEL_HEADER])
+  const inputK = parseFiniteNumber(headers[INPUT_K_HEADER])
+  const topK = parseFiniteNumber(headers[TOP_K_HEADER])
+  const hybridAlpha = parseFiniteNumber(headers[HYBRID_ALPHA_HEADER])
+
+  if (
+    rerankerKind === undefined &&
+    rerankerModel === undefined &&
+    inputK === undefined &&
+    topK === undefined &&
+    hybridAlpha === undefined
+  ) {
+    return undefined
+  }
+  return { rerankerKind, rerankerModel, inputK, topK, hybridAlpha }
 }

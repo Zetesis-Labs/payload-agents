@@ -112,33 +112,6 @@ export function createAgentsCollection(config: ResolvedPluginConfig): Collection
             ]
           },
           {
-            label: 'RAG Configuration',
-            description:
-              'Hard filters (taxonomies, folders), reranker config and hybrid params live on the Search Profile attached to the agent via `defaultRetrievalProfile`.',
-            fields: [
-              {
-                name: 'searchCollections',
-                type: 'select',
-                hasMany: true,
-                defaultValue: config.searchCollectionOptions.map(opt => opt.value),
-                options: config.searchCollectionOptions.map(opt => ({ label: opt.label, value: opt.value })),
-                admin: { description: 'Collections to search for RAG context' }
-              },
-              {
-                name: 'maxContextBytes',
-                type: 'number',
-                defaultValue: 65536,
-                admin: { description: 'Maximum context size in bytes (default: 64KB)' }
-              },
-              {
-                name: 'ttl',
-                type: 'number',
-                defaultValue: 86400,
-                admin: { description: 'TTL for conversation history in seconds (default: 24h)' }
-              }
-            ]
-          },
-          {
             label: 'UI Configuration',
             fields: [
               {
