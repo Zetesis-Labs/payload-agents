@@ -23,9 +23,6 @@ export interface CreateSearchProfilesCollectionConfig {
   /** Override the Payload collection slug. Default: `'search-profiles'`. */
   collectionSlug?: string
 
-  /** Slug of the tenants collection the `tenant` relationship points at. */
-  tenantCollectionSlug: string
-
   /** Slug of the taxonomy collection for hard filters. */
   taxonomyCollectionSlug: string
 
@@ -44,18 +41,18 @@ export interface CreateSearchProfilesCollectionConfig {
 }
 
 /**
- * Allowed reranker kinds shipped by `@zetesis/mcp-typesense`. New providers
- * can be added without bumping this enum if the consumer uses a custom
- * reranker factory.
+ * Allowed reranker providers shipped by `@zetesis/mcp-typesense`. New
+ * providers can be added without bumping this enum if the consumer uses a
+ * custom reranker factory. The `model` field on the profile names which
+ * model to use within the selected provider.
  */
-export const SEARCH_PROFILE_RERANKER_KINDS = ['none', 'deepinfra-bge', 'deepinfra-jina', 'jina', 'tei'] as const
+export const SEARCH_PROFILE_RERANKER_KINDS = ['none', 'deepinfra', 'jina', 'tei'] as const
 
 export type SearchProfileRerankerKind = (typeof SEARCH_PROFILE_RERANKER_KINDS)[number]
 
 const rerankerKindOptions: Array<{ label: string; value: SearchProfileRerankerKind }> = [
   { label: 'None (passthrough)', value: 'none' },
-  { label: 'DeepInfra · BGE Reranker v2 m3', value: 'deepinfra-bge' },
-  { label: 'DeepInfra · Jina Reranker v3', value: 'deepinfra-jina' },
+  { label: 'DeepInfra', value: 'deepinfra' },
   { label: 'Jina AI (direct)', value: 'jina' },
   { label: 'TEI (self-hosted)', value: 'tei' }
 ]
@@ -84,17 +81,6 @@ export function createSearchProfilesCollection(config: CreateSearchProfilesColle
               admin: {
                 description:
                   'URL-friendly identifier referenced by callers (agents, MCP tokens). Must be unique within the tenant.'
-              }
-            },
-            {
-              name: 'tenant',
-              type: 'relationship',
-              relationTo: config.tenantCollectionSlug,
-              required: true,
-              index: true,
-              admin: {
-                position: 'sidebar',
-                description: 'Tenant that owns this profile. Set automatically by the multi-tenant plugin.'
               }
             },
             {
@@ -188,7 +174,7 @@ export function createSearchProfilesCollection(config: CreateSearchProfilesColle
                   defaultValue: 'none' satisfies SearchProfileRerankerKind,
                   admin: {
                     description:
-                      'Reranker backend. "None" disables reranking. DeepInfra requires the consumer to have DEEPINFRA_API_KEY configured.'
+                      'Reranker provider. "None" disables reranking. DeepInfra requires the consumer to have DEEPINFRA_API_KEY configured.'
                   }
                 },
                 {
@@ -196,7 +182,8 @@ export function createSearchProfilesCollection(config: CreateSearchProfilesColle
                   type: 'text',
                   admin: {
                     description:
-                      'Model identifier as expected by the backend, e.g. "BAAI/bge-reranker-v2-m3" or "jinaai/jina-reranker-v3". Optional when kind=none.'
+                      'Model identifier as expected by the provider, e.g. "BAAI/bge-reranker-v2-m3" or "jinaai/jina-reranker-v2-base-multilingual" for DeepInfra. Required unless kind=none.',
+                    condition: (_data, siblingData) => Boolean(siblingData?.kind) && siblingData.kind !== 'none'
                   }
                 }
               ]

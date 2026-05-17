@@ -1,7 +1,8 @@
 /**
  * GET /api/{collectionSlug}/internal/list — internal endpoint the agent
  * runtime calls to fetch all active agents (with decrypted apiKey + populated
- * tenant + populated taxonomies). Authenticated by `X-Internal-Secret`,
+ * tenant + populated retrieval profile at depth=2 so its
+ * taxonomy/folder filters are inlined). Authenticated by `X-Internal-Secret`,
  * scoped to active agents, calls Payload's local API with `overrideAccess:
  * true` so the host's collection access can stay honestly user-scoped.
  *
@@ -53,10 +54,13 @@ export function createAgentsInternalListHandler(config: ResolvedPluginConfig): P
     // `overrideAccess: true` skips the host's collection access (and the
     // populated tenant/taxonomies relations) so we don't need bypass branches
     // in the host's collection access functions.
+    // depth=2 so any consumer-injected retrieval-profile relationship is
+    // populated AND its nested taxonomy/folder filters are inlined. The
+    // runtime reads the slugs directly off the populated profile.
     const { docs } = await req.payload.find({
       collection: config.collectionSlug,
       where,
-      depth: 1,
+      depth: 2,
       limit: 1000,
       overrideAccess: true,
       req,

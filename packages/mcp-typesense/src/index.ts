@@ -52,6 +52,18 @@
 
 // Defaults — exposed so consumers can extend them
 export { DEFAULT_GUIDE, DEFAULT_INSTRUCTIONS } from './defaults'
+// Rerankers — closure-based two-stage retrieval primitives
+export {
+  type CreateRerankerInput,
+  createDeepInfraReranker,
+  createRerankerFactory,
+  type DeepInfraRerankerConfig,
+  noopReranker,
+  type RankedCandidate,
+  type Reranker,
+  type RerankerCandidate,
+  type RerankerFactoryConfig
+} from './rerankers'
 // Main factory
 export { createMcpServer } from './server'
 // Public config types

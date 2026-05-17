@@ -3,9 +3,9 @@
 Calls the dedicated internal endpoint on `@zetesis/payload-agents-core`
 (`GET /api/<agents>/internal/list`) authenticated by `X-Internal-Secret`.
 The endpoint runs Payload's local API with `overrideAccess: true` and
-returns the active agents with apiKey decrypted + tenant/taxonomies
-populated, so we don't depend on access-control bypasses in the host's
-collections.
+returns the active agents with apiKey decrypted + tenant populated and
+``defaultRetrievalProfile`` populated at depth=2 so the runtime can read
+the profile's ``taxonomyFilters`` / ``folderFilters`` slug chains directly.
 """
 
 from __future__ import annotations
@@ -78,8 +78,13 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
     tenant = doc.get("tenant")
     tenant_slug = tenant.get("slug") if isinstance(tenant, dict) else None
 
-    taxonomy_slugs = _extract_taxonomy_slugs(doc.get("taxonomies"))
-    folder_slugs = _extract_folder_slugs(doc.get("folders"))
+    profile = doc.get("defaultRetrievalProfile")
+    if isinstance(profile, dict):
+        taxonomy_slugs = _extract_taxonomy_slugs(profile.get("taxonomyFilters"))
+        folder_slugs = _extract_folder_slugs(profile.get("folderFilters"))
+    else:
+        taxonomy_slugs = []
+        folder_slugs = []
 
     search_collections = doc.get("searchCollections")
     if not isinstance(search_collections, list):
