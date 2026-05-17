@@ -7,17 +7,17 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { getCurrentAuth } from '../auth/context'
 import type { ToolContext } from '../context'
 import { DEFAULT_GUIDE } from '../defaults'
 import { formatResponse } from '../format'
 import { getCollectionStats } from '../tools/get-collection-stats'
 import { getTaxonomyTree } from '../tools/get-taxonomy-tree'
-import type { McpAuthContext, ResourcesConfig } from '../types'
+import type { ResourcesConfig } from '../types'
 
 export interface RegisterResourcesOptions {
   server: McpServer
   ctx: ToolContext
-  auth: McpAuthContext | null
   resources: ResourcesConfig
 }
 
@@ -28,7 +28,7 @@ async function resolveGuide(resources: ResourcesConfig): Promise<string> {
 }
 
 export function registerResources(opts: RegisterResourcesOptions): void {
-  const { server, ctx, auth, resources } = opts
+  const { server, ctx, resources } = opts
 
   server.resource(
     'search_guide',
@@ -83,7 +83,7 @@ export function registerResources(opts: RegisterResourcesOptions): void {
       mimeType: 'text/toon'
     },
     async () => {
-      const result = await getCollectionStats(ctx, auth)
+      const result = await getCollectionStats(ctx, getCurrentAuth())
       return {
         contents: [
           {
