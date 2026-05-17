@@ -7,6 +7,7 @@ import type { DocumentSchema, SearchResponse, SearchResponseHit } from 'typesens
 import type { MultiSearchRequestSchema } from 'typesense/lib/Typesense/Types'
 import { z } from 'zod'
 import type { ToolContext } from '../context'
+import { setAttributes, withSpan } from '../tracing'
 import type { ChunkCollectionConfig, McpAuthContext } from '../types'
 
 /** Chunk document shape as returned by Typesense. Loose because the schema evolves per collection. */
@@ -368,6 +369,37 @@ export async function searchCollections(
   ctx: ToolContext,
   auth: McpAuthContext | null
 ): Promise<SearchResult> {
+  return withSpan(
+    'search_collections',
+    {
+      'retrieval.query': input.query,
+      'retrieval.mode': input.mode ?? 'hybrid',
+      'retrieval.requested_collections': input.collections,
+      'retrieval.requested_per_page': input.per_page,
+      'retrieval.requested_page': input.page,
+      'mcp.tenant_slug': auth?.tenantSlug,
+      'langfuse.trace.metadata.tenant_slug': auth?.tenantSlug,
+      'langfuse.trace.tags': auth?.tenantSlug ? [`tenant:${auth.tenantSlug}`] : undefined,
+      'retrieval.scope.taxonomy_slugs_count': auth?.taxonomySlugs?.length,
+      'retrieval.scope.folder_slugs_count': auth?.folderSlugs?.length,
+      'retrieval.scope.taxonomy_slugs': auth?.taxonomySlugs,
+      'retrieval.scope.folder_slugs': auth?.folderSlugs,
+      'retrieval.profile.reranker_kind': auth?.retrieval?.rerankerKind,
+      'retrieval.profile.reranker_model': auth?.retrieval?.rerankerModel,
+      'retrieval.profile.input_k': auth?.retrieval?.inputK,
+      'retrieval.profile.top_k': auth?.retrieval?.topK,
+      'retrieval.profile.hybrid_alpha': auth?.retrieval?.hybridAlpha
+    },
+    span => executeSearch(input, ctx, auth, span)
+  )
+}
+
+async function executeSearch(
+  input: SearchCollectionsInput,
+  ctx: ToolContext,
+  auth: McpAuthContext | null,
+  parentSpan: import('@opentelemetry/api').Span
+): Promise<SearchResult> {
   // Auto-scope by tenant, taxonomy, and folder when auth provides them.
   let scopedFilters = input.filters
   if (auth?.tenantSlug && !scopedFilters?.tenant) {
@@ -418,7 +450,17 @@ export async function searchCollections(
   )
 
   // Execute multi-search (non-union form → `{ results: SearchResponse[] }`)
-  const result = await ctx.typesense.multiSearch.perform<[ChunkDoc]>({ searches })
+  const result = await withSpan(
+    'typesense.multi_search',
+    {
+      'typesense.collections': targets.map(t => t.chunkCollection),
+      'typesense.mode': mode,
+      'typesense.vector_k': inputK,
+      'typesense.hybrid_alpha': hybridAlpha,
+      'typesense.per_collection_limit': fetchPerCollection
+    },
+    () => ctx.typesense.multiSearch.perform<[ChunkDoc]>({ searches })
+  )
 
   // Typesense already returns each collection's hits in the correct order
   // (text_match desc for lexical, vector_distance asc for semantic, RRF for hybrid),
@@ -438,8 +480,17 @@ export async function searchCollections(
   })
 
   const merged = roundRobinMerge(hitsPerCollection)
+  setAttributes(parentSpan, {
+    'retrieval.merged_candidates': merged.length,
+    'retrieval.typesense_total_found': totalFound,
+    'retrieval.typesense_time_ms': totalTime
+  })
   const reranked = await maybeRerank(ctx, auth, input.query, merged)
   const finalHits = reranked.slice(0, topK)
+  setAttributes(parentSpan, {
+    'retrieval.final_hits_count': finalHits.length,
+    'retrieval.top_score': finalHits[0]?.score
+  })
   await enrichTaxonomies(ctx, finalHits)
 
   if (input.expand_context && input.expand_context > 0) {
@@ -493,23 +544,39 @@ async function maybeRerank(
     model: retrieval.rerankerModel
   })
 
-  try {
-    const ranked = await reranker(
-      query,
-      hits.map(hit => ({
-        id: hit.chunk_id,
-        text: hit.chunk_text,
-        previousScore: hit.score,
-        original: hit
-      }))
-    )
-    return ranked.map(entry => {
-      const hit = entry.original as SearchHit
-      hit.score = entry.rerankerScore
-      return hit
-    })
-  } catch (err) {
-    console.error('[mcp-typesense] reranker failed, falling back to single-stage hits:', err)
-    return hits
-  }
+  return withSpan(
+    `reranker.${retrieval.rerankerKind}`,
+    {
+      'reranker.kind': retrieval.rerankerKind,
+      'reranker.model': retrieval.rerankerModel,
+      'reranker.candidates_count': hits.length
+    },
+    async span => {
+      try {
+        const ranked = await reranker(
+          query,
+          hits.map(hit => ({
+            id: hit.chunk_id,
+            text: hit.chunk_text,
+            previousScore: hit.score,
+            original: hit
+          }))
+        )
+        const reordered = ranked.map(entry => {
+          const hit = entry.original as SearchHit
+          hit.score = entry.rerankerScore
+          return hit
+        })
+        setAttributes(span, {
+          'reranker.top_score': reordered[0]?.score,
+          'reranker.bottom_score': reordered[reordered.length - 1]?.score
+        })
+        return reordered
+      } catch (err) {
+        console.error('[mcp-typesense] reranker failed, falling back to single-stage hits:', err)
+        setAttributes(span, { 'reranker.failed': true, 'reranker.fallback': 'single_stage' })
+        return hits
+      }
+    }
+  )
 }
