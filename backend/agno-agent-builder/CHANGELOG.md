@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.7](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.6...agno-agent-builder-v0.1.7) (2026-05-17)
+
+
+### Features
+
+* **agno-agent-builder:** add Langfuse OTel tracing with per-tenant project routing ([82d3dde](https://github.com/Zetesis-Labs/PayloadAgents/commit/82d3ddeb62cdba48fffa177056a4fd5f942de5ee))
+* **agno-agent-builder:** bring back per-tenant Langfuse project routing ([ddb3ef6](https://github.com/Zetesis-Labs/PayloadAgents/commit/ddb3ef6dfa22108893fc5d8f01804b5c461ed0f9))
+* **agno-agent-builder:** Langfuse OTel tracing with tag-based filtering ([d45d4f3](https://github.com/Zetesis-Labs/PayloadAgents/commit/d45d4f360ad30797509e3c3b8fe2e51d9f1b65a4))
+* **agno-agent-builder:** listen on tenant_reload channel to invalidate Langfuse key cache ([530c052](https://github.com/Zetesis-Labs/PayloadAgents/commit/530c0527d9d0c5ed2f3f2aaad54453efa54ee67d))
+* **agno-microsoft-teams:** add typing indicators and adaptive cards ([e19a9be](https://github.com/Zetesis-Labs/PayloadAgents/commit/e19a9be3c6dd6d406405f4be02bc1876fe0737ba))
+
+
+### Bug Fixes
+
+* **agno-agent-builder:** coerce baggage tenant_id to str for span attributes ([509c8a6](https://github.com/Zetesis-Labs/PayloadAgents/commit/509c8a6970eb2b4bd677dd5f6c392c01fafc953e))
+
+
+### Reverts
+
+* **agno-agent-builder:** drop per-tenant Langfuse routing and tenant_reload listener ([b3036bd](https://github.com/Zetesis-Labs/PayloadAgents/commit/b3036bd6d517ae7b0a2fd0bfd9e759d97c4cea97))
+
 ## [0.1.6](https://github.com/Zetesis-Labs/PayloadAgents/compare/agno-agent-builder-v0.1.5...agno-agent-builder-v0.1.6) (2026-05-13)
 
 
