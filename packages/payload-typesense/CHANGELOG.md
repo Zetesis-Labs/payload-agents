@@ -1,5 +1,19 @@
 # @zetesis/payload-typesense
 
+## [0.4.1](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-typesense-v0.4.0...payload-typesense-v0.4.1) (2026-05-17)
+
+
+### Bug Fixes
+
+* **security:** timing-safe internal-secret compare + LlamaParse upload limits ([77ac5c6](https://github.com/Zetesis-Labs/PayloadAgents/commit/77ac5c6954abb196b25f3cb3ef0fe120fa32ca28))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zetesis/payload-indexer bumped to 0.4.1
+
 ## [0.4.0](https://github.com/Zetesis-Labs/PayloadAgents/compare/payload-typesense-v0.3.1...payload-typesense-v0.4.0) (2026-05-09)
 
 

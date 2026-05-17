@@ -1,5 +1,12 @@
 # @zetesis/agent-ui
 
+## [0.1.4](https://github.com/Zetesis-Labs/PayloadAgents/compare/agent-ui-v0.1.3...agent-ui-v0.1.4) (2026-05-17)
+
+
+### Bug Fixes
+
+* **security:** timing-safe internal-secret compare + LlamaParse upload limits ([77ac5c6](https://github.com/Zetesis-Labs/PayloadAgents/commit/77ac5c6954abb196b25f3cb3ef0fe120fa32ca28))
+
 ## [0.1.3](https://github.com/Zetesis-Labs/PayloadAgents/compare/agent-ui-v0.1.2...agent-ui-v0.1.3) (2026-05-09)
 
 
