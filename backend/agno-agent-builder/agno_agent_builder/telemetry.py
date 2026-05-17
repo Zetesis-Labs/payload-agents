@@ -41,9 +41,10 @@ class BaggageAttributeSpanProcessor(SpanProcessor):
         if not tenant_id:
             return
 
-        span.set_attribute(TENANT_ID_ATTRIBUTE, tenant_id)
-        span.set_attribute(LANGFUSE_TENANT_METADATA_ATTRIBUTE, tenant_id)
-        span.set_attribute(LANGFUSE_TAGS_ATTRIBUTE, [f"tenant:{tenant_id}"])
+        tenant_id_str = str(tenant_id)
+        span.set_attribute(TENANT_ID_ATTRIBUTE, tenant_id_str)
+        span.set_attribute(LANGFUSE_TENANT_METADATA_ATTRIBUTE, tenant_id_str)
+        span.set_attribute(LANGFUSE_TAGS_ATTRIBUTE, [f"tenant:{tenant_id_str}"])
 
     def on_end(self, span: ReadableSpan) -> None:
         return None
