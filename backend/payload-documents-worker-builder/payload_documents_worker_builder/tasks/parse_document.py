@@ -52,6 +52,7 @@ class FileTooLargeError(Exception):
 class UnsupportedMimeTypeError(Exception):
     """Raised when the upload's MIME type isn't on the allowlist."""
 
+
 logger = structlog.get_logger("payload_documents_worker_builder.parse_document")
 
 
