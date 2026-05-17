@@ -34,3 +34,6 @@ class AgentConfig(BaseModel):
     hybrid_alpha: float | None = None
     input_k: int | None = None
     top_k: int | None = None
+    # Mustache template applied to the user query before retrieval. Supported
+    # variables (resolved MCP-side): ``{{query}}``, ``{{tenant_slug}}``.
+    rewrite_template: str | None = None

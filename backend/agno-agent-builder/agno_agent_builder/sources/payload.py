@@ -88,6 +88,8 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
         hybrid_alpha = _coerce_float(profile.get("hybridAlpha"))
         input_k = _coerce_int(profile.get("inputK"))
         top_k = _coerce_int(profile.get("topK"))
+        raw_rewrite = profile.get("queryRewrite")
+        rewrite_template = raw_rewrite.strip() if isinstance(raw_rewrite, str) and raw_rewrite.strip() else None
         raw_collections = profile.get("searchCollections")
         search_collections = (
             [s for s in raw_collections if isinstance(s, str)]
@@ -102,6 +104,7 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
         hybrid_alpha = None
         input_k = None
         top_k = None
+        rewrite_template = None
         search_collections = []
 
     raw_limit = doc.get("toolCallLimit")
@@ -131,6 +134,7 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
         hybrid_alpha=hybrid_alpha,
         input_k=input_k,
         top_k=top_k,
+        rewrite_template=rewrite_template,
     )
 
 

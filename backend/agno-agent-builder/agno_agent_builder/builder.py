@@ -80,6 +80,8 @@ def build_mcp_tools(mcp_url: str, cfg: AgentConfig) -> MCPTools:
         headers["x-input-k"] = str(cfg.input_k)
     if cfg.top_k is not None:
         headers["x-top-k"] = str(cfg.top_k)
+    if cfg.rewrite_template:
+        headers["x-query-rewrite-template"] = cfg.rewrite_template
     if headers:
         params = StreamableHTTPClientParams(url=mcp_url, headers=headers)
         return MCPTools(server_params=params, transport="streamable-http")

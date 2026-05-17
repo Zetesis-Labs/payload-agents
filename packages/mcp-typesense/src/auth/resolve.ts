@@ -18,6 +18,7 @@ const RERANKER_MODEL_HEADER = 'x-reranker-model'
 const INPUT_K_HEADER = 'x-input-k'
 const TOP_K_HEADER = 'x-top-k'
 const HYBRID_ALPHA_HEADER = 'x-hybrid-alpha'
+const QUERY_REWRITE_TEMPLATE_HEADER = 'x-query-rewrite-template'
 
 const parseSlugList = (raw: string | string[] | undefined): string[] | undefined => {
   const value = Array.isArray(raw) ? raw[0] : raw
@@ -78,15 +79,17 @@ function readRetrievalHeaders(headers: IncomingMessage['headers']): McpAuthConte
   const inputK = parseFiniteNumber(headers[INPUT_K_HEADER])
   const topK = parseFiniteNumber(headers[TOP_K_HEADER])
   const hybridAlpha = parseFiniteNumber(headers[HYBRID_ALPHA_HEADER])
+  const rewriteTemplate = readScalar(headers[QUERY_REWRITE_TEMPLATE_HEADER])
 
   if (
     rerankerKind === undefined &&
     rerankerModel === undefined &&
     inputK === undefined &&
     topK === undefined &&
-    hybridAlpha === undefined
+    hybridAlpha === undefined &&
+    rewriteTemplate === undefined
   ) {
     return undefined
   }
-  return { rerankerKind, rerankerModel, inputK, topK, hybridAlpha }
+  return { rerankerKind, rerankerModel, inputK, topK, hybridAlpha, rewriteTemplate }
 }

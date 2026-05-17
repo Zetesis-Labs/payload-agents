@@ -7,6 +7,7 @@ import type { DocumentSchema, SearchResponse, SearchResponseHit } from 'typesens
 import type { MultiSearchRequestSchema } from 'typesense/lib/Typesense/Types'
 import { z } from 'zod'
 import type { ToolContext } from '../context'
+import { applyQueryRewriteTemplate } from '../query-rewrite'
 import { setAttributes, withSpan } from '../tracing'
 import type { ChunkCollectionConfig, McpAuthContext } from '../types'
 
@@ -426,6 +427,22 @@ async function executeSearch(
   const snippetLength = input.snippet_length ?? DEFAULT_SNIPPET_LENGTH
   const mode: SearchMode = input.mode ?? 'hybrid'
 
+  // Profile-driven query rewrite. When the SearchProfile defines a
+  // `queryRewrite` Mustache template, expand it before the query reaches
+  // Typesense — both lexical and vector legs see the rewritten string.
+  const rewrittenQuery = auth?.retrieval?.rewriteTemplate
+    ? applyQueryRewriteTemplate(auth.retrieval.rewriteTemplate, {
+        query: input.query,
+        tenant_slug: auth?.tenantSlug
+      })
+    : input.query
+  const queryUsed = rewrittenQuery || input.query
+  setAttributes(parentSpan, {
+    'query.original': input.query,
+    'query.rewritten': queryUsed,
+    'query.rewrite_applied': rewrittenQuery !== input.query
+  })
+
   // SearchProfile-driven knobs. inputK caps the per-collection recall sent
   // to the reranker (or to the caller when no reranker is configured).
   // hybridAlpha weights vector vs lexical in hybrid mode. topK caps the
@@ -440,7 +457,7 @@ async function executeSearch(
     buildSearchParams({
       collectionDef,
       mode,
-      query: input.query,
+      query: queryUsed,
       filters: scopedFilters,
       perPage: fetchPerCollection,
       page,
@@ -485,7 +502,9 @@ async function executeSearch(
     'retrieval.typesense_total_found': totalFound,
     'retrieval.typesense_time_ms': totalTime
   })
-  const reranked = await maybeRerank(ctx, auth, input.query, merged)
+  // Reranker scores chunks against the rewritten query — the same string
+  // Typesense used — so reranker/Typesense agree on what "relevant" means.
+  const reranked = await maybeRerank(ctx, auth, queryUsed, merged)
   const finalHits = reranked.slice(0, topK)
   setAttributes(parentSpan, {
     'retrieval.final_hits_count': finalHits.length,

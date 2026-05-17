@@ -189,6 +189,12 @@ export interface McpAuthContext {
     inputK?: number
     topK?: number
     hybridAlpha?: number
+    /**
+     * Mustache template applied to the query before embedding. Variables:
+     * `{{query}}`, `{{tenant_slug}}`. Unknown variables expand to empty
+     * string. When unset, the raw user query is passed through unchanged.
+     */
+    rewriteTemplate?: string
   }
   /** User identifier, for logging/auditing. */
   userId?: string

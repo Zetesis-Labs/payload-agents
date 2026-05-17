@@ -39,6 +39,7 @@ class TestPayloadDocToAgentConfig:
                 "hybridAlpha": 0.5,
                 "inputK": 50,
                 "topK": 10,
+                "queryRewrite": "{{query}} en filosofía libertaria austríaca",
                 "reranker": {"kind": "deepinfra", "model": "BAAI/bge-reranker-v2-m3"},
             },
             "toolCallLimit": 5,
@@ -63,6 +64,7 @@ class TestPayloadDocToAgentConfig:
         assert cfg.hybrid_alpha == 0.5
         assert cfg.input_k == 50
         assert cfg.top_k == 10
+        assert cfg.rewrite_template == "{{query}} en filosofía libertaria austríaca"
 
     def test_unpopulated_tenant_becomes_none(self) -> None:
         cfg = payload_doc_to_agent_config(self._doc(tenant=2))
@@ -82,6 +84,7 @@ class TestPayloadDocToAgentConfig:
         assert cfg.hybrid_alpha is None
         assert cfg.input_k is None
         assert cfg.top_k is None
+        assert cfg.rewrite_template is None
 
     def test_invalid_tool_call_limit_falls_back_to_none(self) -> None:
         cfg = payload_doc_to_agent_config(self._doc(toolCallLimit="not-a-number"))
