@@ -7,6 +7,8 @@ import type { DocumentSchema, SearchResponse, SearchResponseHit } from 'typesens
 import type { MultiSearchRequestSchema } from 'typesense/lib/Typesense/Types'
 import { z } from 'zod'
 import type { ToolContext } from '../context'
+import { applyQueryRewriteTemplate } from '../query-rewrite'
+import { setAttributes, withSpan } from '../tracing'
 import type { ChunkCollectionConfig, McpAuthContext } from '../types'
 
 /** Chunk document shape as returned by Typesense. Loose because the schema evolves per collection. */
@@ -17,11 +19,13 @@ const DEFAULT_PER_PAGE = 20
 const DEFAULT_SNIPPET_LENGTH = 300
 const MAX_EXPAND_CONTEXT = 5
 /**
- * Number of nearest neighbors fetched by the vector search in semantic/hybrid modes.
- * Decoupled from per_page so that pagination does not constrain recall — small per_page
- * values would otherwise cap the entire result set (e.g. per_page=3 → k=6 → max 6 hits).
+ * Default number of nearest neighbors fetched by the vector search in
+ * semantic/hybrid modes. Decoupled from per_page so that pagination does
+ * not constrain recall. Overridden per-request when the caller's
+ * SearchProfile sets `inputK`.
  */
-const VECTOR_K = 100
+const DEFAULT_VECTOR_K = 100
+const DEFAULT_HYBRID_ALPHA = 0.7
 
 export const searchCollectionsSchema = z.object({
   query: z.string().describe('Search query text'),
@@ -159,8 +163,10 @@ function buildSearchParams(args: {
   filters: Record<string, string | string[]> | undefined
   perPage: number
   page: number
+  vectorK: number
+  hybridAlpha: number
 }): MultiSearchRequestSchema<ChunkDoc, string> {
-  const { collectionDef, mode, query, filters, perPage, page } = args
+  const { collectionDef, mode, query, filters, perPage, page, vectorK, hybridAlpha } = args
   const params: MultiSearchRequestSchema<ChunkDoc, string> = {
     collection: collectionDef.chunkCollection,
     per_page: perPage,
@@ -178,7 +184,7 @@ function buildSearchParams(args: {
   if (mode === 'semantic') {
     params.q = query
     params.query_by = 'embedding'
-    params.vector_query = `embedding:([], k:${VECTOR_K})`
+    params.vector_query = `embedding:([], k:${vectorK})`
     params.prefix = false
     return params
   }
@@ -186,7 +192,7 @@ function buildSearchParams(args: {
   if (mode === 'hybrid') {
     params.q = query
     params.query_by = `${textFields},embedding`
-    params.vector_query = `embedding:([], k:${VECTOR_K}, alpha:0.7)`
+    params.vector_query = `embedding:([], k:${vectorK}, alpha:${hybridAlpha})`
     params.prefix = false
     return params
   }
@@ -364,6 +370,37 @@ export async function searchCollections(
   ctx: ToolContext,
   auth: McpAuthContext | null
 ): Promise<SearchResult> {
+  return withSpan(
+    'search_collections',
+    {
+      'retrieval.query': input.query,
+      'retrieval.mode': input.mode ?? 'hybrid',
+      'retrieval.requested_collections': input.collections,
+      'retrieval.requested_per_page': input.per_page,
+      'retrieval.requested_page': input.page,
+      'mcp.tenant_slug': auth?.tenantSlug,
+      'langfuse.trace.metadata.tenant_slug': auth?.tenantSlug,
+      'langfuse.trace.tags': auth?.tenantSlug ? [`tenant:${auth.tenantSlug}`] : undefined,
+      'retrieval.scope.taxonomy_slugs_count': auth?.taxonomySlugs?.length,
+      'retrieval.scope.folder_slugs_count': auth?.folderSlugs?.length,
+      'retrieval.scope.taxonomy_slugs': auth?.taxonomySlugs,
+      'retrieval.scope.folder_slugs': auth?.folderSlugs,
+      'retrieval.profile.reranker_kind': auth?.retrieval?.rerankerKind,
+      'retrieval.profile.reranker_model': auth?.retrieval?.rerankerModel,
+      'retrieval.profile.input_k': auth?.retrieval?.inputK,
+      'retrieval.profile.top_k': auth?.retrieval?.topK,
+      'retrieval.profile.hybrid_alpha': auth?.retrieval?.hybridAlpha
+    },
+    span => executeSearch(input, ctx, auth, span)
+  )
+}
+
+async function executeSearch(
+  input: SearchCollectionsInput,
+  ctx: ToolContext,
+  auth: McpAuthContext | null,
+  parentSpan: import('@opentelemetry/api').Span
+): Promise<SearchResult> {
   // Auto-scope by tenant, taxonomy, and folder when auth provides them.
   let scopedFilters = input.filters
   if (auth?.tenantSlug && !scopedFilters?.tenant) {
@@ -390,19 +427,57 @@ export async function searchCollections(
   const snippetLength = input.snippet_length ?? DEFAULT_SNIPPET_LENGTH
   const mode: SearchMode = input.mode ?? 'hybrid'
 
+  // Profile-driven query rewrite. When the SearchProfile defines a
+  // `queryRewrite` Mustache template, expand it before the query reaches
+  // Typesense — both lexical and vector legs see the rewritten string.
+  const rewrittenQuery = auth?.retrieval?.rewriteTemplate
+    ? applyQueryRewriteTemplate(auth.retrieval.rewriteTemplate, {
+        query: input.query,
+        tenant_slug: auth?.tenantSlug
+      })
+    : input.query
+  const queryUsed = rewrittenQuery || input.query
+  setAttributes(parentSpan, {
+    'query.original': input.query,
+    'query.rewritten': queryUsed,
+    'query.rewrite_applied': rewrittenQuery !== input.query
+  })
+
+  // SearchProfile-driven knobs. inputK caps the per-collection recall sent
+  // to the reranker (or to the caller when no reranker is configured).
+  // hybridAlpha weights vector vs lexical in hybrid mode. topK caps the
+  // final response — defaults to perPage so the legacy single-stage
+  // behavior is preserved when no profile is attached.
+  const inputK = clampPositiveInt(auth?.retrieval?.inputK, DEFAULT_VECTOR_K, 1, 1000)
+  const hybridAlpha = clampNumber(auth?.retrieval?.hybridAlpha, DEFAULT_HYBRID_ALPHA, 0, 1)
+  const topK = clampPositiveInt(auth?.retrieval?.topK, perPage, 1, MAX_PER_PAGE)
+  const fetchPerCollection = Math.min(inputK, MAX_PER_PAGE)
+
   const searches = targets.map(collectionDef =>
     buildSearchParams({
       collectionDef,
       mode,
-      query: input.query,
+      query: queryUsed,
       filters: scopedFilters,
-      perPage,
-      page
+      perPage: fetchPerCollection,
+      page,
+      vectorK: inputK,
+      hybridAlpha
     })
   )
 
   // Execute multi-search (non-union form → `{ results: SearchResponse[] }`)
-  const result = await ctx.typesense.multiSearch.perform<[ChunkDoc]>({ searches })
+  const result = await withSpan(
+    'typesense.multi_search',
+    {
+      'typesense.collections': targets.map(t => t.chunkCollection),
+      'typesense.mode': mode,
+      'typesense.vector_k': inputK,
+      'typesense.hybrid_alpha': hybridAlpha,
+      'typesense.per_collection_limit': fetchPerCollection
+    },
+    () => ctx.typesense.multiSearch.perform<[ChunkDoc]>({ searches })
+  )
 
   // Typesense already returns each collection's hits in the correct order
   // (text_match desc for lexical, vector_distance asc for semantic, RRF for hybrid),
@@ -421,7 +496,20 @@ export async function searchCollections(
     hitsPerCollection.push(hits.map(h => mapHit(h, collectionDef.chunkCollection, snippetLength)))
   })
 
-  const finalHits = roundRobinMerge(hitsPerCollection).slice(0, perPage)
+  const merged = roundRobinMerge(hitsPerCollection)
+  setAttributes(parentSpan, {
+    'retrieval.merged_candidates': merged.length,
+    'retrieval.typesense_total_found': totalFound,
+    'retrieval.typesense_time_ms': totalTime
+  })
+  // Reranker scores chunks against the rewritten query — the same string
+  // Typesense used — so reranker/Typesense agree on what "relevant" means.
+  const reranked = await maybeRerank(ctx, auth, queryUsed, merged)
+  const finalHits = reranked.slice(0, topK)
+  setAttributes(parentSpan, {
+    'retrieval.final_hits_count': finalHits.length,
+    'retrieval.top_score': finalHits[0]?.score
+  })
   await enrichTaxonomies(ctx, finalHits)
 
   if (input.expand_context && input.expand_context > 0) {
@@ -433,8 +521,81 @@ export async function searchCollections(
     hits: finalHits,
     total_found: totalFound,
     page,
-    per_page: perPage,
+    per_page: topK,
     search_time_ms: totalTime,
     snippet_length: snippetLength
   }
+}
+
+function clampPositiveInt(value: number | undefined, fallback: number, min: number, max: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback
+  const n = Math.floor(value)
+  return Math.max(min, Math.min(max, n))
+}
+
+function clampNumber(value: number | undefined, fallback: number, min: number, max: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, value))
+}
+
+/**
+ * Two-stage retrieval: when the caller's SearchProfile selects a reranker
+ * provider AND the MCP runtime was configured with a reranker factory, run
+ * the merged candidates through the reranker and return them sorted by
+ * `rerankerScore` desc. Falls back to the original order on any failure
+ * so a broken reranker degrades to single-stage retrieval instead of an
+ * empty response.
+ */
+async function maybeRerank(
+  ctx: ToolContext,
+  auth: McpAuthContext | null,
+  query: string,
+  hits: SearchHit[]
+): Promise<SearchHit[]> {
+  const retrieval = auth?.retrieval
+  if (!retrieval?.rerankerKind || retrieval.rerankerKind === 'none') return hits
+  if (!retrieval.rerankerModel) return hits
+  if (!ctx.resolveReranker) return hits
+  if (hits.length === 0) return hits
+
+  const reranker = ctx.resolveReranker({
+    kind: retrieval.rerankerKind,
+    model: retrieval.rerankerModel
+  })
+
+  return withSpan(
+    `reranker.${retrieval.rerankerKind}`,
+    {
+      'reranker.kind': retrieval.rerankerKind,
+      'reranker.model': retrieval.rerankerModel,
+      'reranker.candidates_count': hits.length
+    },
+    async span => {
+      try {
+        const ranked = await reranker(
+          query,
+          hits.map(hit => ({
+            id: hit.chunk_id,
+            text: hit.chunk_text,
+            previousScore: hit.score,
+            original: hit
+          }))
+        )
+        const reordered = ranked.map(entry => {
+          const hit = entry.original as SearchHit
+          hit.score = entry.rerankerScore
+          return hit
+        })
+        setAttributes(span, {
+          'reranker.top_score': reordered[0]?.score,
+          'reranker.bottom_score': reordered[reordered.length - 1]?.score
+        })
+        return reordered
+      } catch (err) {
+        console.error('[mcp-typesense] reranker failed, falling back to single-stage hits:', err)
+        setAttributes(span, { 'reranker.failed': true, 'reranker.fallback': 'single_stage' })
+        return hits
+      }
+    }
+  )
 }

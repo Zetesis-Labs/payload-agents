@@ -8,15 +8,17 @@
  * 2. `features.llmSampling` (gates the synthesis tools).
  * 3. `content` presence (gates `get_book_toc`).
  *
- * All tools receive the same runtime context plus the resolved auth context
- * for the current session.
+ * All tools share the runtime context. The per-request auth context is
+ * read fresh via `getCurrentAuth()` inside each handler so live changes
+ * to the caller's SearchProfile apply on the next invocation.
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { getCurrentAuth } from '../auth/context'
 import type { ToolContext } from '../context'
 import { type OutputFormat, toolResult } from '../format'
-import type { FeaturesConfig, McpAuthContext, ToolNameOverrides } from '../types'
+import type { FeaturesConfig, ToolNameOverrides } from '../types'
 import { comparePerspectives, comparePerspectivesSchema } from './compare-perspectives'
 import { extractClaims, extractClaimsSchema } from './extract-claims'
 import { getBookToc, getBookTocSchema } from './get-book-toc'
@@ -38,7 +40,6 @@ const formatParam = z
 export interface RegisterToolsOptions {
   server: McpServer
   ctx: ToolContext
-  auth: McpAuthContext | null
   features: FeaturesConfig
   toolNames: ToolNameOverrides
 }
@@ -48,7 +49,7 @@ export interface RegisterToolsOptions {
  * after `new McpServer()` and before `server.connect(transport)`.
  */
 export function registerTools(opts: RegisterToolsOptions): void {
-  const { server, ctx, auth, features, toolNames } = opts
+  const { server, ctx, features, toolNames } = opts
   const chunkNames = ctx.collections.chunkNames.join(', ')
   const hasDocuments = ctx.collections.documents.length > 0
   const hasContent = ctx.content !== null
@@ -89,7 +90,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
       }
     },
     async input => {
-      const result = await getFilterCriteria(input, ctx, auth)
+      const result = await getFilterCriteria(input, ctx, getCurrentAuth())
       return toolResult(result, input.format as OutputFormat)
     }
   )
@@ -108,7 +109,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
         }
       },
       async input => {
-        const result = await getPostSummaries(input, ctx, auth)
+        const result = await getPostSummaries(input, ctx, getCurrentAuth())
         return toolResult(result, input.format as OutputFormat)
       }
     )
@@ -126,7 +127,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
         }
       },
       async input => {
-        const result = await getBookToc(input, ctx, auth)
+        const result = await getBookToc(input, ctx, getCurrentAuth())
         return toolResult(result, input.format as OutputFormat)
       }
     )
@@ -149,7 +150,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
       }
     },
     async input => {
-      const result = await searchCollections(input, ctx, auth)
+      const result = await searchCollections(input, ctx, getCurrentAuth())
       return toolResult(result, input.format as OutputFormat)
     }
   )
@@ -165,7 +166,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
       }
     },
     async input => {
-      const result = await comparePerspectives(input, ctx, auth)
+      const result = await comparePerspectives(input, ctx, getCurrentAuth())
       return toolResult(result, input.format as OutputFormat)
     }
   )
@@ -184,7 +185,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
       }
     },
     async input => {
-      const result = await getChunksByIds(input, ctx, auth)
+      const result = await getChunksByIds(input, ctx, getCurrentAuth())
       return toolResult(result, input.format as OutputFormat)
     }
   )
@@ -208,7 +209,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
         }
       },
       async (input, extra) => {
-        const result = await summarizeDocument(input, ctx, auth, server, extra.signal)
+        const result = await summarizeDocument(input, ctx, getCurrentAuth(), server, extra.signal)
         return toolResult(result, input.format as OutputFormat)
       }
     )
@@ -225,7 +226,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
         }
       },
       async (input, extra) => {
-        const result = await extractClaims(input, ctx, auth, server, extra.signal)
+        const result = await extractClaims(input, ctx, getCurrentAuth(), server, extra.signal)
         return toolResult(result, input.format as OutputFormat)
       }
     )
@@ -241,7 +242,7 @@ export function registerTools(opts: RegisterToolsOptions): void {
         }
       },
       async (input, extra) => {
-        const result = await synthesizeComparison(input, ctx, auth, server, extra.signal)
+        const result = await synthesizeComparison(input, ctx, getCurrentAuth(), server, extra.signal)
         return toolResult(result, input.format as OutputFormat)
       }
     )

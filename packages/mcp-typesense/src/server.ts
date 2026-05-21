@@ -4,14 +4,16 @@
  * Given a `McpServerConfig`, returns a handle with `.listen()` and `.close()`
  * that runs an HTTP server speaking the MCP Streamable HTTP transport. Each
  * new session (a POST without `mcp-session-id`) creates a fresh `McpServer`
- * instance with its own resolved auth context — so one process can serve
- * many concurrent clients with independent tenant scoping.
+ * instance; auth is re-resolved from request headers on every call (not
+ * frozen at session init) so live changes to the caller's SearchProfile
+ * apply on the next request without rebuilding the session.
  */
 
 import { randomUUID } from 'node:crypto'
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { authStore } from './auth/context'
 import { resolveAuth } from './auth/resolve'
 import { createContentFetcher } from './content/payload-rest'
 import type { CollectionRegistry, ContentFetcher, ToolContext } from './context'
@@ -19,7 +21,7 @@ import { DEFAULT_INSTRUCTIONS } from './defaults'
 import { registerResources } from './resources'
 import { createTaxonomyResolver } from './taxonomy/resolver'
 import { registerTools } from './tools'
-import type { ChunkCollectionConfig, McpAuthContext, McpServerConfig, McpServerHandle } from './types'
+import type { ChunkCollectionConfig, McpServerConfig, McpServerHandle } from './types'
 import { createTypesenseClient } from './typesense/client'
 
 const DEFAULT_PORT = 3001
@@ -49,7 +51,8 @@ function buildToolContext(config: McpServerConfig): ToolContext {
   const collections = buildCollectionRegistry(config.collections)
   const taxonomy = createTaxonomyResolver(config.taxonomy)
   const content: ContentFetcher | null = config.content ? createContentFetcher(config.content) : null
-  return { typesense, collections, taxonomy, content }
+  const resolveReranker = config.reranker?.factory ?? null
+  return { typesense, collections, taxonomy, content, resolveReranker }
 }
 
 export function createMcpServer(config: McpServerConfig): McpServerHandle {
@@ -58,7 +61,7 @@ export function createMcpServer(config: McpServerConfig): McpServerHandle {
   const transportPort = config.transport?.port ?? DEFAULT_PORT
   const transportHost = config.transport?.host ?? DEFAULT_HOST
 
-  async function createSession(auth: McpAuthContext | null): Promise<StreamableHTTPServerTransport> {
+  async function createSession(): Promise<StreamableHTTPServerTransport> {
     const server = new McpServer(
       {
         name: config.server.name,
@@ -72,14 +75,12 @@ export function createMcpServer(config: McpServerConfig): McpServerHandle {
     registerTools({
       server,
       ctx,
-      auth,
       features: config.features ?? {},
       toolNames: config.toolNames ?? {}
     })
     registerResources({
       server,
       ctx,
-      auth,
       resources: config.resources ?? {}
     })
 
@@ -112,13 +113,19 @@ export function createMcpServer(config: McpServerConfig): McpServerHandle {
       return
     }
 
+    // Resolve auth on every request — never reuse the auth captured at
+    // session creation. This is what lets a live SearchProfile change
+    // (taxonomy filters, reranker, hybrid alpha, query rewrite, etc.)
+    // take effect on the next tool call without rebuilding the session.
+    const auth = resolveAuth(req, config.auth)
+
     // Route to existing session or create a new one
     const sessionId = req.headers['mcp-session-id'] as string | undefined
 
     if (sessionId) {
       const transport = sessions.get(sessionId)
       if (transport) {
-        await transport.handleRequest(req, res)
+        await authStore.run(auth, () => transport.handleRequest(req, res))
       } else {
         res.writeHead(404).end(
           JSON.stringify({
@@ -131,10 +138,11 @@ export function createMcpServer(config: McpServerConfig): McpServerHandle {
       return
     }
 
-    // No session ID → new initialize request → resolve auth and create session
-    const auth = resolveAuth(req, config.auth)
-    const transport = await createSession(auth)
-    await transport.handleRequest(req, res)
+    // No session ID → new initialize request → create session and handle
+    // the initialize call inside the auth scope so any tool handler that
+    // fires during init sees the same context every later request will.
+    const transport = await createSession()
+    await authStore.run(auth, () => transport.handleRequest(req, res))
   }
 
   let httpServer: HttpServer | null = null

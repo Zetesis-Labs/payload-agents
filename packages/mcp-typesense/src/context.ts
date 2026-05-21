@@ -7,6 +7,7 @@
  */
 
 import type { Client as TypesenseClient } from 'typesense'
+import type { CreateRerankerInput, Reranker } from './rerankers'
 import type { ChunkCollectionConfig, FetchBooksParams, RawBookDoc } from './types'
 
 // ============================================================================
@@ -83,4 +84,10 @@ export interface ToolContext {
   taxonomy: TaxonomyResolver
   /** Present only when ContentConfig was provided in the server config. */
   content: ContentFetcher | null
+  /**
+   * Resolve a reranker closure for a given (kind, model) pair. Null when
+   * the consumer did not provide a reranker integration — tools should
+   * treat null as "reranking disabled".
+   */
+  resolveReranker: ((input: CreateRerankerInput) => Reranker) | null
 }

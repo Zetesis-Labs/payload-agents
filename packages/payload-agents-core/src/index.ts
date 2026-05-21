@@ -1,5 +1,11 @@
 // Plugin
 
+export {
+  type CreateSearchProfilesCollectionConfig,
+  createSearchProfilesCollection,
+  SEARCH_PROFILE_RERANKER_KINDS,
+  type SearchProfileRerankerKind
+} from './collections/search-profiles'
 export type { AgnoMessage, AgnoRun, AgnoSessionDetail, AgnoToolCall } from './lib/agno-schema'
 export {
   AgnoMessageSchema,
