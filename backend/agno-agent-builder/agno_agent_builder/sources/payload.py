@@ -78,18 +78,28 @@ def payload_doc_to_agent_config(doc: dict[str, Any]) -> AgentConfig:
     tenant = doc.get("tenant")
     tenant_slug = tenant.get("slug") if isinstance(tenant, dict) else None
 
-    profile = doc.get("defaultRetrievalProfile") if isinstance(doc.get("defaultRetrievalProfile"), dict) else None
+    profile = (
+        doc.get("defaultRetrievalProfile")
+        if isinstance(doc.get("defaultRetrievalProfile"), dict)
+        else None
+    )
     if profile:
         taxonomy_slugs = _extract_taxonomy_slugs(profile.get("taxonomyFilters"))
         folder_slugs = _extract_folder_slugs(profile.get("folderFilters"))
         reranker = profile.get("reranker") if isinstance(profile.get("reranker"), dict) else None
-        reranker_kind = reranker.get("kind") if reranker and isinstance(reranker.get("kind"), str) else None
-        reranker_model = reranker.get("model") if reranker and isinstance(reranker.get("model"), str) else None
+        reranker_kind = (
+            reranker.get("kind") if reranker and isinstance(reranker.get("kind"), str) else None
+        )
+        reranker_model = (
+            reranker.get("model") if reranker and isinstance(reranker.get("model"), str) else None
+        )
         hybrid_alpha = _coerce_float(profile.get("hybridAlpha"))
         input_k = _coerce_int(profile.get("inputK"))
         top_k = _coerce_int(profile.get("topK"))
         raw_rewrite = profile.get("queryRewrite")
-        rewrite_template = raw_rewrite.strip() if isinstance(raw_rewrite, str) and raw_rewrite.strip() else None
+        rewrite_template = (
+            raw_rewrite.strip() if isinstance(raw_rewrite, str) and raw_rewrite.strip() else None
+        )
         raw_collections = profile.get("searchCollections")
         search_collections = (
             [s for s in raw_collections if isinstance(s, str)]
